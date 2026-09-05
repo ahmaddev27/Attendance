@@ -5,16 +5,16 @@
      x-transition:leave="transition ease-in duration-150"
      x-transition:leave-start="opacity-100"
      x-transition:leave-end="opacity-0"
-     class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+     class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
      @click.self="leaveOpen = false"
      @keydown.escape.window="leaveOpen = false">
     <div class="bg-surface rounded-2xl w-full max-w-md p-6 shadow-lg"
          x-transition:enter="transition ease-out duration-250"
-         x-transition:enter-start="opacity-0 translate-y-6 sm:scale-95"
-         x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+         x-transition:enter-start="opacity-0 translate-y-4 scale-95"
+         x-transition:enter-end="opacity-100 translate-y-0 scale-100"
          x-transition:leave="transition ease-in duration-150"
-         x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
-         x-transition:leave-end="opacity-0 translate-y-4 sm:scale-95"
+         x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+         x-transition:leave-end="opacity-0 translate-y-4 scale-95"
          x-data="{
             empNum: localStorage.getItem('taqat_employee_number') || '',
             hasStored: !!localStorage.getItem('taqat_employee_number'),

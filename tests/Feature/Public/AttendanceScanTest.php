@@ -42,3 +42,21 @@ it('persists attendance on confirm', function () {
     expect(Attendance::count())->toBe(1);
     expect(Attendance::first()->type)->toBe(AttendanceType::CheckIn);
 });
+
+it('rejects direct confirm POST when fraud check fails', function () {
+    $emp = Employee::factory()->create(['employee_number' => 1001]);
+    $s = app(\App\Services\SettingsService::class);
+    $s->set('gps_enabled', true, 'boolean');
+    $s->set('office_lat', 31.9539, 'number');
+    $s->set('office_lng', 35.9106, 'number');
+    $s->set('geofence_radius_meters', 100, 'number');
+
+    $this->post('/scan/attendance/confirm', [
+        'employee_number' => 1001,
+        'latitude' => 32.0,
+        'longitude' => 36.0,
+    ])->assertRedirect(route('scan.index'))
+      ->assertSessionHas('toast');
+
+    expect(\App\Models\Attendance::count())->toBe(0);
+});

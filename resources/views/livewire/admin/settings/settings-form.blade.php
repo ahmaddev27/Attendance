@@ -100,7 +100,8 @@
                 </div>
                 <div>
                     <label class="block text-[12px] font-semibold text-ink-2 mb-1.5">كلمة السر</label>
-                    <input type="password" wire:model="smsPassword" class="form-input" dir="ltr" style="text-align:right" autocomplete="new-password">
+                    <input type="password" wire:model="smsPassword" placeholder="اتركه فارغاً للاحتفاظ بالكلمة الحالية"
+                           class="form-input" dir="ltr" style="text-align:right" autocomplete="new-password">
                     @error('smsPassword') <p class="text-danger text-xs mt-1.5">{{ $message }}</p> @enderror
                 </div>
                 <div>

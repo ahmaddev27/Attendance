@@ -37,3 +37,20 @@ it('previews next scan type without persisting', function () {
     expect($type)->toBe(AttendanceType::CheckIn);
     expect(Attendance::count())->toBe(0);
 });
+
+it('throws and does not persist when fraud check fails', function () {
+    $emp = Employee::factory()->create();
+
+    $settings = app(\App\Services\SettingsService::class);
+    $settings->set('gps_enabled', true, 'boolean');
+    $settings->set('office_lat', 31.9539, 'number');
+    $settings->set('office_lng', 35.9106, 'number');
+    $settings->set('geofence_radius_meters', 100, 'number');
+
+    $ctx = new FraudCheckContext('1.1.1.1', 32.0, 36.0);
+
+    expect(fn () => app(AttendanceService::class)->record($emp, $ctx))
+        ->toThrow(\DomainException::class, 'gps_failed');
+
+    expect(Attendance::count())->toBe(0);
+});

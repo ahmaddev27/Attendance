@@ -39,7 +39,10 @@ class SettingsForm extends Component
         $this->ipWhitelistText = implode("\n", (array) $settings->get('ip_whitelist', []));
 
         $this->smsUsername = (string) $settings->get('sms_username', '');
-        $this->smsPassword = (string) $settings->get('sms_password', '');
+        // The current password is intentionally never loaded: Livewire serializes
+        // public properties into the page snapshot, which would leak it into the
+        // rendered HTML. An empty field means "keep the existing password".
+        $this->smsPassword = '';
         $this->smsSender = (string) $settings->get('sms_sender', '');
 
         $this->employeeNumberStart = (int) $settings->get('employee_number_start', 1001);
@@ -74,7 +77,13 @@ class SettingsForm extends Component
         $settings->set('ip_whitelist', $this->parseIpWhitelist(), 'json');
 
         $settings->set('sms_username', $this->smsUsername, 'string');
-        $settings->set('sms_password', $this->smsPassword, 'string');
+
+        // Empty means "leave the stored password unchanged" — the field is
+        // never pre-filled, so an empty submission is not a deliberate clear.
+        if ($this->smsPassword !== '') {
+            $settings->set('sms_password', $this->smsPassword, 'string');
+        }
+
         $settings->set('sms_sender', $this->smsSender, 'string');
 
         $settings->set('employee_number_start', $this->employeeNumberStart, 'number');

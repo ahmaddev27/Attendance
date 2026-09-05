@@ -127,17 +127,17 @@
             wire:transition:leave="transition ease-in duration-150"
             wire:transition:leave-start="opacity-100"
             wire:transition:leave-end="opacity-0"
-            class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
             wire:click.self="cancelApprove"
             wire:keydown.escape.window="cancelApprove"
         >
             <div
                 wire:transition:enter="transition ease-out duration-250"
-                wire:transition:enter-start="opacity-0 translate-y-6 sm:scale-95"
-                wire:transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                wire:transition:enter-start="opacity-0 translate-y-4 scale-95"
+                wire:transition:enter-end="opacity-100 translate-y-0 scale-100"
                 wire:transition:leave="transition ease-in duration-150"
-                wire:transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
-                wire:transition:leave-end="opacity-0 translate-y-4 sm:scale-95"
+                wire:transition:leave-start="opacity-100 translate-y-0 scale-100"
+                wire:transition:leave-end="opacity-0 translate-y-4 scale-95"
                 class="bg-surface rounded-2xl w-full max-w-md p-6 shadow-lg"
             >
                 <div class="w-11 h-11 rounded-full bg-success-soft text-success grid place-items-center mb-4">
@@ -183,17 +183,17 @@
             wire:transition:leave="transition ease-in duration-150"
             wire:transition:leave-start="opacity-100"
             wire:transition:leave-end="opacity-0"
-            class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
             wire:click.self="cancelReject"
             wire:keydown.escape.window="cancelReject"
         >
             <div
                 wire:transition:enter="transition ease-out duration-250"
-                wire:transition:enter-start="opacity-0 translate-y-6 sm:scale-95"
-                wire:transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                wire:transition:enter-start="opacity-0 translate-y-4 scale-95"
+                wire:transition:enter-end="opacity-100 translate-y-0 scale-100"
                 wire:transition:leave="transition ease-in duration-150"
-                wire:transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
-                wire:transition:leave-end="opacity-0 translate-y-4 sm:scale-95"
+                wire:transition:leave-start="opacity-100 translate-y-0 scale-100"
+                wire:transition:leave-end="opacity-0 translate-y-4 scale-95"
                 class="bg-surface rounded-2xl w-full max-w-md p-6 shadow-lg"
             >
                 <h2 class="text-base font-bold text-ink mb-1">سبب الرفض</h2>

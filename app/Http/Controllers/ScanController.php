@@ -64,7 +64,18 @@ class ScanController extends Controller
             $request->float('longitude'),
         );
 
-        $attendance = $this->attendance->record($employee, $ctx);
+        try {
+            $attendance = $this->attendance->record($employee, $ctx);
+        } catch (\DomainException $e) {
+            $message = match ($e->getMessage()) {
+                FraudCheckStatus::GpsFailed->value => __('messages.scan_fraud_gps_failed'),
+                FraudCheckStatus::IpFailed->value => __('messages.scan_fraud_ip_failed'),
+                default => 'فشل التحقق من الموقع',
+            };
+
+            return redirect()->route('scan.index')
+                ->with('toast', ['message' => $message, 'type' => 'error']);
+        }
 
         $message = $attendance->type === AttendanceType::CheckIn
             ? __('تم تسجيل حضورك بنجاح')
