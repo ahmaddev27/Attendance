@@ -4,6 +4,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ScanController;
 use App\Livewire\Admin\Employees\EmployeeForm;
 use App\Livewire\Admin\Employees\EmployeeList;
+use App\Livewire\Admin\Leaves\LeaveList;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -38,4 +39,6 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::get('/employees', EmployeeList::class)->name('employees.index');
     Route::get('/employees/create', EmployeeForm::class)->name('employees.create');
     Route::get('/employees/{employee}/edit', EmployeeForm::class)->name('employees.edit');
+
+    Route::get('/leaves', LeaveList::class)->name('leaves.index');
 });
