@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\ProfileController;
+use App\Livewire\Admin\Employees\EmployeeForm;
+use App\Livewire\Admin\Employees\EmployeeList;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -21,4 +23,8 @@ require __DIR__.'/auth.php';
 
 Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
     Route::view('/', 'admin.overview')->name('overview');
+
+    Route::get('/employees', EmployeeList::class)->name('employees.index');
+    Route::get('/employees/create', EmployeeForm::class)->name('employees.create');
+    Route::get('/employees/{employee}/edit', EmployeeForm::class)->name('employees.edit');
 });
