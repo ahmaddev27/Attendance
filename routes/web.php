@@ -6,6 +6,7 @@ use App\Livewire\Admin\Attendance\AttendanceList;
 use App\Livewire\Admin\Employees\EmployeeForm;
 use App\Livewire\Admin\Employees\EmployeeList;
 use App\Livewire\Admin\Leaves\LeaveList;
+use App\Livewire\Admin\Settings\SettingsForm;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -44,4 +45,6 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::get('/leaves', LeaveList::class)->name('leaves.index');
 
     Route::get('/attendance', AttendanceList::class)->name('attendance.index');
+
+    Route::get('/settings', SettingsForm::class)->name('settings.index');
 });
