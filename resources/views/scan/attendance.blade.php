@@ -8,7 +8,7 @@
     <p class="text-sm text-muted text-center mb-8">أدخل رقمك الوظيفي</p>
 
     <form method="POST" action="{{ route('scan.attendance.preview') }}"
-          x-data="{ lat: null, lng: null, locating: true, empNum: @js(old('employee_number')) || localStorage.getItem('taqat_employee_number') || '' }"
+          x-data="{ lat: null, lng: null, locating: true, empNum: @js(old('employee_number')) || localStorage.getItem('taqat_employee_number') || '', submitting: false }"
           x-init="
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
@@ -19,7 +19,7 @@
             locating = false;
         }
     "
-          @submit="localStorage.setItem('taqat_employee_number', empNum)">
+          @submit="localStorage.setItem('taqat_employee_number', empNum); submitting = true">
         @csrf
         <input type="hidden" name="latitude" x-bind:value="lat">
         <input type="hidden" name="longitude" x-bind:value="lng">
@@ -34,9 +34,13 @@
             @enderror
         </div>
 
-        <button type="submit"
-                class="w-full bg-brand hover:bg-brand-hover text-white py-4 rounded-xl text-base font-semibold shadow transition">
-            متابعة
+        <button type="submit" :disabled="submitting"
+                class="w-full bg-brand hover:bg-brand-hover text-white py-4 rounded-xl text-base font-semibold shadow transition disabled:opacity-70 disabled:cursor-wait inline-flex items-center justify-center gap-2">
+            <svg x-show="submitting" x-cloak class="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-opacity="0.25"/>
+                <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+            </svg>
+            <span x-text="submitting ? 'جاري المتابعة...' : 'متابعة'"></span>
         </button>
 
         <div class="flex items-center justify-center gap-1.5 text-xs text-muted mt-6">

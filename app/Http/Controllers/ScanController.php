@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\DataObjects\FraudCheckContext;
+use App\Enums\AttendanceType;
 use App\Enums\FraudCheckStatus;
 use App\Http\Requests\Public\RecordAttendanceRequest;
 use App\Http\Requests\Public\SubmitLeaveRequestRequest;
@@ -65,8 +66,16 @@ class ScanController extends Controller
 
         $attendance = $this->attendance->record($employee, $ctx);
 
+        $message = $attendance->type === AttendanceType::CheckIn
+            ? __('تم تسجيل حضورك بنجاح')
+            : __('تم تسجيل انصرافك بنجاح');
+
         return redirect()->route('scan.index')
-            ->with('success', $attendance);
+            ->with('success', $attendance)
+            ->with('toast', [
+                'message' => $message.' · '.$attendance->scanned_at->format('H:i'),
+                'type' => 'success',
+            ]);
     }
 
     public function leaveSubmit(SubmitLeaveRequestRequest $request)
@@ -74,6 +83,11 @@ class ScanController extends Controller
         $employee = $request->employee();
         $this->leave->submit($employee, $request->validated());
 
-        return redirect()->route('scan.index')->with('leave_success', true);
+        return redirect()->route('scan.index')
+            ->with('leave_success', true)
+            ->with('toast', [
+                'message' => __('تم إرسال طلب الإجازة. ستصلك رسالة SMS بالنتيجة.'),
+                'type' => 'success',
+            ]);
     }
 }

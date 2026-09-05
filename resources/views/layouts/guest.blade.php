@@ -21,6 +21,8 @@
         </div>
     </div>
 
+    <x-toast-container />
+
     @livewireScripts
 </body>
 </html>

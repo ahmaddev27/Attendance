@@ -79,7 +79,7 @@ class SettingsForm extends Component
 
         $settings->set('employee_number_start', $this->employeeNumberStart, 'number');
 
-        session()->flash('success', __('تم حفظ الإعدادات بنجاح'));
+        $this->dispatch('toast', message: __('تم حفظ الإعدادات'), type: 'success');
     }
 
     /**

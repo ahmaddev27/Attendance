@@ -19,6 +19,10 @@
         </footer>
     </div>
 
+    <x-toast-container />
+
+    @stack('scripts')
+
     @livewireScripts
 </body>
 </html>

@@ -5,17 +5,17 @@
             <h1 class="text-2xl md:text-3xl font-bold text-ink tracking-tight">إعدادات النظام</h1>
         </div>
         <div class="flex gap-2">
-            <button type="submit" class="bg-brand hover:bg-brand-hover text-white px-4 py-2 rounded-lg text-sm font-semibold transition">
-                حفظ التغييرات
+            <button type="submit" wire:loading.attr="disabled" wire:target="save"
+                    class="inline-flex items-center gap-2 bg-brand hover:bg-brand-hover text-white px-4 py-2 rounded-lg text-sm font-semibold shadow transition disabled:opacity-70 disabled:cursor-wait">
+                <svg wire:loading wire:target="save" class="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-opacity="0.25"/>
+                    <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                </svg>
+                <span wire:loading.remove wire:target="save">حفظ التغييرات</span>
+                <span wire:loading wire:target="save">جاري الحفظ...</span>
             </button>
         </div>
     </div>
-
-    @if (session('success'))
-        <div class="bg-success-soft text-success rounded-lg px-4 py-3 mb-6 text-sm font-medium">
-            {{ session('success') }}
-        </div>
-    @endif
 
     <div class="bg-surface border border-hairline rounded-xl divide-y divide-hairline">
         {{-- GPS check --}}

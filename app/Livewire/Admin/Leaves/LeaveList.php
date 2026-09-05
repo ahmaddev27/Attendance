@@ -43,7 +43,7 @@ class LeaveList extends Component
 
         $service->approve($leave, auth()->user());
 
-        session()->flash('success', __('تمت الموافقة على طلب الإجازة'));
+        $this->dispatch('toast', message: __('تمت الموافقة على الإجازة'), type: 'success');
     }
 
     public function startReject(int $id): void
@@ -72,7 +72,7 @@ class LeaveList extends Component
         $this->rejectingId = null;
         $this->rejectReason = '';
 
-        session()->flash('success', __('تم رفض طلب الإجازة'));
+        $this->dispatch('toast', message: __('تم رفض طلب الإجازة'), type: 'success');
     }
 
     #[Layout('layouts.app')]

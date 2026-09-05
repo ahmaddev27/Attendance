@@ -11,7 +11,8 @@
          x-transition:enter-end="translate-y-0 opacity-100"
          x-data="{
             empNum: localStorage.getItem('taqat_employee_number') || '',
-            hasStored: !!localStorage.getItem('taqat_employee_number')
+            hasStored: !!localStorage.getItem('taqat_employee_number'),
+            submitting: false
          }">
         <div class="flex justify-between items-start mb-4">
             <div>
@@ -30,7 +31,8 @@
             </button>
         </div>
 
-        <form method="POST" action="{{ route('scan.leave.submit') }}" class="space-y-3">
+        <form method="POST" action="{{ route('scan.leave.submit') }}" class="space-y-3"
+              @submit="submitting = true">
             @csrf
 
             <template x-if="hasStored">
@@ -67,9 +69,13 @@
             </div>
 
             <div class="pt-2">
-                <button type="submit"
-                        class="w-full bg-brand hover:bg-brand-hover text-white py-3 rounded-lg text-sm font-semibold shadow transition">
-                    إرسال الطلب
+                <button type="submit" :disabled="submitting"
+                        class="w-full bg-brand hover:bg-brand-hover text-white py-3 rounded-lg text-sm font-semibold shadow transition disabled:opacity-70 disabled:cursor-wait inline-flex items-center justify-center gap-2">
+                    <svg x-show="submitting" x-cloak class="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-opacity="0.25"/>
+                        <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                    </svg>
+                    <span x-text="submitting ? 'جاري الإرسال...' : 'إرسال الطلب'"></span>
                 </button>
             </div>
         </form>

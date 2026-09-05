@@ -78,6 +78,8 @@
         </main>
     </div>
 
+    <x-toast-container />
+
     @livewireScripts
 </body>
 </html>

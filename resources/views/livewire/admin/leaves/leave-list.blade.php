@@ -6,12 +6,6 @@
         </div>
     </div>
 
-    @if (session('success'))
-        <div class="bg-success-soft text-success rounded-lg px-4 py-3 mb-6 text-sm font-medium">
-            {{ session('success') }}
-        </div>
-    @endif
-
     <div class="flex flex-wrap gap-2.5 mb-4">
         <select wire:model.live="status" class="px-3 py-2 text-sm border border-hairline-strong rounded-lg bg-surface">
             <option value="all">كل الحالات</option>
@@ -82,12 +76,22 @@
                                         type="button"
                                         wire:click="approve({{ $leave->id }})"
                                         wire:confirm="هل تريد الموافقة على هذه الإجازة؟"
-                                        class="bg-brand hover:bg-brand-hover text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition"
-                                    >قبول</button>
+                                        wire:loading.attr="disabled"
+                                        wire:target="approve({{ $leave->id }})"
+                                        class="inline-flex items-center gap-1.5 bg-brand hover:bg-brand-hover text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition disabled:opacity-70 disabled:cursor-wait"
+                                    >
+                                        <svg wire:loading wire:target="approve({{ $leave->id }})" class="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none">
+                                            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-opacity="0.25"/>
+                                            <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                                        </svg>
+                                        قبول
+                                    </button>
                                     <button
                                         type="button"
                                         wire:click="startReject({{ $leave->id }})"
-                                        class="bg-transparent border border-hairline-strong text-ink-2 hover:bg-surface-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition"
+                                        wire:loading.attr="disabled"
+                                        wire:target="startReject({{ $leave->id }})"
+                                        class="bg-transparent border border-hairline-strong text-ink-2 hover:bg-surface-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition disabled:opacity-70 disabled:cursor-wait"
                                     >رفض</button>
                                 </div>
                             @elseif ($leave->status->value === 'approved')
@@ -132,7 +136,13 @@
                 @enderror
 
                 <div class="flex gap-2 justify-start mt-5">
-                    <button type="button" wire:click="confirmReject" class="bg-danger hover:opacity-90 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">
+                    <button type="button" wire:click="confirmReject"
+                            wire:loading.attr="disabled" wire:target="confirmReject"
+                            class="inline-flex items-center gap-1.5 bg-danger hover:opacity-90 text-white px-4 py-2 rounded-lg text-sm font-semibold transition disabled:opacity-70 disabled:cursor-wait">
+                        <svg wire:loading wire:target="confirmReject" class="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
+                            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-opacity="0.25"/>
+                            <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                        </svg>
                         تأكيد الرفض
                     </button>
                     <button type="button" wire:click="cancelReject" class="bg-transparent border border-hairline-strong text-ink-2 hover:bg-surface-2 px-4 py-2 rounded-lg text-sm font-semibold transition">

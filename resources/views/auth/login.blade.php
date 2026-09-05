@@ -6,7 +6,9 @@
 
     <x-auth-session-status class="mb-4" :status="session('status')" />
 
-    <form method="POST" action="{{ route('login') }}" class="space-y-4">
+    <form method="POST" action="{{ route('login') }}" class="space-y-4"
+          x-data="{ submitting: false }"
+          @submit="submitting = true">
         @csrf
 
         <div>
@@ -35,8 +37,12 @@
         </div>
 
         <div class="pt-2">
-            <x-primary-button>
-                {{ __('دخول') }}
+            <x-primary-button x-bind:disabled="submitting" class="disabled:opacity-70 disabled:cursor-wait gap-2">
+                <svg x-show="submitting" x-cloak class="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-opacity="0.25"/>
+                    <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                </svg>
+                <span x-text="submitting ? '{{ __('جاري الدخول...') }}' : '{{ __('دخول') }}'"></span>
             </x-primary-button>
         </div>
     </form>

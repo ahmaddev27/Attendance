@@ -13,23 +13,6 @@
         </div>
     </div>
 
-    @if(session('success'))
-        @php $att = session('success'); @endphp
-        <div class="bg-success-soft text-success border-r-4 border-success rounded-lg p-4 mb-4 text-center">
-            <div class="text-sm font-semibold mb-0.5">
-                {{ $att->type->value === 'check_in' ? 'تم تسجيل الحضور' : 'تم تسجيل الانصراف' }}
-            </div>
-            <div class="text-xs opacity-80 num">{{ $att->scanned_at->format('H:i') }}</div>
-        </div>
-    @endif
-
-    @if(session('leave_success'))
-        <div class="bg-brand-soft text-brand-ink border-r-4 border-brand rounded-lg p-4 mb-4 text-center">
-            <div class="text-sm font-semibold mb-0.5">تم إرسال طلب الإجازة</div>
-            <div class="text-xs opacity-80">ستصلك رسالة SMS بالنتيجة قريباً</div>
-        </div>
-    @endif
-
     <div class="space-y-3" x-data="{ leaveOpen: false }">
         <a href="{{ route('scan.attendance.form') }}"
            class="block bg-brand hover:bg-brand-hover text-white text-center py-4 rounded-xl text-base font-semibold shadow transition">
