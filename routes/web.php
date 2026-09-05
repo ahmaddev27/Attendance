@@ -8,6 +8,7 @@ use App\Livewire\Admin\Employees\EmployeeList;
 use App\Livewire\Admin\Leaves\LeaveList;
 use App\Livewire\Admin\Overview;
 use App\Livewire\Admin\Settings\SettingsForm;
+use App\Livewire\Admin\SmsLogs\SmsLogList;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -46,6 +47,8 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::get('/leaves', LeaveList::class)->name('leaves.index');
 
     Route::get('/attendance', AttendanceList::class)->name('attendance.index');
+
+    Route::get('/sms-logs', SmsLogList::class)->name('sms-logs.index');
 
     Route::get('/settings', SettingsForm::class)->name('settings.index');
 });
