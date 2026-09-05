@@ -8,7 +8,8 @@
     <p class="text-sm text-muted text-center mb-8">أدخل رقمك الوظيفي</p>
 
     <form method="POST" action="{{ route('scan.attendance.preview') }}"
-          x-data="{ lat: null, lng: null, locating: true }" x-init="
+          x-data="{ lat: null, lng: null, locating: true, empNum: @js(old('employee_number')) || localStorage.getItem('taqat_employee_number') || '' }"
+          x-init="
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 pos => { lat = pos.coords.latitude; lng = pos.coords.longitude; locating = false; },
@@ -17,13 +18,14 @@
         } else {
             locating = false;
         }
-    ">
+    "
+          @submit="localStorage.setItem('taqat_employee_number', empNum)">
         @csrf
         <input type="hidden" name="latitude" x-bind:value="lat">
         <input type="hidden" name="longitude" x-bind:value="lng">
 
         <div class="mb-6">
-            <input type="number" name="employee_number" required autofocus
+            <input type="number" name="employee_number" x-model="empNum" required autofocus
                    class="w-full rounded-xl border border-hairline-strong bg-surface py-4 text-center text-[22px] font-bold tracking-wider num text-ink focus:border-brand focus:ring-1 focus:ring-brand"
                    dir="ltr">
 

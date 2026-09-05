@@ -69,11 +69,6 @@ class ScanController extends Controller
             ->with('success', $attendance);
     }
 
-    public function leaveForm()
-    {
-        return view('scan.leave');
-    }
-
     public function leaveSubmit(SubmitLeaveRequestRequest $request)
     {
         $employee = $request->employee();

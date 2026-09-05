@@ -8,7 +8,10 @@ use App\Services\Sms\SmsGatewayInterface;
 beforeEach(fn () => $this->app->instance(SmsGatewayInterface::class, new FakeSmsGateway()));
 
 it('shows leave request form', function () {
-    $this->get('/scan/leave')->assertOk()->assertSee('طلب إجازة');
+    $this->get('/scan')
+        ->assertOk()
+        ->assertSee('تسجيل الحضور')
+        ->assertSee('طلب إجازة');
 });
 
 it('submits a leave request', function () {

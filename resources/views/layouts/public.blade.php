@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ config('app.name', 'TAQAT') }}</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="bg-ground text-ink font-sans antialiased min-h-screen">
@@ -17,5 +18,7 @@
             TAQAT · نظام الحضور
         </footer>
     </div>
+
+    @livewireScripts
 </body>
 </html>

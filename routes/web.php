@@ -11,9 +11,7 @@ use App\Livewire\Admin\Settings\SettingsForm;
 use App\Livewire\Admin\SmsLogs\SmsLogList;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::get('/', fn () => redirect()->route('scan.index'));
 
 Route::middleware('throttle:30,1')->group(function () {
     Route::get('/scan', [ScanController::class, 'index'])->name('scan.index');
@@ -21,13 +19,8 @@ Route::middleware('throttle:30,1')->group(function () {
     Route::post('/scan/attendance/preview', [ScanController::class, 'attendancePreview'])->name('scan.attendance.preview');
     Route::post('/scan/attendance/confirm', [ScanController::class, 'attendanceConfirm'])->name('scan.attendance.confirm');
 
-    Route::get('/scan/leave', [ScanController::class, 'leaveForm'])->name('scan.leave.form');
     Route::post('/scan/leave', [ScanController::class, 'leaveSubmit'])->name('scan.leave.submit');
 });
-
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
