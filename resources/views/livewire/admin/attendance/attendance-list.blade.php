@@ -8,26 +8,32 @@
         <input type="date" wire:model.live="from" class="px-3 py-2 text-sm border border-hairline-strong rounded-lg bg-surface">
         <input type="date" wire:model.live="to" class="px-3 py-2 text-sm border border-hairline-strong rounded-lg bg-surface">
 
-        <select wire:model.live="employeeId" class="px-3 py-2 text-sm border border-hairline-strong rounded-lg bg-surface">
-            <option value="">كل الموظفين</option>
-            @foreach ($employees as $employee)
-                <option value="{{ $employee->id }}">{{ $employee->name }} ({{ $employee->employee_number }})</option>
-            @endforeach
-        </select>
+        <div wire:ignore class="min-w-[220px]">
+            <select data-search data-placeholder="كل الموظفين" wire:model.live="employeeId" class="w-full">
+                <option value="">كل الموظفين</option>
+                @foreach ($employees as $employee)
+                    <option value="{{ $employee->id }}">{{ $employee->name }} ({{ $employee->employee_number }})</option>
+                @endforeach
+            </select>
+        </div>
 
-        <select wire:model.live="type" class="px-3 py-2 text-sm border border-hairline-strong rounded-lg bg-surface">
-            <option value="all">حضور + انصراف</option>
-            <option value="check_in">حضور</option>
-            <option value="check_out">انصراف</option>
-        </select>
+        <div wire:ignore class="min-w-[170px]">
+            <select data-search wire:model.live="type" class="w-full">
+                <option value="all">حضور + انصراف</option>
+                <option value="check_in">حضور</option>
+                <option value="check_out">انصراف</option>
+            </select>
+        </div>
 
-        <select wire:model.live="fraudStatus" class="px-3 py-2 text-sm border border-hairline-strong rounded-lg bg-surface">
-            <option value="all">كل حالات الفحص</option>
-            <option value="passed">مقبول</option>
-            <option value="skipped">بدون فحص</option>
-            <option value="gps_failed">فشل فحص الموقع</option>
-            <option value="ip_failed">فشل فحص IP</option>
-        </select>
+        <div wire:ignore class="min-w-[190px]">
+            <select data-search wire:model.live="fraudStatus" class="w-full">
+                <option value="all">كل حالات الفحص</option>
+                <option value="passed">مقبول</option>
+                <option value="skipped">بدون فحص</option>
+                <option value="gps_failed">فشل فحص الموقع</option>
+                <option value="ip_failed">فشل فحص IP</option>
+            </select>
+        </div>
     </div>
 
     <div class="bg-surface border border-hairline rounded-xl overflow-hidden">

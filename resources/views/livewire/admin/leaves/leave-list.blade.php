@@ -7,22 +7,26 @@
     </div>
 
     <div class="flex flex-wrap gap-2.5 mb-4">
-        <select wire:model.live="status" class="px-3 py-2 text-sm border border-hairline-strong rounded-lg bg-surface">
-            <option value="all">كل الحالات</option>
-            <option value="pending">قيد المراجعة</option>
-            <option value="approved">مقبولة</option>
-            <option value="rejected">مرفوضة</option>
-        </select>
+        <div wire:ignore class="min-w-[170px]">
+            <select data-search wire:model.live="status" class="w-full">
+                <option value="all">كل الحالات</option>
+                <option value="pending">قيد المراجعة</option>
+                <option value="approved">مقبولة</option>
+                <option value="rejected">مرفوضة</option>
+            </select>
+        </div>
 
         <input type="date" wire:model.live="from" class="px-3 py-2 text-sm border border-hairline-strong rounded-lg bg-surface">
         <input type="date" wire:model.live="to" class="px-3 py-2 text-sm border border-hairline-strong rounded-lg bg-surface">
 
-        <select wire:model.live="employeeId" class="px-3 py-2 text-sm border border-hairline-strong rounded-lg bg-surface">
-            <option value="">كل الموظفين</option>
-            @foreach ($employees as $employee)
-                <option value="{{ $employee->id }}">{{ $employee->name }} ({{ $employee->employee_number }})</option>
-            @endforeach
-        </select>
+        <div wire:ignore class="min-w-[220px]">
+            <select data-search data-placeholder="كل الموظفين" wire:model.live="employeeId" class="w-full">
+                <option value="">كل الموظفين</option>
+                @foreach ($employees as $employee)
+                    <option value="{{ $employee->id }}">{{ $employee->name }} ({{ $employee->employee_number }})</option>
+                @endforeach
+            </select>
+        </div>
     </div>
 
     <div class="bg-surface border border-hairline rounded-xl overflow-hidden">
@@ -71,15 +75,17 @@
                         </td>
                         <td class="px-4 py-3 text-[13px] text-left">
                             @if ($leave->status->value === 'pending')
-                                <div class="flex gap-2 justify-end">
+                                <div class="flex gap-1 justify-end">
                                     <button
                                         type="button"
                                         wire:click="startApprove({{ $leave->id }})"
                                         wire:loading.attr="disabled"
                                         wire:target="startApprove({{ $leave->id }})"
-                                        class="inline-flex items-center gap-1.5 bg-brand hover:bg-brand-hover text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition disabled:opacity-70 disabled:cursor-wait"
+                                        title="قبول"
+                                        class="inline-flex items-center gap-1.5 bg-success-soft hover:bg-success text-success hover:text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition disabled:opacity-70 disabled:cursor-wait"
                                     >
-                                        <svg wire:loading wire:target="startApprove({{ $leave->id }})" class="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none">
+                                        <svg wire:loading.remove wire:target="startApprove({{ $leave->id }})" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                                        <svg wire:loading wire:target="startApprove({{ $leave->id }})" class="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
                                             <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-opacity="0.25"/>
                                             <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
                                         </svg>
@@ -90,8 +96,16 @@
                                         wire:click="startReject({{ $leave->id }})"
                                         wire:loading.attr="disabled"
                                         wire:target="startReject({{ $leave->id }})"
-                                        class="bg-transparent border border-hairline-strong text-ink-2 hover:bg-surface-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition disabled:opacity-70 disabled:cursor-wait"
-                                    >رفض</button>
+                                        title="رفض"
+                                        class="inline-flex items-center gap-1.5 bg-transparent border border-hairline-strong text-ink-2 hover:bg-danger-soft hover:text-danger hover:border-danger-soft px-3 py-1.5 rounded-lg text-xs font-semibold transition disabled:opacity-70 disabled:cursor-wait"
+                                    >
+                                        <svg wire:loading.remove wire:target="startReject({{ $leave->id }})" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                                        <svg wire:loading wire:target="startReject({{ $leave->id }})" class="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
+                                            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-opacity="0.25"/>
+                                            <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                                        </svg>
+                                        رفض
+                                    </button>
                                 </div>
                             @elseif ($leave->status->value === 'approved')
                                 <div class="text-[11px] text-muted">

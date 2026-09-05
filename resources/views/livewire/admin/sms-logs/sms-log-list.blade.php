@@ -7,11 +7,13 @@
     </div>
 
     <div class="flex flex-wrap gap-2.5 mb-4">
-        <select wire:model.live="status" class="px-3 py-2 text-sm border border-hairline-strong rounded-lg bg-surface">
-            <option value="all">كل الحالات</option>
-            <option value="sent">مرسلة</option>
-            <option value="failed">فشلت</option>
-        </select>
+        <div wire:ignore class="min-w-[160px]">
+            <select data-search wire:model.live="status" class="w-full">
+                <option value="all">كل الحالات</option>
+                <option value="sent">مرسلة</option>
+                <option value="failed">فشلت</option>
+            </select>
+        </div>
 
         <input
             type="text"

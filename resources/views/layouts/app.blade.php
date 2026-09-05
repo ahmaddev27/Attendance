@@ -6,6 +6,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>TAQAT - نظام إدارة الحضور</title>
     <link rel="icon" type="image/png" href="{{ asset('favicon.png') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0-rc.0/css/select2.min.css">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
 </head>
@@ -75,6 +76,63 @@
 
     <x-toast-container />
 
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0-rc.0/js/select2.min.js"></script>
+
     @livewireScripts
+
+    <script>
+        (function() {
+            if (typeof jQuery === 'undefined') return;
+
+            function initSelect2() {
+                jQuery('select[data-search]').each(function() {
+                    const $el = jQuery(this);
+                    if ($el.hasClass('select2-hidden-accessible')) return;
+
+                    $el.select2({
+                        dir: 'rtl',
+                        width: '100%',
+                        minimumResultsForSearch: 5,
+                        placeholder: $el.data('placeholder') || null,
+                        language: {
+                            noResults: () => 'لا توجد نتائج',
+                            searching: () => 'جاري البحث...',
+                            inputTooShort: () => 'أدخل حرفاً للبحث',
+                        },
+                    });
+
+                    // Bridge Select2 change → Livewire (the select lives behind
+                    // wire:ignore, so Livewire never touches it after the first
+                    // render — we forward selection changes to the component
+                    // manually instead of relying on native input/change bubbling).
+                    $el.on('change', function() {
+                        const wireId = $el.closest('[wire\\:id]').attr('wire:id');
+                        const wireModel = $el.attr('wire:model') || $el.attr('wire:model.live');
+                        if (wireId && wireModel && window.Livewire) {
+                            const comp = window.Livewire.find(wireId);
+                            if (comp && comp.get(wireModel) !== $el.val()) {
+                                comp.set(wireModel, $el.val());
+                            }
+                        }
+                    });
+                });
+            }
+
+            // Init on first load
+            document.addEventListener('DOMContentLoaded', initSelect2);
+
+            // Re-init after Livewire updates (Livewire 3 events)
+            document.addEventListener('livewire:navigated', initSelect2);
+            document.addEventListener('livewire:load', initSelect2);
+            if (window.Livewire) {
+                window.Livewire.hook('morph.added', ({ el }) => {
+                    if (el.querySelectorAll) {
+                        initSelect2();
+                    }
+                });
+            }
+        })();
+    </script>
 </body>
 </html>

@@ -18,11 +18,13 @@
             placeholder="بحث بالاسم أو الرقم أو الجوال…"
             class="px-3 py-2 text-sm border border-hairline-strong rounded-lg bg-surface min-w-[240px] flex-1 max-w-sm placeholder:text-muted"
         >
-        <select wire:model.live="status" class="px-3 py-2 text-sm border border-hairline-strong rounded-lg bg-surface">
-            <option value="all">الكل</option>
-            <option value="active">نشط</option>
-            <option value="inactive">معطّل</option>
-        </select>
+        <div wire:ignore class="min-w-[160px]">
+            <select data-search wire:model.live="status" class="w-full">
+                <option value="all">الكل</option>
+                <option value="active">نشط</option>
+                <option value="inactive">معطّل</option>
+            </select>
+        </div>
     </div>
 
     <div class="bg-surface border border-hairline rounded-xl overflow-hidden">
@@ -33,7 +35,7 @@
                     <th class="px-4 py-3 text-right text-[11px] font-semibold text-muted uppercase tracking-wider">الاسم</th>
                     <th class="px-4 py-3 text-right text-[11px] font-semibold text-muted uppercase tracking-wider">الجوال</th>
                     <th class="px-4 py-3 text-right text-[11px] font-semibold text-muted uppercase tracking-wider" style="width:110px">الحالة</th>
-                    <th class="px-4 py-3 text-right text-[11px] font-semibold text-muted uppercase tracking-wider" style="width:80px"></th>
+                    <th class="px-4 py-3 text-left text-[11px] font-semibold text-muted uppercase tracking-wider" style="width:100px">إجراءات</th>
                 </tr>
             </thead>
             <tbody>
@@ -55,7 +57,18 @@
                             @endif
                         </td>
                         <td class="px-4 py-3 text-[13px] text-left">
-                            <button type="button" wire:click="openEdit({{ $employee->id }})" class="text-brand hover:text-brand-hover text-xs font-semibold">تعديل</button>
+                            <div class="inline-flex items-center gap-1">
+                                <button type="button" wire:click="openEdit({{ $employee->id }})"
+                                        title="تعديل"
+                                        class="p-1.5 text-ink-2 hover:text-brand hover:bg-brand-soft rounded-md transition">
+                                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                </button>
+                                <button type="button" wire:click="startDelete({{ $employee->id }})"
+                                        title="حذف"
+                                        class="p-1.5 text-ink-2 hover:text-danger hover:bg-danger-soft rounded-md transition">
+                                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"/></svg>
+                                </button>
+                            </div>
                         </td>
                     </tr>
                 @empty
@@ -159,6 +172,65 @@
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+    @endif
+
+    {{-- Delete confirmation modal --}}
+    @if ($deletingId)
+        @php $deletingEmployee = $employees->firstWhere('id', $deletingId); @endphp
+        <div
+            wire:transition:enter="transition ease-out duration-200"
+            wire:transition:enter-start="opacity-0"
+            wire:transition:enter-end="opacity-100"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            wire:click.self="cancelDelete"
+            wire:keydown.escape.window="cancelDelete"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-modal-title"
+        >
+            <div
+                wire:transition:enter="transition ease-out duration-250"
+                wire:transition:enter-start="opacity-0 translate-y-4 scale-95"
+                wire:transition:enter-end="opacity-100 translate-y-0 scale-100"
+                class="bg-surface rounded-2xl w-full max-w-md p-6 shadow-lg"
+            >
+                <div class="flex items-start gap-4 mb-4">
+                    <div class="w-10 h-10 rounded-full bg-danger-soft text-danger grid place-items-center shrink-0">
+                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+                    </div>
+                    <div class="flex-1">
+                        <h3 id="delete-modal-title" class="text-lg font-bold text-ink mb-1">تأكيد حذف الموظف</h3>
+                        <p class="text-sm text-muted">
+                            هل أنت متأكد من حذف الموظف؟ سيتم حذف كل بيانات الحضور والإجازات المرتبطة به. هذه العملية لا يمكن التراجع عنها.
+                        </p>
+                        @if ($deletingEmployee)
+                            <div class="inline-flex items-center gap-2 mt-3 px-3 py-1.5 bg-surface-2 rounded-lg text-sm">
+                                <span class="font-semibold text-ink">{{ $deletingEmployee->name }}</span>
+                                <span class="text-muted num">#{{ $deletingEmployee->employee_number }}</span>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-4 border-t border-hairline">
+                    <button type="button" wire:click="cancelDelete"
+                            class="inline-flex items-center px-4 py-2 bg-transparent border border-hairline-strong text-ink-2 hover:bg-surface-2 rounded-lg text-sm font-semibold transition">
+                        إلغاء
+                    </button>
+                    <button type="button" wire:click="confirmDelete"
+                            wire:loading.attr="disabled"
+                            wire:target="confirmDelete"
+                            class="inline-flex items-center gap-2 px-4 py-2 bg-danger hover:bg-danger text-white rounded-lg text-sm font-semibold shadow transition disabled:opacity-70 disabled:cursor-wait">
+                        <svg wire:loading wire:target="confirmDelete" class="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-opacity="0.25"/>
+                            <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                        </svg>
+                        <span wire:loading.remove wire:target="confirmDelete">تأكيد الحذف</span>
+                        <span wire:loading wire:target="confirmDelete">جاري الحذف...</span>
+                    </button>
+                </div>
             </div>
         </div>
     @endif

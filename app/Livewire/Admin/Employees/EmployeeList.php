@@ -25,6 +25,9 @@ class EmployeeList extends Component
 
     public ?int $editingId = null;
 
+    // Delete confirmation state
+    public ?int $deletingId = null;
+
     // Form fields
     public string $name = '';
 
@@ -118,6 +121,31 @@ class EmployeeList extends Component
         $this->reset(['name', 'phone', 'email', 'isActive']);
         $this->isActive = true;
         $this->resetErrorBag();
+    }
+
+    public function startDelete(int $id): void
+    {
+        $this->deletingId = $id;
+    }
+
+    public function cancelDelete(): void
+    {
+        $this->deletingId = null;
+    }
+
+    public function confirmDelete(): void
+    {
+        if (! $this->deletingId) {
+            return;
+        }
+
+        $employee = Employee::findOrFail($this->deletingId);
+        $name = $employee->name;
+        $employee->delete();
+
+        $this->deletingId = null;
+        $this->dispatch('toast', message: "تم حذف الموظف {$name}", type: 'success');
+        $this->resetPage();
     }
 
     #[Layout('layouts.app')]

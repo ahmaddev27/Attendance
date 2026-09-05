@@ -107,3 +107,47 @@ it('allows updating own phone without unique conflict', function () {
         ->call('save')
         ->assertHasNoErrors();
 });
+
+it('opens the delete confirmation modal', function () {
+    $emp = Employee::factory()->create();
+
+    Livewire::test(EmployeeList::class)
+        ->call('startDelete', $emp->id)
+        ->assertSet('deletingId', $emp->id);
+});
+
+it('deletes an employee when confirmed', function () {
+    $emp = Employee::factory()->create();
+
+    Livewire::test(EmployeeList::class)
+        ->call('startDelete', $emp->id)
+        ->call('confirmDelete')
+        ->assertSet('deletingId', null)
+        ->assertDispatched('toast', type: 'success');
+
+    expect(Employee::find($emp->id))->toBeNull();
+});
+
+it('cancels delete without removing employee', function () {
+    $emp = Employee::factory()->create();
+
+    Livewire::test(EmployeeList::class)
+        ->call('startDelete', $emp->id)
+        ->call('cancelDelete')
+        ->assertSet('deletingId', null);
+
+    expect(Employee::find($emp->id))->not->toBeNull();
+});
+
+it('cascades delete to attendances and leave requests', function () {
+    $emp = Employee::factory()->create();
+    $attendance = \App\Models\Attendance::factory()->for($emp)->create();
+    $leaveRequest = \App\Models\LeaveRequest::factory()->for($emp)->create();
+
+    Livewire::test(EmployeeList::class)
+        ->call('startDelete', $emp->id)
+        ->call('confirmDelete');
+
+    expect(\App\Models\Attendance::find($attendance->id))->toBeNull()
+        ->and(\App\Models\LeaveRequest::find($leaveRequest->id))->toBeNull();
+});
