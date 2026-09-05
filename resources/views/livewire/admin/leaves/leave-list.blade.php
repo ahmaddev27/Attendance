@@ -74,13 +74,12 @@
                                 <div class="flex gap-2 justify-end">
                                     <button
                                         type="button"
-                                        wire:click="approve({{ $leave->id }})"
-                                        wire:confirm="هل تريد الموافقة على هذه الإجازة؟"
+                                        wire:click="startApprove({{ $leave->id }})"
                                         wire:loading.attr="disabled"
-                                        wire:target="approve({{ $leave->id }})"
+                                        wire:target="startApprove({{ $leave->id }})"
                                         class="inline-flex items-center gap-1.5 bg-brand hover:bg-brand-hover text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition disabled:opacity-70 disabled:cursor-wait"
                                     >
-                                        <svg wire:loading wire:target="approve({{ $leave->id }})" class="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none">
+                                        <svg wire:loading wire:target="startApprove({{ $leave->id }})" class="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none">
                                             <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-opacity="0.25"/>
                                             <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
                                         </svg>
@@ -119,9 +118,84 @@
 
     <div class="mt-4">{{ $leaves->links() }}</div>
 
+    @if ($approvingId)
+        @php $approvingLeave = $leaves->firstWhere('id', $approvingId); @endphp
+        <div
+            wire:transition:enter="transition ease-out duration-200"
+            wire:transition:enter-start="opacity-0"
+            wire:transition:enter-end="opacity-100"
+            wire:transition:leave="transition ease-in duration-150"
+            wire:transition:leave-start="opacity-100"
+            wire:transition:leave-end="opacity-0"
+            class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            wire:click.self="cancelApprove"
+            wire:keydown.escape.window="cancelApprove"
+        >
+            <div
+                wire:transition:enter="transition ease-out duration-250"
+                wire:transition:enter-start="opacity-0 translate-y-6 sm:scale-95"
+                wire:transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                wire:transition:leave="transition ease-in duration-150"
+                wire:transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                wire:transition:leave-end="opacity-0 translate-y-4 sm:scale-95"
+                class="bg-surface rounded-2xl w-full max-w-md p-6 shadow-lg"
+            >
+                <div class="w-11 h-11 rounded-full bg-success-soft text-success grid place-items-center mb-4">
+                    <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 6L9 17l-5-5"/>
+                    </svg>
+                </div>
+
+                <h2 class="text-base font-bold text-ink mb-1">تأكيد الموافقة</h2>
+                <p class="text-[13px] text-muted mb-4">
+                    هل أنت متأكد من الموافقة على طلب الإجازة؟
+                    @if ($approvingLeave)
+                        <span class="block mt-1.5 text-ink-2 font-medium">
+                            {{ $approvingLeave->employee->name }}
+                            <span class="num">· {{ $approvingLeave->start_date->format('Y-m-d') }} إلى {{ $approvingLeave->end_date->format('Y-m-d') }}</span>
+                        </span>
+                    @endif
+                </p>
+
+                <div class="flex gap-2 justify-start mt-5">
+                    <button type="button" wire:click="confirmApprove"
+                            wire:loading.attr="disabled" wire:target="confirmApprove"
+                            class="inline-flex items-center gap-1.5 bg-success hover:opacity-90 text-white px-4 py-2 rounded-lg text-sm font-semibold transition disabled:opacity-70 disabled:cursor-wait">
+                        <svg wire:loading wire:target="confirmApprove" class="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
+                            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-opacity="0.25"/>
+                            <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                        </svg>
+                        تأكيد الموافقة
+                    </button>
+                    <button type="button" wire:click="cancelApprove" class="bg-transparent border border-hairline-strong text-ink-2 hover:bg-surface-2 px-4 py-2 rounded-lg text-sm font-semibold transition">
+                        إلغاء
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
     @if ($rejectingId)
-        <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
-            <div class="bg-surface border border-hairline rounded-xl p-6 max-w-md w-full shadow-lg">
+        <div
+            wire:transition:enter="transition ease-out duration-200"
+            wire:transition:enter-start="opacity-0"
+            wire:transition:enter-end="opacity-100"
+            wire:transition:leave="transition ease-in duration-150"
+            wire:transition:leave-start="opacity-100"
+            wire:transition:leave-end="opacity-0"
+            class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            wire:click.self="cancelReject"
+            wire:keydown.escape.window="cancelReject"
+        >
+            <div
+                wire:transition:enter="transition ease-out duration-250"
+                wire:transition:enter-start="opacity-0 translate-y-6 sm:scale-95"
+                wire:transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                wire:transition:leave="transition ease-in duration-150"
+                wire:transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                wire:transition:leave-end="opacity-0 translate-y-4 sm:scale-95"
+                class="bg-surface rounded-2xl w-full max-w-md p-6 shadow-lg"
+            >
                 <h2 class="text-base font-bold text-ink mb-1">سبب الرفض</h2>
                 <p class="text-[13px] text-muted mb-4">سيصل هذا السبب للموظف عبر SMS، وسيُحفظ في سجل الطلب.</p>
 

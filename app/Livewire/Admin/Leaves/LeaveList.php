@@ -26,6 +26,8 @@ class LeaveList extends Component
     #[Url]
     public ?int $employeeId = null;
 
+    public ?int $approvingId = null;
+
     public ?int $rejectingId = null;
 
     public string $rejectReason = '';
@@ -44,6 +46,23 @@ class LeaveList extends Component
         $service->approve($leave, auth()->user());
 
         $this->dispatch('toast', message: __('تمت الموافقة على الإجازة'), type: 'success');
+    }
+
+    public function startApprove(int $id): void
+    {
+        $this->approvingId = $id;
+    }
+
+    public function cancelApprove(): void
+    {
+        $this->approvingId = null;
+    }
+
+    public function confirmApprove(LeaveService $service): void
+    {
+        $this->approve($this->approvingId, $service);
+
+        $this->approvingId = null;
     }
 
     public function startReject(int $id): void

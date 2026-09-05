@@ -3,8 +3,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ config('app.name', 'TAQAT') }}</title>
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <title>TAQAT - نظام إدارة الحضور</title>
+    <link rel="icon" type="image/png" href="{{ asset('favicon.png') }}">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="bg-ground text-ink font-sans antialiased min-h-screen">

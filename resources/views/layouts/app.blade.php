@@ -4,8 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{{ config('app.name', 'TAQAT') }}</title>
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <title>TAQAT - نظام إدارة الحضور</title>
+    <link rel="icon" type="image/png" href="{{ asset('favicon.png') }}">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
 </head>
@@ -14,12 +14,8 @@
         {{-- Sidebar --}}
         <aside class="hidden md:flex fixed inset-y-0 right-0 w-60 bg-surface border-l border-hairline flex-col p-4 gap-6 z-30">
             {{-- Brand --}}
-            <a href="{{ route('admin.overview') }}" class="flex items-center gap-3 px-2 py-1">
-                <x-brand-mark class="w-10 h-10" />
-                <div>
-                    <div class="text-sm font-bold text-ink">TAQAT</div>
-                    <div class="text-[11px] text-muted">إدارة الحضور</div>
-                </div>
+            <a href="{{ route('admin.overview') }}" class="block px-2 py-2">
+                <x-brand-logo class="h-10 w-auto mx-auto" />
             </a>
 
             {{-- Nav --}}
@@ -50,8 +46,7 @@
         {{-- Mobile top bar --}}
         <header class="md:hidden fixed inset-x-0 top-0 h-14 bg-surface border-b border-hairline flex items-center justify-between px-4 z-30">
             <div class="flex items-center gap-2">
-                <x-brand-mark class="w-8 h-8" />
-                <span class="text-sm font-bold">TAQAT</span>
+                <x-brand-logo class="h-7 w-auto" />
             </div>
             <button @click="mobileNav = !mobileNav" class="p-2 text-ink-2">
                 <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>

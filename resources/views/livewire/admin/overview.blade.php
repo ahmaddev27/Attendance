@@ -1,14 +1,7 @@
 <div>
-    <div class="flex justify-between items-end pb-6 mb-6 border-b border-hairline">
-        <div>
-            <div class="text-xs text-muted mb-1">الرئيسية</div>
-            <h1 class="text-2xl md:text-3xl font-bold text-ink tracking-tight">نظرة عامة</h1>
-        </div>
-        <div class="flex gap-2">
-            <button type="button" class="bg-transparent border border-hairline-strong text-ink-2 hover:bg-surface-2 px-4 py-2 rounded-lg text-sm font-semibold transition">
-                تصدير تقرير
-            </button>
-        </div>
+    <div class="pb-6 mb-6 border-b border-hairline">
+        <div class="text-xs text-muted mb-1">الرئيسية</div>
+        <h1 class="text-2xl md:text-3xl font-bold text-ink tracking-tight">نظرة عامة</h1>
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">

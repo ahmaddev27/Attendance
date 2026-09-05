@@ -1,7 +1,7 @@
 @extends('layouts.public')
 @section('content')
     <div class="text-center pt-6 pb-6">
-        <x-brand-mark class="w-12 h-12 mb-3 mx-auto" />
+        <x-brand-logo class="h-12 w-auto mb-3 mx-auto" />
     </div>
 
     <h2 class="text-xl font-bold text-ink text-center mb-1">تسجيل الحضور</h2>
