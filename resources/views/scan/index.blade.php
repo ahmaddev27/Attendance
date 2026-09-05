@@ -7,8 +7,8 @@
         <p class="text-sm text-muted">نظام الحضور والإجازات</p>
         <div x-show="empNum" x-cloak class="mt-3 inline-flex items-center gap-2 text-xs bg-brand-soft text-brand-ink px-3 py-1.5 rounded-full">
             <span>الرقم الوظيفي: <span class="num font-semibold" x-text="empNum"></span></span>
-            <button @click="localStorage.removeItem('taqat_employee_number'); empNum = null" class="text-brand-ink/60 hover:text-brand-ink" title="تغيير">
-                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/></svg>
+            <button @click="localStorage.removeItem('taqat_employee_number'); empNum = null" class="text-brand-ink/60 hover:text-brand-ink p-2 -m-1 rounded" title="تغيير">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/></svg>
             </button>
         </div>
     </div>

@@ -19,9 +19,14 @@ class LeaveService
 
     public function submit(Employee $employee, array $data): LeaveRequest
     {
+        $start = $data['start_date'];
+        $end = $data['end_date'] ?? $data['start_date'];
+
+        $this->assertNoOverlap($employee, $start, $end);
+
         return $this->repo->create($employee, [
-            'start_date' => $data['start_date'],
-            'end_date' => $data['end_date'] ?? $data['start_date'],
+            'start_date' => $start,
+            'end_date' => $end,
             'note' => $data['note'] ?? null,
             'status' => LeaveStatus::Pending,
         ]);
@@ -71,6 +76,25 @@ class LeaveService
     {
         if ($leave->status !== LeaveStatus::Pending) {
             throw new DomainException('Only pending leaves can be decided.');
+        }
+    }
+
+    private function assertNoOverlap(Employee $employee, string $start, string $end): void
+    {
+        $overlapping = LeaveRequest::where('employee_id', $employee->id)
+            ->whereIn('status', [LeaveStatus::Pending, LeaveStatus::Approved])
+            ->where(function ($query) use ($start, $end) {
+                $query->whereBetween('start_date', [$start, $end])
+                    ->orWhereBetween('end_date', [$start, $end])
+                    ->orWhere(function ($query) use ($start, $end) {
+                        $query->where('start_date', '<=', $start)
+                            ->where('end_date', '>=', $end);
+                    });
+            })
+            ->exists();
+
+        if ($overlapping) {
+            throw new DomainException('لديك طلب إجازة موجود مسبقاً في هذه الفترة');
         }
     }
 }

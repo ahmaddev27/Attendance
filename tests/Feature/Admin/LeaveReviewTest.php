@@ -46,3 +46,12 @@ it('rejects a leave with reason', function () {
     expect($leave->fresh()->status)->toBe(LeaveStatus::Rejected);
     expect($leave->fresh()->rejection_reason)->toBe('Not enough notice');
 });
+
+it('shows error when trying to approve already-decided leave', function () {
+    $emp = Employee::factory()->create();
+    $leave = LeaveRequest::factory()->for($emp)->create(['status' => LeaveStatus::Approved]);
+
+    Livewire::test(LeaveList::class)
+        ->call('approve', $leave->id)
+        ->assertDispatched('toast', type: 'error');
+});

@@ -55,3 +55,17 @@ it('does not re-review already-decided requests', function () {
     expect(fn () => app(LeaveService::class)->reject($leave, $reviewer, 'x'))
         ->toThrow(\DomainException::class);
 });
+
+it('prevents overlapping leave requests', function () {
+    $emp = Employee::factory()->create();
+    LeaveRequest::factory()->for($emp)->create([
+        'start_date' => '2026-10-05',
+        'end_date' => '2026-10-10',
+        'status' => LeaveStatus::Pending,
+    ]);
+
+    expect(fn () => app(LeaveService::class)->submit($emp, [
+        'start_date' => '2026-10-07',
+        'end_date' => '2026-10-08',
+    ]))->toThrow(\DomainException::class);
+});

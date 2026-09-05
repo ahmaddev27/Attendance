@@ -4,7 +4,7 @@
         <h1 class="text-2xl md:text-3xl font-bold text-ink tracking-tight">نظرة عامة</h1>
     </div>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4">
         <div class="bg-surface border border-hairline rounded-xl p-5">
             <div class="text-[11.5px] text-muted font-medium mb-2">حضور اليوم</div>
             <div class="text-3xl font-bold text-ink num">

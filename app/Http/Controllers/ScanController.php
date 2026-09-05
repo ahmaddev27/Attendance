@@ -92,7 +92,13 @@ class ScanController extends Controller
     public function leaveSubmit(SubmitLeaveRequestRequest $request)
     {
         $employee = $request->employee();
-        $this->leave->submit($employee, $request->validated());
+
+        try {
+            $this->leave->submit($employee, $request->validated());
+        } catch (\DomainException $e) {
+            return redirect()->route('scan.index')
+                ->with('toast', ['message' => $e->getMessage(), 'type' => 'error']);
+        }
 
         return redirect()->route('scan.index')
             ->with('leave_success', true)

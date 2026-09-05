@@ -8,7 +8,7 @@ class EmployeeRepository
 {
     public function maxEmployeeNumber(): int
     {
-        return (int) Employee::max('employee_number');
+        return (int) Employee::query()->lockForUpdate()->max('employee_number');
     }
 
     public function findByNumber(int $number): ?Employee

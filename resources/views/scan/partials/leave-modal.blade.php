@@ -7,7 +7,9 @@
      x-transition:leave-end="opacity-0"
      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
      @click.self="leaveOpen = false"
-     @keydown.escape.window="leaveOpen = false">
+     @keydown.escape.window="leaveOpen = false"
+     role="dialog"
+     aria-modal="true">
     <div class="bg-surface rounded-2xl w-full max-w-md p-6 shadow-lg"
          x-transition:enter="transition ease-out duration-250"
          x-transition:enter-start="opacity-0 translate-y-4 scale-95"
@@ -32,7 +34,7 @@
                     </template>
                 </p>
             </div>
-            <button type="button" @click="leaveOpen = false" class="text-muted hover:text-ink p-1">
+            <button type="button" @click="leaveOpen = false" class="text-muted hover:text-ink p-2.5 -m-2 rounded-lg">
                 <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
             </button>
         </div>

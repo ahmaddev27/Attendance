@@ -11,12 +11,6 @@
         </div>
     </div>
 
-    @if (session('success'))
-        <div class="bg-success-soft text-success rounded-lg px-4 py-3 mb-6 text-sm font-medium">
-            {{ session('success') }}
-        </div>
-    @endif
-
     <div class="flex flex-wrap gap-2.5 mb-4">
         <input
             type="text"
@@ -87,6 +81,9 @@
             class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
             wire:click.self="closeModal"
             wire:keydown.escape.window="closeModal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="employee-modal-title"
         >
             <div
                 wire:transition:enter="transition ease-out duration-250"
@@ -99,14 +96,14 @@
             >
                 <div class="flex justify-between items-start mb-4">
                     <div>
-                        <h2 class="text-lg font-bold text-ink">
+                        <h2 id="employee-modal-title" class="text-lg font-bold text-ink">
                             {{ $editingId ? 'تعديل موظف' : 'موظف جديد' }}
                         </h2>
                         <p class="text-xs text-muted mt-0.5">
                             {{ $editingId ? 'حدّث بيانات الموظف' : 'سيتم إرسال الرقم الوظيفي على الجوال عبر SMS' }}
                         </p>
                     </div>
-                    <button type="button" wire:click="closeModal" class="text-muted hover:text-ink p-1">
+                    <button type="button" wire:click="closeModal" class="text-muted hover:text-ink p-2.5 -m-2 rounded-lg">
                         <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
                     </button>
                 </div>

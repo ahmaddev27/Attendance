@@ -5,6 +5,7 @@ namespace App\Livewire\Admin\Leaves;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Services\LeaveService;
+use DomainException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -43,9 +44,13 @@ class LeaveList extends Component
     {
         $leave = LeaveRequest::findOrFail($id);
 
-        $service->approve($leave, auth()->user());
+        try {
+            $service->approve($leave, auth()->user());
 
-        $this->dispatch('toast', message: __('تمت الموافقة على الإجازة'), type: 'success');
+            $this->dispatch('toast', message: __('تمت الموافقة على الإجازة'), type: 'success');
+        } catch (DomainException $e) {
+            $this->dispatch('toast', message: __('تم اتخاذ قرار على هذه الإجازة مسبقاً'), type: 'error');
+        }
     }
 
     public function startApprove(int $id): void
@@ -86,12 +91,16 @@ class LeaveList extends Component
 
         $leave = LeaveRequest::findOrFail($this->rejectingId);
 
-        $service->reject($leave, auth()->user(), $this->rejectReason);
+        try {
+            $service->reject($leave, auth()->user(), $this->rejectReason);
+
+            $this->dispatch('toast', message: __('تم رفض طلب الإجازة'), type: 'success');
+        } catch (DomainException $e) {
+            $this->dispatch('toast', message: __('تم اتخاذ قرار على هذه الإجازة مسبقاً'), type: 'error');
+        }
 
         $this->rejectingId = null;
         $this->rejectReason = '';
-
-        $this->dispatch('toast', message: __('تم رفض طلب الإجازة'), type: 'success');
     }
 
     #[Layout('layouts.app')]

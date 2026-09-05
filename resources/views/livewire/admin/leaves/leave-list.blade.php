@@ -130,6 +130,8 @@
             class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
             wire:click.self="cancelApprove"
             wire:keydown.escape.window="cancelApprove"
+            role="dialog"
+            aria-modal="true"
         >
             <div
                 wire:transition:enter="transition ease-out duration-250"
@@ -186,6 +188,8 @@
             class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
             wire:click.self="cancelReject"
             wire:keydown.escape.window="cancelReject"
+            role="dialog"
+            aria-modal="true"
         >
             <div
                 wire:transition:enter="transition ease-out duration-250"

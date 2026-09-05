@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Employee;
 use App\Repositories\EmployeeRepository;
 use App\Services\Sms\SmsService;
+use Illuminate\Support\Facades\DB;
 
 class EmployeeService
 {
@@ -16,18 +17,20 @@ class EmployeeService
 
     public function create(array $data): Employee
     {
-        $data['employee_number'] = $this->nextEmployeeNumber();
-        $employee = $this->repo->create($data);
+        return DB::transaction(function () use ($data) {
+            $data['employee_number'] = $this->nextEmployeeNumber();
+            $employee = $this->repo->create($data);
 
-        $this->sms->dispatch(
-            $employee->phone,
-            trans('messages.employee_welcome', [
-                'company' => config('app.name'),
-                'number' => $employee->employee_number,
-            ])
-        );
+            $this->sms->dispatch(
+                $employee->phone,
+                trans('messages.employee_welcome', [
+                    'company' => config('app.name'),
+                    'number' => $employee->employee_number,
+                ])
+            );
 
-        return $employee;
+            return $employee;
+        });
     }
 
     public function update(Employee $employee, array $data): Employee

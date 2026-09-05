@@ -30,14 +30,21 @@ class Overview extends Component
 
         $recentScans = Attendance::with('employee')->latest('scanned_at')->limit(5)->get();
 
-        $last7Days = collect(range(0, 6))->map(function ($i) {
+        $last7DaysStart = today()->subDays(6);
+
+        $attendanceByDay = Attendance::query()
+            ->where('type', AttendanceType::CheckIn)
+            ->whereDate('scanned_at', '>=', $last7DaysStart)
+            ->selectRaw('DATE(scanned_at) as day, COUNT(DISTINCT employee_id) as count')
+            ->groupBy('day')
+            ->pluck('count', 'day');
+
+        $last7Days = collect(range(0, 6))->map(function ($i) use ($attendanceByDay) {
             $date = today()->subDays($i);
 
             return [
                 'date' => $date->format('m-d'),
-                'count' => Attendance::whereDate('scanned_at', $date)
-                    ->where('type', AttendanceType::CheckIn)
-                    ->distinct('employee_id')->count('employee_id'),
+                'count' => (int) ($attendanceByDay[$date->format('Y-m-d')] ?? 0),
             ];
         })->reverse()->values();
 

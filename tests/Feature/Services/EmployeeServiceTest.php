@@ -41,3 +41,11 @@ it('dispatches welcome SMS containing the employee number', function () {
 
     Queue::assertPushed(\App\Jobs\SendSmsJob::class);
 });
+
+it('assigns sequential numbers even under near-concurrent creates', function () {
+    // Simulate: two creates back-to-back should get sequential numbers
+    $a = app(EmployeeService::class)->create(['name' => 'A', 'phone' => '+962700000001']);
+    $b = app(EmployeeService::class)->create(['name' => 'B', 'phone' => '+962700000002']);
+
+    expect($b->employee_number)->toBe($a->employee_number + 1);
+});
