@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ScanController;
+use App\Livewire\Admin\Attendance\AttendanceList;
 use App\Livewire\Admin\Employees\EmployeeForm;
 use App\Livewire\Admin\Employees\EmployeeList;
 use App\Livewire\Admin\Leaves\LeaveList;
@@ -41,4 +42,6 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::get('/employees/{employee}/edit', EmployeeForm::class)->name('employees.edit');
 
     Route::get('/leaves', LeaveList::class)->name('leaves.index');
+
+    Route::get('/attendance', AttendanceList::class)->name('attendance.index');
 });
