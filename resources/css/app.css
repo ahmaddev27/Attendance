@@ -1,3 +1,186 @@
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ==========================================================================
+   TAQAT Design Tokens
+   ========================================================================== */
+
+:root {
+    --ground: #F7F8FB;
+    --surface: #FFFFFF;
+    --surface-2: #EEF1F6;
+    --ink: #17222E;
+    --ink-2: #47536A;
+    --muted: #7C8698;
+    --hairline: #E4E8EF;
+    --hairline-strong: #D2D8E1;
+
+    --brand: #2678C4;
+    --brand-hover: #1E63A6;
+    --brand-soft: #E6F0F8;
+    --brand-ink: #0F4A7F;
+
+    --accent: #F5A623;
+    --accent-soft: #FDF2DC;
+    --accent-ink: #9C6205;
+
+    --success: #1E9E7F;
+    --success-soft: #DDF0E9;
+    --warn: #F5A623;
+    --warn-soft: #FDF2DC;
+    --danger: #C74F35;
+    --danger-soft: #FBE5DE;
+
+    --shadow-sm: 0 1px 2px rgba(23, 34, 46, .04), 0 2px 8px rgba(23, 34, 46, .04);
+    --shadow: 0 1px 2px rgba(23, 34, 46, .05), 0 4px 12px rgba(23, 34, 46, .06);
+    --shadow-lg: 0 4px 12px rgba(23, 34, 46, .06), 0 20px 40px rgba(23, 34, 46, .08);
+
+    --radius: 12px;
+    --radius-sm: 8px;
+    --radius-lg: 20px;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ground: #0E1520;
+        --surface: #182231;
+        --surface-2: #202B3D;
+        --ink: #F0F3F8;
+        --ink-2: #B5BECD;
+        --muted: #7B8699;
+        --hairline: #253046;
+        --hairline-strong: #303C56;
+
+        --brand: #4A97DE;
+        --brand-hover: #6BAAE5;
+        --brand-soft: #1A3350;
+        --brand-ink: #A5CDF0;
+
+        --accent: #F5B347;
+        --accent-soft: #3B2E15;
+        --accent-ink: #F5C876;
+
+        --success: #46B892;
+        --success-soft: #17352C;
+        --warn: #F5B347;
+        --warn-soft: #3B2E15;
+        --danger: #DE6F55;
+        --danger-soft: #3A211B;
+
+        --shadow-sm: 0 1px 2px rgba(0, 0, 0, .2), 0 2px 8px rgba(0, 0, 0, .2);
+        --shadow: 0 1px 2px rgba(0, 0, 0, .25), 0 4px 12px rgba(0, 0, 0, .3);
+        --shadow-lg: 0 4px 12px rgba(0, 0, 0, .3), 0 20px 40px rgba(0, 0, 0, .4);
+    }
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+@layer base {
+    body {
+        font-family: 'Tajawal', system-ui, sans-serif;
+        background-color: var(--ground);
+        color: var(--ink);
+    }
+
+    [x-cloak] {
+        display: none !important;
+    }
+}
+
+/* ==========================================================================
+   Utilities
+   ========================================================================== */
+
+@layer utilities {
+    /* Numeric strings (dates, times, counters) stay LTR and tabular even
+       inside an RTL document. */
+    .num {
+        font-variant-numeric: tabular-nums;
+        direction: ltr;
+        unicode-bidi: embed;
+        display: inline-block;
+    }
+}
+
+/* ==========================================================================
+   Components
+   ========================================================================== */
+
+@layer components {
+    .badge {
+        @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold leading-none;
+    }
+
+    .badge-success {
+        @apply badge;
+        background-color: var(--success-soft);
+        color: var(--success);
+    }
+
+    .badge-warn {
+        @apply badge;
+        background-color: var(--warn-soft);
+        color: var(--accent-ink);
+    }
+
+    .badge-danger {
+        @apply badge;
+        background-color: var(--danger-soft);
+        color: var(--danger);
+    }
+
+    .badge-neutral {
+        @apply badge;
+        background-color: var(--surface-2);
+        color: var(--ink-2);
+    }
+
+    .card {
+        @apply rounded-xl bg-surface border border-hairline;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .panel {
+        @apply rounded-2xl bg-surface border border-hairline p-6;
+        box-shadow: var(--shadow);
+    }
+
+    .form-input {
+        @apply block w-full rounded-lg border bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-muted transition;
+        border-color: var(--hairline-strong);
+    }
+
+    .form-input:focus {
+        @apply outline-none ring-2;
+        border-color: var(--brand);
+        --tw-ring-color: var(--brand-soft);
+    }
+
+    .btn {
+        @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition select-none disabled:opacity-50 disabled:pointer-events-none;
+    }
+
+    .btn-primary {
+        @apply btn text-white;
+        background-color: var(--brand);
+    }
+
+    .btn-primary:hover {
+        background-color: var(--brand-hover);
+    }
+
+    .btn-ghost {
+        @apply btn bg-transparent;
+        color: var(--ink-2);
+    }
+
+    .btn-ghost:hover {
+        background-color: var(--surface-2);
+        color: var(--ink);
+    }
+}
