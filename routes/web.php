@@ -6,6 +6,7 @@ use App\Livewire\Admin\Attendance\AttendanceList;
 use App\Livewire\Admin\Employees\EmployeeForm;
 use App\Livewire\Admin\Employees\EmployeeList;
 use App\Livewire\Admin\Leaves\LeaveList;
+use App\Livewire\Admin\Overview;
 use App\Livewire\Admin\Settings\SettingsForm;
 use Illuminate\Support\Facades\Route;
 
@@ -36,7 +37,7 @@ Route::middleware('auth')->group(function () {
 require __DIR__.'/auth.php';
 
 Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
-    Route::view('/', 'admin.overview')->name('overview');
+    Route::get('/', Overview::class)->name('overview');
 
     Route::get('/employees', EmployeeList::class)->name('employees.index');
     Route::get('/employees/create', EmployeeForm::class)->name('employees.create');
