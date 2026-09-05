@@ -12,8 +12,23 @@
 
                 <!-- Navigation Links -->
                 <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
-                    <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
-                        {{ __('Dashboard') }}
+                    <x-nav-link :href="route('admin.overview')" :active="request()->routeIs('admin.overview')">
+                        الرئيسية
+                    </x-nav-link>
+                    <x-nav-link :href="route('admin.employees.index')" :active="request()->routeIs('admin.employees.*')">
+                        الموظفين
+                    </x-nav-link>
+                    <x-nav-link :href="route('admin.attendance.index')" :active="request()->routeIs('admin.attendance.*')">
+                        الحضور
+                    </x-nav-link>
+                    <x-nav-link :href="route('admin.leaves.index')" :active="request()->routeIs('admin.leaves.*')">
+                        الإجازات
+                    </x-nav-link>
+                    <x-nav-link :href="route('admin.settings.index')" :active="request()->routeIs('admin.settings.*')">
+                        الإعدادات
+                    </x-nav-link>
+                    <x-nav-link :href="route('admin.sms-logs.index')" :active="request()->routeIs('admin.sms-logs.*')">
+                        سجل SMS
                     </x-nav-link>
                 </div>
             </div>
@@ -67,8 +82,23 @@
     <!-- Responsive Navigation Menu -->
     <div :class="{'block': open, 'hidden': ! open}" class="hidden sm:hidden">
         <div class="pt-2 pb-3 space-y-1">
-            <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
-                {{ __('Dashboard') }}
+            <x-responsive-nav-link :href="route('admin.overview')" :active="request()->routeIs('admin.overview')">
+                الرئيسية
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('admin.employees.index')" :active="request()->routeIs('admin.employees.*')">
+                الموظفين
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('admin.attendance.index')" :active="request()->routeIs('admin.attendance.*')">
+                الحضور
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('admin.leaves.index')" :active="request()->routeIs('admin.leaves.*')">
+                الإجازات
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('admin.settings.index')" :active="request()->routeIs('admin.settings.*')">
+                الإعدادات
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('admin.sms-logs.index')" :active="request()->routeIs('admin.sms-logs.*')">
+                سجل SMS
             </x-responsive-nav-link>
         </div>
 
