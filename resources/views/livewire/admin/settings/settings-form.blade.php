@@ -1,83 +1,127 @@
-<div class="p-6 max-w-3xl">
-    <h1 class="text-2xl font-bold mb-4">الإعدادات</h1>
+<form wire:submit="save">
+    <div class="flex justify-between items-end pb-6 mb-6 border-b border-hairline">
+        <div>
+            <div class="text-xs text-muted mb-1">الإعدادات</div>
+            <h1 class="text-2xl md:text-3xl font-bold text-ink tracking-tight">إعدادات النظام</h1>
+        </div>
+        <div class="flex gap-2">
+            <button type="submit" class="bg-brand hover:bg-brand-hover text-white px-4 py-2 rounded-lg text-sm font-semibold transition">
+                حفظ التغييرات
+            </button>
+        </div>
+    </div>
 
     @if (session('success'))
-        <div class="bg-green-100 text-green-800 p-3 mb-3 rounded">{{ session('success') }}</div>
+        <div class="bg-success-soft text-success rounded-lg px-4 py-3 mb-6 text-sm font-medium">
+            {{ session('success') }}
+        </div>
     @endif
 
-    <form wire:submit="save" class="space-y-6">
-        <fieldset class="border p-4 rounded">
-            <legend class="font-bold px-1">فحص الموقع الجغرافي (GPS)</legend>
-
-            <label class="inline-flex items-center gap-2 mb-3">
-                <input type="checkbox" wire:model="gpsEnabled">
-                <span>تفعيل فحص الموقع الجغرافي</span>
-            </label>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div>
-                    <label class="block mb-1 text-sm">خط العرض</label>
-                    <input type="number" step="0.0000001" wire:model="officeLat" class="border p-2 rounded w-full" dir="ltr">
-                    @error('officeLat') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
+    <div class="bg-surface border border-hairline rounded-xl divide-y divide-hairline">
+        {{-- GPS check --}}
+        <div class="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-6 md:gap-8 p-6">
+            <div>
+                <h3 class="text-sm font-bold text-ink mb-1">فحص الموقع الجغرافي</h3>
+                <p class="text-xs text-muted leading-relaxed">يرفض التسجيل إذا كان الموظف خارج نطاق المكتب.</p>
+            </div>
+            <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <label class="text-sm text-ink">تفعيل فحص GPS</label>
+                    <label class="relative inline-flex items-center shrink-0 cursor-pointer">
+                        <input type="checkbox" wire:model="gpsEnabled" class="peer sr-only">
+                        <span class="w-9 h-5 rounded-full bg-hairline-strong peer-checked:bg-brand transition-colors"></span>
+                        <span class="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-white transition-transform peer-checked:-translate-x-4"></span>
+                    </label>
                 </div>
-                <div>
-                    <label class="block mb-1 text-sm">خط الطول</label>
-                    <input type="number" step="0.0000001" wire:model="officeLng" class="border p-2 rounded w-full" dir="ltr">
-                    @error('officeLng') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
-                </div>
-                <div>
-                    <label class="block mb-1 text-sm">نصف قطر السماحية (متر)</label>
-                    <input type="number" wire:model="geofenceRadius" class="border p-2 rounded w-full" min="1">
-                    @error('geofenceRadius') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-[12px] font-semibold text-ink-2 mb-1.5">خط العرض</label>
+                        <input type="number" step="0.0000001" wire:model="officeLat" class="form-input num" dir="ltr" style="text-align:right">
+                        @error('officeLat') <p class="text-danger text-xs mt-1.5">{{ $message }}</p> @enderror
+                    </div>
+                    <div>
+                        <label class="block text-[12px] font-semibold text-ink-2 mb-1.5">خط الطول</label>
+                        <input type="number" step="0.0000001" wire:model="officeLng" class="form-input num" dir="ltr" style="text-align:right">
+                        @error('officeLng') <p class="text-danger text-xs mt-1.5">{{ $message }}</p> @enderror
+                    </div>
+                    <div>
+                        <label class="block text-[12px] font-semibold text-ink-2 mb-1.5">نصف قطر السماحية (متر)</label>
+                        <input type="number" wire:model="geofenceRadius" min="1" class="form-input num" dir="ltr" style="text-align:right">
+                        @error('geofenceRadius') <p class="text-danger text-xs mt-1.5">{{ $message }}</p> @enderror
+                    </div>
                 </div>
             </div>
-        </fieldset>
+        </div>
 
-        <fieldset class="border p-4 rounded">
-            <legend class="font-bold px-1">فحص عنوان IP</legend>
-
-            <label class="inline-flex items-center gap-2 mb-3">
-                <input type="checkbox" wire:model="ipEnabled">
-                <span>تفعيل فحص عنوان IP</span>
-            </label>
-
-            <label class="block mb-1 text-sm">قائمة عناوين IP المسموح بها (عنوان واحد في كل سطر)</label>
-            <textarea wire:model="ipWhitelistText" rows="4" class="border p-2 rounded w-full font-mono" dir="ltr"
-                placeholder="192.168.1.100"></textarea>
-            @error('ipWhitelistText') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
-        </fieldset>
-
-        <fieldset class="border p-4 rounded">
-            <legend class="font-bold px-1">بيانات اعتماد MTC SMS</legend>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div>
-                    <label class="block mb-1 text-sm">اسم المستخدم</label>
-                    <input type="text" wire:model="smsUsername" class="border p-2 rounded w-full" dir="ltr">
-                    @error('smsUsername') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
+        {{-- IP check --}}
+        <div class="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-6 md:gap-8 p-6">
+            <div>
+                <h3 class="text-sm font-bold text-ink mb-1">فحص عنوان IP</h3>
+                <p class="text-xs text-muted leading-relaxed">يقبل التسجيل فقط من شبكات محدّدة.</p>
+            </div>
+            <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <label class="text-sm text-ink">تفعيل فحص IP</label>
+                    <label class="relative inline-flex items-center shrink-0 cursor-pointer">
+                        <input type="checkbox" wire:model="ipEnabled" class="peer sr-only">
+                        <span class="w-9 h-5 rounded-full bg-hairline-strong peer-checked:bg-brand transition-colors"></span>
+                        <span class="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-white transition-transform peer-checked:-translate-x-4"></span>
+                    </label>
                 </div>
+
                 <div>
-                    <label class="block mb-1 text-sm">كلمة السر</label>
-                    <input type="password" wire:model="smsPassword" class="border p-2 rounded w-full" dir="ltr" autocomplete="new-password">
-                    @error('smsPassword') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
-                </div>
-                <div>
-                    <label class="block mb-1 text-sm">اسم المرسل</label>
-                    <input type="text" wire:model="smsSender" class="border p-2 rounded w-full" dir="ltr">
-                    @error('smsSender') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
+                    <label class="block text-[12px] font-semibold text-ink-2 mb-1.5">قائمة عناوين IP المسموح بها</label>
+                    <textarea
+                        wire:model="ipWhitelistText"
+                        rows="4"
+                        class="form-input font-mono"
+                        dir="ltr"
+                        style="text-align:right"
+                        placeholder="192.168.1.100"
+                    ></textarea>
+                    <p class="text-[11.5px] text-muted mt-1.5">عنوان أو مدى واحد في كل سطر.</p>
+                    @error('ipWhitelistText') <p class="text-danger text-xs mt-1.5">{{ $message }}</p> @enderror
                 </div>
             </div>
-        </fieldset>
+        </div>
 
-        <fieldset class="border p-4 rounded">
-            <legend class="font-bold px-1">ترقيم الموظفين</legend>
+        {{-- MTC SMS provider --}}
+        <div class="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-6 md:gap-8 p-6">
+            <div>
+                <h3 class="text-sm font-bold text-ink mb-1">بيانات اعتماد MTC SMS</h3>
+                <p class="text-xs text-muted leading-relaxed">بيانات الاتصال بواجهة الإرسال. تُخزَّن مشفّرة.</p>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                    <label class="block text-[12px] font-semibold text-ink-2 mb-1.5">اسم المستخدم</label>
+                    <input type="text" wire:model="smsUsername" class="form-input" dir="ltr" style="text-align:right">
+                    @error('smsUsername') <p class="text-danger text-xs mt-1.5">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label class="block text-[12px] font-semibold text-ink-2 mb-1.5">كلمة السر</label>
+                    <input type="password" wire:model="smsPassword" class="form-input" dir="ltr" style="text-align:right" autocomplete="new-password">
+                    @error('smsPassword') <p class="text-danger text-xs mt-1.5">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label class="block text-[12px] font-semibold text-ink-2 mb-1.5">اسم المرسل</label>
+                    <input type="text" wire:model="smsSender" class="form-input" dir="ltr" style="text-align:right">
+                    @error('smsSender') <p class="text-danger text-xs mt-1.5">{{ $message }}</p> @enderror
+                </div>
+            </div>
+        </div>
 
-            <label class="block mb-1 text-sm">الرقم الوظيفي الابتدائي</label>
-            <input type="number" wire:model="employeeNumberStart" class="border p-2 rounded w-full md:w-48" min="1">
-            @error('employeeNumberStart') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
-            <p class="text-sm text-gray-500 mt-1">يُستخدم فقط عند إنشاء أول موظف، أي حين يكون جدول الموظفين فارغاً.</p>
-        </fieldset>
-
-        <button type="submit" class="bg-blue-600 text-white px-6 py-3 rounded">حفظ الإعدادات</button>
-    </form>
-</div>
+        {{-- Employee numbering --}}
+        <div class="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-6 md:gap-8 p-6">
+            <div>
+                <h3 class="text-sm font-bold text-ink mb-1">ترقيم الموظفين</h3>
+                <p class="text-xs text-muted leading-relaxed">يُستخدم فقط عندما تكون قاعدة البيانات فارغة.</p>
+            </div>
+            <div class="max-w-[220px]">
+                <label class="block text-[12px] font-semibold text-ink-2 mb-1.5">الرقم الوظيفي الابتدائي</label>
+                <input type="number" wire:model="employeeNumberStart" min="1" class="form-input num" dir="ltr" style="text-align:right">
+                @error('employeeNumberStart') <p class="text-danger text-xs mt-1.5">{{ $message }}</p> @enderror
+            </div>
+        </div>
+    </div>
+</form>

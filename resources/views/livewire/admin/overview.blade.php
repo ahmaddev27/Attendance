@@ -1,51 +1,81 @@
-<div class="p-6">
-    <h1 class="text-2xl font-bold mb-4">لوحة التحكم</h1>
-
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div class="bg-white p-4 rounded shadow">
-            <div class="text-sm text-gray-500">حضور اليوم</div>
-            <div class="text-3xl font-bold">{{ $presentToday }} / {{ $activeEmployees }}</div>
+<div>
+    <div class="flex justify-between items-end pb-6 mb-6 border-b border-hairline">
+        <div>
+            <div class="text-xs text-muted mb-1">الرئيسية</div>
+            <h1 class="text-2xl md:text-3xl font-bold text-ink tracking-tight">نظرة عامة</h1>
         </div>
-        <div class="bg-white p-4 rounded shadow">
-            <div class="text-sm text-gray-500">غياب اليوم</div>
-            <div class="text-3xl font-bold">{{ $absentToday }}</div>
-        </div>
-        <div class="bg-white p-4 rounded shadow">
-            <div class="text-sm text-gray-500">إجازات معتمدة اليوم</div>
-            <div class="text-3xl font-bold">{{ $approvedLeavesToday }}</div>
-        </div>
-        <div class="bg-white p-4 rounded shadow">
-            <div class="text-sm text-gray-500">طلبات قيد المراجعة</div>
-            <div class="text-3xl font-bold text-orange-600">{{ $pendingLeaves }}</div>
+        <div class="flex gap-2">
+            <button type="button" class="bg-transparent border border-hairline-strong text-ink-2 hover:bg-surface-2 px-4 py-2 rounded-lg text-sm font-semibold transition">
+                تصدير تقرير
+            </button>
         </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div class="bg-white p-4 rounded shadow">
-            <h2 class="font-bold mb-3">آخر 7 أيام</h2>
-            <div class="flex items-end gap-2 h-40">
-                @foreach($last7Days as $day)
-                    <div class="flex-1 flex flex-col items-center">
-                        <div class="bg-blue-600 w-full" style="height: {{ min(100, $day['count'] * 10) }}%"></div>
-                        <div class="text-xs mt-1">{{ $day['date'] }}</div>
-                        <div class="text-xs font-bold">{{ $day['count'] }}</div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        <div class="bg-surface border border-hairline rounded-xl p-5">
+            <div class="text-[11.5px] text-muted font-medium mb-2">حضور اليوم</div>
+            <div class="text-3xl font-bold text-ink num">
+                {{ $presentToday }}<small class="text-[15px] text-muted font-medium mr-1">/ {{ $activeEmployees }}</small>
+            </div>
+        </div>
+        <div class="bg-surface border border-hairline rounded-xl p-5">
+            <div class="text-[11.5px] text-muted font-medium mb-2">غياب اليوم</div>
+            <div class="text-3xl font-bold text-ink num">{{ $absentToday }}</div>
+        </div>
+        <div class="bg-surface border border-hairline rounded-xl p-5">
+            <div class="text-[11.5px] text-muted font-medium mb-2">إجازة معتمدة</div>
+            <div class="text-3xl font-bold text-ink num">{{ $approvedLeavesToday }}</div>
+        </div>
+        <div class="bg-surface border border-hairline rounded-xl p-5">
+            <div class="text-[11.5px] text-muted font-medium mb-2">طلبات معلّقة</div>
+            <div class="text-3xl font-bold num {{ $pendingLeaves > 0 ? 'text-warn' : 'text-ink' }}">
+                {{ $pendingLeaves }}
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-4">
+        <div class="bg-surface border border-hairline rounded-xl p-5">
+            <div class="flex justify-between items-baseline mb-5">
+                <h3 class="text-sm font-bold text-ink">حضور آخر ٧ أيام</h3>
+                <span class="text-[11.5px] text-muted">أفراد فريدون</span>
+            </div>
+            @php $maxDay = max(1, $last7Days->max('count')); @endphp
+            <div class="flex items-end gap-2 h-40 pt-3">
+                @foreach ($last7Days as $i => $day)
+                    <div class="flex-1 flex flex-col items-center gap-2">
+                        <span class="text-[11px] text-muted font-semibold num">{{ $day['count'] }}</span>
+                        <div
+                            class="w-full rounded-t {{ $i === 6 ? 'bg-brand' : 'bg-brand-soft' }}"
+                            style="height: {{ max(6, ($day['count'] / $maxDay) * 100) }}%"
+                        ></div>
+                        <span class="text-[10.5px] num {{ $i === 6 ? 'text-brand font-bold' : 'text-muted' }}">{{ $day['date'] }}</span>
                     </div>
                 @endforeach
             </div>
         </div>
 
-        <div class="bg-white p-4 rounded shadow">
-            <h2 class="font-bold mb-3">آخر عمليات المسح</h2>
-            <ul class="space-y-2">
-                @forelse($recentScans as $scan)
-                    <li class="flex justify-between text-sm">
-                        <span>{{ $scan->employee->name }}</span>
-                        <span class="text-gray-500">{{ $scan->type->value }} — {{ $scan->scanned_at->format('H:i') }}</span>
-                    </li>
+        <div class="bg-surface border border-hairline rounded-xl p-5">
+            <div class="flex justify-between items-baseline mb-5">
+                <h3 class="text-sm font-bold text-ink">آخر عمليات المسح</h3>
+                <span class="text-[11.5px] text-muted">آخر ٥</span>
+            </div>
+            <div class="flex flex-col">
+                @forelse ($recentScans as $scan)
+                    <div class="flex items-center gap-3 py-2.5 border-b border-hairline last:border-b-0">
+                        <div class="w-8 h-8 rounded-full bg-surface-2 text-ink-2 grid place-items-center text-xs font-bold flex-shrink-0">
+                            {{ mb_substr($scan->employee->name, 0, 1) }}
+                        </div>
+                        <div class="flex-1 text-[13.5px] font-medium text-ink truncate">{{ $scan->employee->name }}</div>
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold {{ $scan->type->value === 'check_in' ? 'bg-success-soft text-success' : 'bg-surface-2 text-ink-2' }}">
+                            {{ $scan->type->value === 'check_in' ? 'حضور' : 'انصراف' }}
+                        </span>
+                        <span class="text-[11.5px] text-muted num">{{ $scan->scanned_at->format('H:i') }}</span>
+                    </div>
                 @empty
-                    <li class="text-sm text-gray-500">لا توجد عمليات مسح بعد</li>
+                    <div class="text-sm text-muted text-center py-6">لا توجد عمليات مسح بعد</div>
                 @endforelse
-            </ul>
+            </div>
         </div>
     </div>
 </div>

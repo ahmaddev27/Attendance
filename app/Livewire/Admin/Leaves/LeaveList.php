@@ -87,7 +87,7 @@ class LeaveList extends Component
     private function leavesQuery()
     {
         return LeaveRequest::query()
-            ->with('employee')
+            ->with(['employee', 'reviewer'])
             ->when($this->status !== 'all', fn ($query) => $query->where('status', $this->status))
             ->when($this->from, fn ($query) => $query->whereDate('start_date', '>=', $this->from))
             ->when($this->to, fn ($query) => $query->whereDate('end_date', '<=', $this->to))

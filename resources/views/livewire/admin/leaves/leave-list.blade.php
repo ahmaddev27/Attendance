@@ -1,24 +1,29 @@
-<div class="p-6">
-    <h1 class="text-2xl font-bold mb-4">طلبات الإجازة</h1>
+<div>
+    <div class="flex justify-between items-end pb-6 mb-6 border-b border-hairline">
+        <div>
+            <div class="text-xs text-muted mb-1">الإجازات</div>
+            <h1 class="text-2xl md:text-3xl font-bold text-ink tracking-tight">طلبات الإجازة</h1>
+        </div>
+    </div>
 
     @if (session('success'))
-        <div class="bg-green-100 text-green-800 border border-green-300 rounded p-3 mb-4">
+        <div class="bg-success-soft text-success rounded-lg px-4 py-3 mb-6 text-sm font-medium">
             {{ session('success') }}
         </div>
     @endif
 
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-        <select wire:model.live="status" class="border p-2 rounded">
+    <div class="flex flex-wrap gap-2.5 mb-4">
+        <select wire:model.live="status" class="px-3 py-2 text-sm border border-hairline-strong rounded-lg bg-surface">
             <option value="all">كل الحالات</option>
             <option value="pending">قيد المراجعة</option>
             <option value="approved">مقبولة</option>
             <option value="rejected">مرفوضة</option>
         </select>
 
-        <input type="date" wire:model.live="from" class="border p-2 rounded" placeholder="من تاريخ">
-        <input type="date" wire:model.live="to" class="border p-2 rounded" placeholder="إلى تاريخ">
+        <input type="date" wire:model.live="from" class="px-3 py-2 text-sm border border-hairline-strong rounded-lg bg-surface">
+        <input type="date" wire:model.live="to" class="px-3 py-2 text-sm border border-hairline-strong rounded-lg bg-surface">
 
-        <select wire:model.live="employeeId" class="border p-2 rounded">
+        <select wire:model.live="employeeId" class="px-3 py-2 text-sm border border-hairline-strong rounded-lg bg-surface">
             <option value="">كل الموظفين</option>
             @foreach ($employees as $employee)
                 <option value="{{ $employee->id }}">{{ $employee->name }} ({{ $employee->employee_number }})</option>
@@ -26,84 +31,112 @@
         </select>
     </div>
 
-    <table class="w-full border-collapse border">
-        <thead class="bg-gray-100">
-            <tr>
-                <th class="border p-2">الموظف</th>
-                <th class="border p-2">من</th>
-                <th class="border p-2">إلى</th>
-                <th class="border p-2">ملاحظة</th>
-                <th class="border p-2">الحالة</th>
-                <th class="border p-2">إجراءات</th>
-            </tr>
-        </thead>
-        <tbody>
-            @forelse ($leaves as $leave)
-                <tr wire:key="leave-{{ $leave->id }}">
-                    <td class="border p-2">{{ $leave->employee->name }}</td>
-                    <td class="border p-2 text-center">{{ $leave->start_date->format('Y-m-d') }}</td>
-                    <td class="border p-2 text-center">{{ $leave->end_date->format('Y-m-d') }}</td>
-                    <td class="border p-2 text-sm">{{ $leave->note }}</td>
-                    <td class="border p-2 text-center">
-                        @switch($leave->status->value)
-                            @case('pending')
-                                <span class="text-yellow-700">قيد المراجعة</span>
-                                @break
-                            @case('approved')
-                                <span class="text-green-700">مقبولة</span>
-                                @break
-                            @case('rejected')
-                                <span class="text-red-700">مرفوضة</span>
-                                @break
-                        @endswitch
-                    </td>
-                    <td class="border p-2 text-center">
-                        @if ($leave->status->value === 'pending')
-                            <button
-                                type="button"
-                                wire:click="approve({{ $leave->id }})"
-                                wire:confirm="هل تريد الموافقة على هذه الإجازة؟"
-                                class="text-green-600 hover:underline"
-                            >قبول</button>
-                            <button
-                                type="button"
-                                wire:click="startReject({{ $leave->id }})"
-                                class="text-red-600 hover:underline mx-2"
-                            >رفض</button>
-                        @else
-                            —
-                        @endif
-                    </td>
-                </tr>
-            @empty
+    <div class="bg-surface border border-hairline rounded-xl overflow-hidden">
+        <table class="w-full border-collapse">
+            <thead class="bg-surface-2">
                 <tr>
-                    <td class="border p-2 text-center text-gray-500" colspan="6">لا توجد طلبات إجازة</td>
+                    <th class="px-4 py-3 text-right text-[11px] font-semibold text-muted uppercase tracking-wider">الموظف</th>
+                    <th class="px-4 py-3 text-right text-[11px] font-semibold text-muted uppercase tracking-wider" style="width:120px">من</th>
+                    <th class="px-4 py-3 text-right text-[11px] font-semibold text-muted uppercase tracking-wider" style="width:120px">إلى</th>
+                    <th class="px-4 py-3 text-right text-[11px] font-semibold text-muted uppercase tracking-wider">الملاحظة</th>
+                    <th class="px-4 py-3 text-right text-[11px] font-semibold text-muted uppercase tracking-wider" style="width:130px">الحالة</th>
+                    <th class="px-4 py-3 text-right text-[11px] font-semibold text-muted uppercase tracking-wider" style="width:190px"></th>
                 </tr>
-            @endforelse
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @forelse ($leaves as $leave)
+                    <tr wire:key="leave-{{ $leave->id }}" class="border-t border-hairline hover:bg-surface-2 transition">
+                        <td class="px-4 py-3 text-[13px]">
+                            <div class="font-medium text-ink">{{ $leave->employee->name }}</div>
+                            <div class="text-[11px] text-muted num">#{{ $leave->employee->employee_number }}</div>
+                        </td>
+                        <td class="px-4 py-3 text-[13px]"><span class="num">{{ $leave->start_date->format('Y-m-d') }}</span></td>
+                        <td class="px-4 py-3 text-[13px]"><span class="num">{{ $leave->end_date->format('Y-m-d') }}</span></td>
+                        <td class="px-4 py-3 text-[13px] text-ink-2">{{ $leave->note ?: '—' }}</td>
+                        <td class="px-4 py-3 text-[13px]">
+                            @switch($leave->status->value)
+                                @case('pending')
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-warn-soft text-warn">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
+                                        قيد المراجعة
+                                    </span>
+                                    @break
+                                @case('approved')
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-success-soft text-success">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
+                                        مقبولة
+                                    </span>
+                                    @break
+                                @case('rejected')
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-danger-soft text-danger">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
+                                        مرفوضة
+                                    </span>
+                                    @break
+                            @endswitch
+                        </td>
+                        <td class="px-4 py-3 text-[13px] text-left">
+                            @if ($leave->status->value === 'pending')
+                                <div class="flex gap-2 justify-end">
+                                    <button
+                                        type="button"
+                                        wire:click="approve({{ $leave->id }})"
+                                        wire:confirm="هل تريد الموافقة على هذه الإجازة؟"
+                                        class="bg-brand hover:bg-brand-hover text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition"
+                                    >قبول</button>
+                                    <button
+                                        type="button"
+                                        wire:click="startReject({{ $leave->id }})"
+                                        class="bg-transparent border border-hairline-strong text-ink-2 hover:bg-surface-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition"
+                                    >رفض</button>
+                                </div>
+                            @elseif ($leave->status->value === 'approved')
+                                <div class="text-[11px] text-muted">
+                                    اعتمدها {{ $leave->reviewer?->name ?? '—' }}
+                                    @if ($leave->reviewed_at)
+                                        <span class="num">· {{ $leave->reviewed_at->diffForHumans() }}</span>
+                                    @endif
+                                </div>
+                            @else
+                                <div class="text-[11px] text-muted">
+                                    {{ $leave->rejection_reason ? str($leave->rejection_reason)->limit(30) : 'مرفوضة' }}
+                                </div>
+                            @endif
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="6" class="px-4 py-8 text-center text-sm text-muted">لا توجد طلبات إجازة</td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
 
     <div class="mt-4">{{ $leaves->links() }}</div>
 
     @if ($rejectingId)
-        <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div class="bg-white p-6 rounded max-w-md w-full">
-                <h2 class="text-xl font-bold mb-3">سبب الرفض</h2>
+        <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+            <div class="bg-surface border border-hairline rounded-xl p-6 max-w-md w-full shadow-lg">
+                <h2 class="text-base font-bold text-ink mb-1">سبب الرفض</h2>
+                <p class="text-[13px] text-muted mb-4">سيصل هذا السبب للموظف عبر SMS، وسيُحفظ في سجل الطلب.</p>
 
                 <textarea
                     wire:model="rejectReason"
-                    class="border p-2 rounded w-full"
                     rows="3"
+                    class="form-input"
                     placeholder="اكتب سبب رفض طلب الإجازة"
                 ></textarea>
                 @error('rejectReason')
-                    <div class="text-red-600 text-sm mt-1">{{ $message }}</div>
+                    <p class="text-danger text-xs mt-1.5">{{ $message }}</p>
                 @enderror
 
-                <div class="mt-4 flex justify-end gap-2">
-                    <button type="button" wire:click="cancelReject" class="px-4 py-2 rounded border">إلغاء</button>
-                    <button type="button" wire:click="confirmReject" class="bg-red-600 text-white px-4 py-2 rounded">
+                <div class="flex gap-2 justify-start mt-5">
+                    <button type="button" wire:click="confirmReject" class="bg-danger hover:opacity-90 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">
                         تأكيد الرفض
+                    </button>
+                    <button type="button" wire:click="cancelReject" class="bg-transparent border border-hairline-strong text-ink-2 hover:bg-surface-2 px-4 py-2 rounded-lg text-sm font-semibold transition">
+                        إلغاء
                     </button>
                 </div>
             </div>

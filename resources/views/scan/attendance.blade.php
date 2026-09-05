@@ -1,26 +1,50 @@
 @extends('layouts.public')
 @section('content')
-    <h1 class="text-2xl font-bold mb-6">تسجيل الحضور</h1>
+    <div class="text-center pt-6 pb-6">
+        <x-brand-mark class="w-12 h-12 mb-3 mx-auto" />
+    </div>
 
-    <form method="POST" action="{{ route('scan.attendance.preview') }}" x-data="{ lat: null, lng: null }" x-init="
+    <h2 class="text-xl font-bold text-ink text-center mb-1">تسجيل الحضور</h2>
+    <p class="text-sm text-muted text-center mb-8">أدخل رقمك الوظيفي</p>
+
+    <form method="POST" action="{{ route('scan.attendance.preview') }}"
+          x-data="{ lat: null, lng: null, locating: true }" x-init="
         if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(pos => { lat = pos.coords.latitude; lng = pos.coords.longitude; });
+            navigator.geolocation.getCurrentPosition(
+                pos => { lat = pos.coords.latitude; lng = pos.coords.longitude; locating = false; },
+                () => { locating = false; }
+            );
+        } else {
+            locating = false;
         }
     ">
         @csrf
         <input type="hidden" name="latitude" x-bind:value="lat">
         <input type="hidden" name="longitude" x-bind:value="lng">
 
-        <label class="block mb-1">الرقم الوظيفي</label>
-        <input type="number" name="employee_number" required autofocus
-               class="border p-3 rounded w-full text-center text-xl" dir="ltr">
+        <div class="mb-6">
+            <input type="number" name="employee_number" required autofocus
+                   class="w-full rounded-xl border border-hairline-strong bg-surface py-4 text-center text-[22px] font-bold tracking-wider num text-ink focus:border-brand focus:ring-1 focus:ring-brand"
+                   dir="ltr">
 
-        @error('employee_number')
-            <div class="text-red-600 text-sm mt-2">{{ $message }}</div>
-        @enderror
+            @error('employee_number')
+                <div class="text-danger text-sm mt-2 text-center">{{ $message }}</div>
+            @enderror
+        </div>
 
-        <button type="submit" class="mt-6 w-full bg-blue-600 text-white py-3 rounded-lg text-lg">
+        <button type="submit"
+                class="w-full bg-brand hover:bg-brand-hover text-white py-4 rounded-xl text-base font-semibold shadow transition">
             متابعة
         </button>
+
+        <div class="flex items-center justify-center gap-1.5 text-xs text-muted mt-6">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="10" r="3" />
+                <path d="M12 2a8 8 0 0 0-8 8c0 6 8 12 8 12s8-6 8-12a8 8 0 0 0-8-8z" />
+            </svg>
+            <span x-show="locating">جاري التحقّق من الموقع</span>
+            <span x-show="!locating && lat">تم تحديد الموقع</span>
+            <span x-show="!locating && !lat">تعذّر تحديد الموقع</span>
+        </div>
     </form>
 @endsection

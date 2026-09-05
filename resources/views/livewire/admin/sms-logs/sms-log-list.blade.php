@@ -1,54 +1,76 @@
-<div class="p-6">
-    <h1 class="text-2xl font-bold mb-4">سجل الرسائل النصية</h1>
+<div>
+    <div class="flex justify-between items-end pb-6 mb-6 border-b border-hairline">
+        <div>
+            <div class="text-xs text-muted mb-1">سجل SMS</div>
+            <h1 class="text-2xl md:text-3xl font-bold text-ink tracking-tight">الرسائل المرسلة</h1>
+        </div>
+    </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-        <select wire:model.live="status" class="border p-2 rounded">
+    <div class="flex flex-wrap gap-2.5 mb-4">
+        <select wire:model.live="status" class="px-3 py-2 text-sm border border-hairline-strong rounded-lg bg-surface">
             <option value="all">كل الحالات</option>
             <option value="sent">مرسلة</option>
             <option value="failed">فشلت</option>
         </select>
 
-        <input type="text" wire:model.live.debounce.300ms="phone" placeholder="بحث برقم الجوال" class="border p-2 rounded" dir="ltr">
+        <input
+            type="text"
+            wire:model.live.debounce.300ms="phone"
+            placeholder="بحث برقم الجوال…"
+            class="px-3 py-2 text-sm border border-hairline-strong rounded-lg bg-surface min-w-[200px] placeholder:text-muted"
+            dir="ltr"
+        >
 
-        <input type="date" wire:model.live="from" class="border p-2 rounded" placeholder="من تاريخ">
-        <input type="date" wire:model.live="to" class="border p-2 rounded" placeholder="إلى تاريخ">
+        <input type="date" wire:model.live="from" class="px-3 py-2 text-sm border border-hairline-strong rounded-lg bg-surface">
+        <input type="date" wire:model.live="to" class="px-3 py-2 text-sm border border-hairline-strong rounded-lg bg-surface">
     </div>
 
-    <table class="w-full border-collapse border">
-        <thead class="bg-gray-100">
-            <tr>
-                <th class="border p-2">الوقت</th>
-                <th class="border p-2">الجوال</th>
-                <th class="border p-2">الرسالة</th>
-                <th class="border p-2">الحالة</th>
-                <th class="border p-2">الخطأ</th>
-            </tr>
-        </thead>
-        <tbody>
-            @forelse ($logs as $log)
-                <tr wire:key="sms-log-{{ $log->id }}">
-                    <td class="border p-2 text-center">{{ $log->sent_at->format('Y-m-d H:i') }}</td>
-                    <td class="border p-2 text-center" dir="ltr">{{ $log->phone }}</td>
-                    <td class="border p-2 text-sm">{{ $log->message }}</td>
-                    <td class="border p-2 text-center">
-                        @switch($log->status->value)
-                            @case('sent')
-                                <span class="text-green-700">مرسلة</span>
-                                @break
-                            @case('failed')
-                                <span class="text-red-700">فشلت</span>
-                                @break
-                        @endswitch
-                    </td>
-                    <td class="border p-2 text-center text-red-600" dir="ltr">{{ $log->error_code }}</td>
-                </tr>
-            @empty
+    <div class="bg-surface border border-hairline rounded-xl overflow-hidden">
+        <table class="w-full border-collapse">
+            <thead class="bg-surface-2">
                 <tr>
-                    <td class="border p-2 text-center text-gray-500" colspan="5">لا توجد رسائل</td>
+                    <th class="px-4 py-3 text-right text-[11px] font-semibold text-muted uppercase tracking-wider" style="width:150px">الوقت</th>
+                    <th class="px-4 py-3 text-right text-[11px] font-semibold text-muted uppercase tracking-wider" style="width:150px">الجوال</th>
+                    <th class="px-4 py-3 text-right text-[11px] font-semibold text-muted uppercase tracking-wider">الرسالة</th>
+                    <th class="px-4 py-3 text-right text-[11px] font-semibold text-muted uppercase tracking-wider" style="width:100px">الحالة</th>
+                    <th class="px-4 py-3 text-right text-[11px] font-semibold text-muted uppercase tracking-wider" style="width:90px">الخطأ</th>
                 </tr>
-            @endforelse
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @forelse ($logs as $log)
+                    <tr wire:key="sms-log-{{ $log->id }}" class="border-t border-hairline hover:bg-surface-2 transition">
+                        <td class="px-4 py-3 text-[13px]"><span class="num">{{ $log->sent_at->format('Y-m-d H:i') }}</span></td>
+                        <td class="px-4 py-3 text-[13px]"><span class="num" dir="ltr">{{ $log->phone }}</span></td>
+                        <td class="px-4 py-3 text-[12.5px] text-ink-2">{{ $log->message }}</td>
+                        <td class="px-4 py-3 text-[13px]">
+                            @if ($log->status->value === 'sent')
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-success-soft text-success">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
+                                    مرسلة
+                                </span>
+                            @else
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-danger-soft text-danger">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
+                                    فشلت
+                                </span>
+                            @endif
+                        </td>
+                        <td class="px-4 py-3 text-[13px]">
+                            @if ($log->error_code)
+                                <span class="num text-danger font-semibold">{{ $log->error_code }}</span>
+                            @else
+                                <span class="text-muted">—</span>
+                            @endif
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="5" class="px-4 py-8 text-center text-sm text-muted">لا توجد رسائل</td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
 
     <div class="mt-4">{{ $logs->links() }}</div>
 </div>
