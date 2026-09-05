@@ -18,3 +18,7 @@ Route::middleware('auth')->group(function () {
 });
 
 require __DIR__.'/auth.php';
+
+Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
+    Route::view('/', 'admin.overview')->name('overview');
+});
