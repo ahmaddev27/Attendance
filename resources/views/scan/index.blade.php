@@ -19,7 +19,6 @@
         <a href="{{ route('scan.attendance.form') }}" class="block bg-blue-600 text-white text-center py-4 rounded-lg text-lg">
             تسجيل الحضور
         </a>
-        {{-- TODO(Task 4.2): replace placeholder route with the real leave-request form --}}
         <a href="{{ route('scan.leave.form') }}" class="block bg-purple-600 text-white text-center py-4 rounded-lg text-lg">
             طلب إجازة
         </a>
