@@ -1,0 +1,21 @@
+{
+  "name": "TAQAT - نظام إدارة الحضور",
+  "short_name": "TAQAT",
+  "description": "TAQAT Digital Workplace",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F7F8FB",
+  "theme_color": "#2678C4",
+  "orientation": "portrait-primary",
+  "lang": "ar",
+  "dir": "rtl",
+  "icons": [
+    { "src": "/img/logo.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/img/logo.png", "sizes": "512x512", "type": "image/png" }
+  ],
+  "shortcuts": [
+    { "name": "لوحة التحكم", "url": "/dashboard", "description": "لوحة التحكم الشخصية" },
+    { "name": "المهام", "url": "/my-tasks", "description": "مهامي" },
+    { "name": "الإجازات", "url": "/my-leaves", "description": "إجازاتي" }
+  ]
+}

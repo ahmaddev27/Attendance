@@ -17,3 +17,6 @@ export { tasksApi, myTasksApi } from '@/lib/api/endpoints/tasks';
 export { taskCommentsApi } from '@/lib/api/endpoints/task-comments';
 export { taskAttachmentsApi } from '@/lib/api/endpoints/task-attachments';
 export { taskStatusesApi, taskPrioritiesApi, taskTagsApi } from '@/lib/api/endpoints/task-config';
+export { adminDashboardApi } from '@/lib/api/endpoints/admin-dashboard';
+export { reportsApi, downloadCsv } from '@/lib/api/endpoints/reports';
+export { auditLogsApi } from '@/lib/api/endpoints/audit-logs';

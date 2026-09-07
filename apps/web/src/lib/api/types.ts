@@ -718,3 +718,177 @@ export type RequestForwardPayload = {
   forwarded_to_id: number;
   comment?: string;
 };
+
+// ---------------------------------------------------------------------------
+// Notifications (M7)
+// ---------------------------------------------------------------------------
+
+export type NotificationChannel = 'database' | 'sms' | 'email' | 'broadcast';
+
+export type Notification = {
+  id: string; // UUID from Laravel
+  type: string; // full class name, e.g. "App\\Modules\\Notifications\\Notifications\\TaskAssignedNotification"
+  data: {
+    title?: string;
+    body?: string;
+    action_url?: string;
+    icon?: string;
+    [key: string]: unknown;
+  };
+  read_at: string | null;
+  created_at: string;
+};
+
+export type NotificationPreference = {
+  notification_type: string;
+  channel: NotificationChannel;
+  enabled: boolean;
+};
+
+// ---------------------------------------------------------------------------
+// Employee dashboard (M7)
+// ---------------------------------------------------------------------------
+
+export type EmployeeDashboard = {
+  today: {
+    has_checked_in: boolean;
+    check_in_time: string | null;
+    check_out_time: string | null;
+    work_hours_so_far: number;
+  };
+  this_week: {
+    attendance_days: number;
+    total_hours: number;
+  };
+  this_month: {
+    attendance_percentage: number;
+    late_count: number;
+    absent_count: number;
+  };
+  tasks: {
+    assigned_open: number;
+    assigned_overdue: number;
+    assigned_due_today: number;
+    completed_this_week: number;
+  };
+  leaves: {
+    balances: Array<{ type: string; remaining: number; color: string }>;
+    pending_requests: number;
+    upcoming_approved: number;
+  };
+  requests: {
+    pending: number;
+    awaiting_my_approval: number;
+  };
+  unread_notifications: number;
+};
+
+// ---------------------------------------------------------------------------
+// M8 — Executive dashboard, reports, audit log
+// ---------------------------------------------------------------------------
+
+export type ExecutiveDashboard = {
+  employees: { total: number; active: number; on_leave: number; joined_this_month: number };
+  attendance_today: { present: number; absent_expected: number; late: number; on_leave_today: number };
+  requests: { pending_total: number; submitted_this_week: number };
+  leaves: { pending: number; approved_this_month: number };
+  tasks: { total_open: number; overdue: number; completed_this_week: number };
+  departments: Array<{ id: number; name: string; employees_count: number }>;
+  attendance_trend_7d: Array<{ date: string; present: number }>;
+};
+
+export type AttendanceTrendPoint = { date: string; present: number };
+
+export type DashboardDepartmentBreakdown = { id: number; name: string; employees_count: number };
+
+/**
+ * Dynamic report row — the reports endpoints return a shape that varies per
+ * report (attendance rows, leave rows, department-performance rows, …), so
+ * the table/columns are driven by whatever keys the API actually returns
+ * rather than a fixed type per report.
+ */
+export type ReportRow = Record<string, unknown>;
+
+export type AttendanceReportParams = {
+  from?: string;
+  to?: string;
+  employee_id?: number;
+  department_id?: number;
+  status?: AttendanceStatus;
+  page?: number;
+  per_page?: number;
+};
+
+export type LeaveReportParams = {
+  from?: string;
+  to?: string;
+  employee_id?: number;
+  department_id?: number;
+  leave_type_id?: number;
+  status?: LeaveStatus | 'all';
+  page?: number;
+  per_page?: number;
+};
+
+export type MonthlyEmployeeReport = {
+  employee: EmployeeSummary;
+  year: number;
+  month: number;
+  attendance_percentage: number;
+  working_days: number;
+  present_days: number;
+  absent_days: number;
+  late_minutes: number;
+  tasks_completed: number;
+  leaves_taken: number;
+  distribution: {
+    present: number;
+    absent: number;
+    leave: number;
+    weekend: number;
+    holiday: number;
+  };
+};
+
+export type DepartmentPerformanceParams = {
+  department_id?: number;
+  from?: string;
+  to?: string;
+};
+
+export type DepartmentPerformanceRow = {
+  department_id: number;
+  department_name: string;
+  employees_count: number;
+  avg_attendance_percentage: number;
+  task_completion_rate: number;
+  overdue_tasks: number;
+};
+
+export type AuditLogEntry = {
+  id: number;
+  log_name: string;
+  description: string;
+  subject_type: string | null;
+  subject_id: number | null;
+  causer_type: string | null;
+  causer_id: number | null;
+  causer: { id: number; name: string } | null;
+  event: string | null;
+  properties: {
+    old?: Record<string, unknown>;
+    attributes?: Record<string, unknown>;
+    [key: string]: unknown;
+  };
+  created_at: string;
+};
+
+export type AuditLogListParams = {
+  page?: number;
+  per_page?: number;
+  causer_id?: number;
+  subject_type?: string;
+  event?: string;
+  from?: string;
+  to?: string;
+};
