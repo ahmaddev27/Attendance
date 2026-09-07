@@ -11,11 +11,13 @@
 ############################################
 FROM php:8.4-cli-alpine AS composer_build
 
-# mbstring + zip are needed just to run `composer install` for a Laravel app:
-# laravel/framework's composer.json hard-requires ext-mbstring, and several
-# common packages (and Laravel itself) require ext-zip.
+# Composer checks ext-* platform requirements up-front, so every extension
+# listed in composer.json's "require" of any installed package must exist
+# here — not just in the runtime stage. Currently:
+#   mbstring (laravel/framework)  zip (laravel/framework + others)
+#   exif     (spatie/image via spatie/laravel-medialibrary)
 RUN apk add --no-cache git unzip libzip-dev oniguruma-dev ${PHPIZE_DEPS} \
-    && docker-php-ext-install mbstring zip
+    && docker-php-ext-install mbstring zip exif
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
