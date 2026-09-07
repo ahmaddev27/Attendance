@@ -196,6 +196,13 @@ jobs:
             # db/redis/minio keep running since we didn't rebuild them.
             $DC up -d --remove-orphans
 
+            # nginx is not rebuilt, so `up -d` leaves it running with a
+            # cached (and now stale) IP for the fresh api container. Restart
+            # it so `resolver` picks the new upstream IP up right away — the
+            # config-level fix (variable fastcgi_pass) is layered on top of
+            # this and covers future ad-hoc recreates.
+            $DC restart nginx
+
             echo ""
             echo "════════════════════════════════════════"
             echo "▶ 4/6  Waiting for api container to be ready"
