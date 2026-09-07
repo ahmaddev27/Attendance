@@ -13,6 +13,7 @@ import {
   Clock,
   Home,
   LogOut,
+  Palette,
   QrCode,
   Users,
   UsersRound,
@@ -37,6 +38,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/organization/schedules', label: 'الجداول', icon: Clock },
   { href: '/organization/holidays', label: 'العطل', icon: CalendarOff },
   { href: '/organization/devices', label: 'أجهزة QR', icon: QrCode },
+  { href: '/organization/leave-types', label: 'أنواع الإجازات', icon: Palette },
   { href: '/leaves', label: 'الإجازات', icon: Check },
   { href: '/tasks', label: 'المهام', icon: ClipboardCheck },
 ];

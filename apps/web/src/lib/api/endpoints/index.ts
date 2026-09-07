@@ -6,3 +6,6 @@ export { attendanceApi, scanApi } from '@/lib/api/endpoints/attendance';
 export { devicesApi } from '@/lib/api/endpoints/devices';
 export { holidaysApi } from '@/lib/api/endpoints/holidays';
 export { schedulesApi } from '@/lib/api/endpoints/schedules';
+export { leaveTypesApi } from '@/lib/api/endpoints/leave-types';
+export { leaveRequestsApi, myLeavesApi } from '@/lib/api/endpoints/leaves';
+export { leaveBalancesApi } from '@/lib/api/endpoints/leave-balances';

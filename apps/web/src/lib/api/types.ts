@@ -337,3 +337,78 @@ export type PositionListParams = {
   department_id?: number;
   is_active?: boolean;
 };
+
+// ---------------------------------------------------------------------------
+// Leaves (M4)
+// ---------------------------------------------------------------------------
+
+export type LeaveStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'cancelled';
+
+export type LeaveType = {
+  id: number;
+  name: string;
+  code: string;
+  is_paid: boolean;
+  is_balance_based: boolean;
+  default_annual_entitlement: number;
+  allow_negative_balance: boolean;
+  requires_attachment: boolean;
+  max_consecutive_days: number | null;
+  min_notice_days: number;
+  color: string;
+  is_active: boolean;
+  sort_order: number;
+};
+
+export type LeaveTypePayload = Omit<LeaveType, 'id'>;
+
+export type LeaveBalance = {
+  id: number;
+  employee_id: number;
+  leave_type_id: number;
+  leave_type?: LeaveType;
+  year: number;
+  entitlement: number;
+  used: number;
+  pending: number;
+  carry_over_from_previous: number;
+  remaining: number;
+  available: number;
+};
+
+export type LeaveRequest = {
+  id: number;
+  employee_id: number;
+  employee: EmployeeSummary;
+  leave_type_id: number;
+  leave_type: LeaveType;
+  start_date: string;
+  end_date: string;
+  days: number;
+  reason: string | null;
+  attachment_url: string | null;
+  status: LeaveStatus;
+  reviewed_by: number | null;
+  reviewer: { id: number; name: string } | null;
+  reviewed_at: string | null;
+  rejection_reason: string | null;
+  created_at: string;
+};
+
+export type LeaveRequestPayload = {
+  employee_id?: number;
+  leave_type_id: number;
+  start_date: string;
+  end_date: string;
+  reason?: string;
+};
+
+export type LeaveRequestListParams = {
+  page?: number;
+  per_page?: number;
+  employee_id?: number;
+  leave_type_id?: number;
+  status?: LeaveStatus | 'all';
+  from?: string;
+  to?: string;
+};

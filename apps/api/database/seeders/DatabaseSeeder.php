@@ -16,6 +16,7 @@ class DatabaseSeeder extends Seeder
             RolePermissionSeeder::class,
             DemoOrgSeeder::class,
             AttendanceSeeder::class,
+            LeaveSeeder::class,
         ]);
     }
 }

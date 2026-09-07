@@ -1,8 +1,9 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { CalendarDays, Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { DataTable, type DataTableColumn } from '@/components/data-table/data-table';
@@ -22,6 +23,7 @@ import { EMPLOYEE_STATUS_OPTIONS } from '@/lib/constants/employee-options';
 const PER_PAGE = 20;
 
 export default function EmployeesPage() {
+  const router = useRouter();
   const [page, setPage] = React.useState(1);
   const [search, setSearch] = React.useState('');
   const [departmentId, setDepartmentId] = React.useState<string | undefined>();
@@ -177,6 +179,11 @@ export default function EmployeesPage() {
         isLoading={isLoading}
         emptyMessage="لا يوجد موظفون مطابقون لبحثك"
         actions={[
+          {
+            label: 'عرض الإجازات',
+            icon: CalendarDays,
+            onClick: (employee) => router.push(`/employees/${employee.id}/leaves`),
+          },
           { label: 'تعديل', icon: Pencil, onClick: openEditDialog },
           { label: 'حذف', icon: Trash2, variant: 'destructive', onClick: setDeletingEmployee },
         ]}

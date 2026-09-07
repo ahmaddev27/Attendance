@@ -7,6 +7,10 @@ use App\Modules\Attendance\Controllers\ScanController;
 use App\Modules\Attendance\Controllers\WorkScheduleController;
 use App\Modules\Auth\Controllers\AuthController;
 use App\Modules\Employees\Controllers\EmployeeController;
+use App\Modules\Leaves\Controllers\EmployeeLeavesController;
+use App\Modules\Leaves\Controllers\LeaveBalanceController;
+use App\Modules\Leaves\Controllers\LeaveRequestController;
+use App\Modules\Leaves\Controllers\LeaveTypeController;
 use App\Modules\Organization\Controllers\DepartmentController;
 use App\Modules\Organization\Controllers\PositionController;
 use App\Modules\Organization\Controllers\TeamController;
@@ -63,4 +67,24 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::apiResource('work-schedules', WorkScheduleController::class)
         ->parameters(['work-schedules' => 'schedule']);
+});
+
+// M4 — Leaves: types + balances + requests.
+Route::middleware('auth:sanctum')->group(function () {
+    // Admin
+    Route::apiResource('leave-types', LeaveTypeController::class);
+    Route::apiResource('leave-requests', LeaveRequestController::class)->except(['update']);
+    Route::post('/leave-requests/{leave_request}/approve', [LeaveRequestController::class, 'approve']);
+    Route::post('/leave-requests/{leave_request}/reject', [LeaveRequestController::class, 'reject']);
+    Route::post('/leave-requests/{leave_request}/cancel', [LeaveRequestController::class, 'cancel']);
+    Route::get('/leave-balances', [LeaveBalanceController::class, 'index']); // ?employee_id=X&year=Y
+    Route::post('/leave-balances/adjust', [LeaveBalanceController::class, 'adjust']);
+
+    // Employee self-service (uses request()->user()->employee)
+    Route::prefix('me/leaves')->group(function () {
+        Route::get('/', [EmployeeLeavesController::class, 'index']); // my leave requests
+        Route::get('/balances', [EmployeeLeavesController::class, 'balances']); // my balances
+        Route::post('/', [EmployeeLeavesController::class, 'store']); // submit
+        Route::post('/{leave_request}/cancel', [EmployeeLeavesController::class, 'cancel']);
+    });
 });
