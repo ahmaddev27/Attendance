@@ -129,8 +129,9 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_SSH_PORT }}
-          script_stop: true
           command_timeout: 30m
+          # `set -euo pipefail` inside the script gives us fail-fast; the
+          # v1 action removed `script_stop` so we don't need it here.
           script: |
             set -euo pipefail
 
