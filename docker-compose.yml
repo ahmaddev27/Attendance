@@ -1,0 +1,148 @@
+services:
+  db:
+    image: mysql:8.4
+    container_name: taqat_db
+    environment:
+      MYSQL_ROOT_PASSWORD: root_secret
+      MYSQL_DATABASE: taqat
+      MYSQL_USER: taqat
+      MYSQL_PASSWORD: taqat_secret
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./infra/docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_secret"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [taqat]
+
+  redis:
+    image: redis:7-alpine
+    container_name: taqat_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [taqat]
+
+  minio:
+    image: minio/minio:latest
+    container_name: taqat_minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: taqat_minio
+      MINIO_ROOT_PASSWORD: taqat_minio_secret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [taqat]
+
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: ../../infra/docker/api/Dockerfile
+    container_name: taqat_api
+    volumes:
+      - ./apps/api:/var/www/html
+      - api_vendor:/var/www/html/vendor
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+    networks: [taqat]
+
+  nginx:
+    image: nginx:alpine
+    container_name: taqat_nginx
+    ports:
+      - "8000:80"
+    volumes:
+      - ./apps/api:/var/www/html:ro
+      - ./infra/docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on: [api]
+    networks: [taqat]
+
+  queue:
+    build:
+      context: ./apps/api
+      dockerfile: ../../infra/docker/api/Dockerfile
+    container_name: taqat_queue
+    command: php artisan queue:work redis --tries=3 --backoff=60 --queue=default,notifications,ai,reports
+    volumes:
+      - ./apps/api:/var/www/html
+      - api_vendor:/var/www/html/vendor
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    networks: [taqat]
+
+  scheduler:
+    build:
+      context: ./apps/api
+      dockerfile: ../../infra/docker/api/Dockerfile
+    container_name: taqat_scheduler
+    command: php artisan schedule:work
+    volumes:
+      - ./apps/api:/var/www/html
+      - api_vendor:/var/www/html/vendor
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    networks: [taqat]
+
+  reverb:
+    build:
+      context: ./apps/api
+      dockerfile: ../../infra/docker/api/Dockerfile
+    container_name: taqat_reverb
+    command: php artisan reverb:start --host=0.0.0.0 --port=8080
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./apps/api:/var/www/html
+      - api_vendor:/var/www/html/vendor
+    depends_on:
+      redis: { condition: service_healthy }
+    networks: [taqat]
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: ../../infra/docker/web/Dockerfile
+    container_name: taqat_web
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000/api
+      NEXT_PUBLIC_REVERB_HOST: localhost
+      NEXT_PUBLIC_REVERB_PORT: 8080
+      NEXT_PUBLIC_REVERB_APP_KEY: taqat-app-key
+    depends_on: [nginx]
+    networks: [taqat]
+
+volumes:
+  db_data:
+  redis_data:
+  minio_data:
+  api_vendor:
+
+networks:
+  taqat:
+    driver: bridge

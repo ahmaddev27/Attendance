@@ -1,0 +1,126 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  api-tests:
+    name: API (PHP 8.3 / Pest)
+    runs-on: ubuntu-latest
+
+    # Mirrors the credentials used by docker-compose.yml / infra/docker/mysql/init.sql
+    # so local dev and CI stay aligned. apps/api's own .env.testing / phpunit.xml
+    # may override these — adjust here if it configures something different.
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+          MYSQL_DATABASE: taqat_testing
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    defaults:
+      run:
+        working-directory: apps/api
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: mbstring, pdo_mysql, redis, gd, zip, bcmath, exif, pcntl, opcache
+          coverage: none
+
+      - name: Get Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: composer-${{ hashFiles('apps/api/composer.lock') }}
+          restore-keys: composer-
+
+      - name: Install PHP dependencies
+        run: composer install --no-progress --prefer-dist --no-interaction
+
+      - name: Prepare application key
+        run: |
+          [ -f .env ] || cp .env.example .env
+          php artisan key:generate --force
+
+      - name: Run tests
+        run: php artisan test
+        env:
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: taqat_testing
+          DB_USERNAME: root
+          DB_PASSWORD: ""
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: 6379
+          QUEUE_CONNECTION: sync
+          CACHE_STORE: array
+          SESSION_DRIVER: array
+
+  web-build:
+    name: Web (Node 20 / Next.js build)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          # Placeholder values are fine here — this job only verifies the
+          # build succeeds, it doesn't ship the resulting artifact. Real
+          # production values are baked in by .github/workflows/deploy.yml.
+          NEXT_PUBLIC_API_URL: http://localhost:8000/api
+          NEXT_PUBLIC_REVERB_HOST: localhost
+          NEXT_PUBLIC_REVERB_PORT: "8080"
+          NEXT_PUBLIC_REVERB_APP_KEY: taqat-app-key
+
+  ci-status:
+    name: CI status
+    if: always()
+    needs: [api-tests, web-build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any job failed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
