@@ -412,3 +412,309 @@ export type LeaveRequestListParams = {
   from?: string;
   to?: string;
 };
+
+// ---------------------------------------------------------------------------
+// Tasks (M6)
+// ---------------------------------------------------------------------------
+
+export type TaskAction =
+  | 'created'
+  | 'assigned'
+  | 'unassigned'
+  | 'status_changed'
+  | 'priority_changed'
+  | 'commented'
+  | 'attached_file'
+  | 'completed'
+  | 'deleted'
+  | 'restored';
+
+export type TaskStatus = {
+  id: number;
+  name: string;
+  code: string;
+  color: string;
+  sort_order: number;
+  is_done_state: boolean;
+  is_cancelled_state: boolean;
+};
+
+export type TaskStatusPayload = Omit<TaskStatus, 'id'>;
+
+export type TaskPriority = {
+  id: number;
+  name: string;
+  code: string;
+  color: string;
+  sort_order: number;
+};
+
+export type TaskPriorityPayload = Omit<TaskPriority, 'id'>;
+
+export type TaskTag = {
+  id: number;
+  name: string;
+  color: string;
+};
+
+export type TaskTagPayload = Omit<TaskTag, 'id'>;
+
+export type TaskAttachment = {
+  id: number;
+  file_name: string;
+  mime_type: string;
+  size: number;
+  uploaded_by: EmployeeSummary | null;
+  download_url: string;
+  created_at: string;
+};
+
+export type TaskComment = {
+  id: number;
+  user: { id: number; name: string; avatar_url: string | null };
+  parent_id: number | null;
+  body: string;
+  mentions: number[];
+  edited_at: string | null;
+  created_at: string;
+  can_edit: boolean;
+  can_delete: boolean;
+};
+
+export type TaskCommentPayload = {
+  body: string;
+  mentions?: number[];
+  parent_id?: number | null;
+};
+
+export type TaskHistoryEntry = {
+  id: number;
+  action: TaskAction;
+  user: { id: number; name: string };
+  old_value: unknown;
+  new_value: unknown;
+  created_at: string;
+};
+
+export type Task = {
+  id: number;
+  parent_task_id: number | null;
+  title: string;
+  description: string | null;
+  status: TaskStatus;
+  priority: TaskPriority;
+  creator: EmployeeSummary;
+  assignee: EmployeeSummary | null;
+  tags: TaskTag[];
+  estimated_hours: number | null;
+  actual_hours: number | null;
+  progress_percent: number;
+  start_date: string | null;
+  due_date: string | null;
+  completed_at: string | null;
+  comments_count: number;
+  attachments_count: number;
+  subtasks_count: number;
+  created_at: string;
+};
+
+export type TaskDetail = Task & {
+  subtasks: Task[];
+  comments: TaskComment[];
+  history: TaskHistoryEntry[];
+  attachments: TaskAttachment[];
+};
+
+export type TaskPayload = {
+  title: string;
+  description?: string;
+  parent_task_id?: number | null;
+  status_id: number;
+  priority_id: number;
+  assigned_to?: number | null;
+  estimated_hours?: number | null;
+  progress_percent?: number;
+  start_date?: string | null;
+  due_date?: string | null;
+  tag_ids?: number[];
+};
+
+export type TaskListParams = {
+  page?: number;
+  per_page?: number;
+  assigned_to?: number;
+  created_by?: number;
+  status_id?: number;
+  priority_id?: number;
+  tag_id?: number;
+  parent_task_id?: number | null;
+  due_from?: string;
+  due_to?: string;
+  search?: string;
+};
+
+export type KanbanBoard = Record<string, Task[]>; // keyed by status.code
+
+// ---------------------------------------------------------------------------
+// Workflow engine + request builder (M5)
+// ---------------------------------------------------------------------------
+
+export type RequestStatus =
+  | 'draft'
+  | 'submitted'
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'returned'
+  | 'cancelled'
+  | 'completed';
+
+export type ApproverType =
+  | 'direct_manager'
+  | 'department_manager'
+  | 'specific_employee'
+  | 'specific_role'
+  | 'form_field';
+
+export type ApprovalAction = 'approved' | 'rejected' | 'returned' | 'forwarded';
+
+export type FormFieldType = 'text' | 'textarea' | 'number' | 'date' | 'select' | 'checkbox' | 'file' | 'employee';
+
+export type FormField = {
+  key: string;
+  label: string;
+  type: FormFieldType;
+  required: boolean;
+  options?: string[];
+  min?: number;
+  max?: number;
+  placeholder?: string;
+};
+
+export type Workflow = {
+  id: number;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+  steps: WorkflowStep[];
+};
+
+export type WorkflowPayload = {
+  name: string;
+  description?: string | null;
+  is_active: boolean;
+};
+
+export type WorkflowStep = {
+  id: number;
+  workflow_id: number;
+  step_order: number;
+  name: string;
+  approver_type: ApproverType;
+  approver_ref: string | null;
+  can_reject: boolean;
+  can_return: boolean;
+  can_forward: boolean;
+  sla_hours: number | null;
+};
+
+export type WorkflowStepPayload = {
+  name: string;
+  approver_type: ApproverType;
+  approver_ref?: string | null;
+  can_reject: boolean;
+  can_return: boolean;
+  can_forward: boolean;
+  sla_hours?: number | null;
+};
+
+export type WorkflowStepReorderPayload = {
+  steps: { id: number; step_order: number }[];
+};
+
+export type RequestType = {
+  id: number;
+  name: string;
+  code: string;
+  description: string | null;
+  icon: string | null;
+  color: string;
+  workflow_id: number;
+  workflow?: Workflow;
+  form_schema: FormField[];
+  is_active: boolean;
+  sort_order: number;
+};
+
+export type RequestTypePayload = {
+  name: string;
+  code: string;
+  description?: string | null;
+  icon?: string | null;
+  color: string;
+  workflow_id: number;
+  form_schema: FormField[];
+  is_active: boolean;
+  sort_order: number;
+};
+
+export type RequestSummary = {
+  id: number;
+  request_number: string;
+  request_type: { id: number; name: string; color: string; icon: string | null };
+  employee: EmployeeSummary;
+  status: RequestStatus;
+  submitted_at: string | null;
+  completed_at: string | null;
+  /**
+   * Not part of the spec's base shape, but the admin/employee request list
+   * tables both need a "current step" column — mirrors the
+   * `WorkSchedule.employees_count` precedent above: optional because the
+   * list endpoint may omit it, in which case the UI falls back to a dash.
+   */
+  current_step?: { id: number; name: string; step_order: number } | null;
+};
+
+export type RequestApproval = {
+  id: number;
+  workflow_step: { id: number; name: string; step_order: number };
+  approver: EmployeeSummary;
+  action: ApprovalAction;
+  comment: string | null;
+  forwarded_to: EmployeeSummary | null;
+  decided_at: string;
+};
+
+export type RequestDetail = RequestSummary & {
+  form_data: Record<string, unknown>;
+  current_step: WorkflowStep | null;
+  approvals: RequestApproval[];
+};
+
+/** Admin "all requests" list filters — mirrors the leave-requests list pattern. */
+export type RequestListParams = {
+  page?: number;
+  per_page?: number;
+  search?: string;
+  status?: RequestStatus | 'all';
+  request_type_id?: number;
+  employee_id?: number;
+  from?: string;
+  to?: string;
+};
+
+/** Employee self-service submission payload — `request_type_id` + the dynamic form answers. */
+export type SubmitRequestPayload = {
+  request_type_id: number;
+  form_data: Record<string, unknown>;
+};
+
+/** Body for approve/reject/return — a free-text comment, required for reject/return. */
+export type RequestActionPayload = {
+  comment?: string;
+};
+
+export type RequestForwardPayload = {
+  forwarded_to_id: number;
+  comment?: string;
+};

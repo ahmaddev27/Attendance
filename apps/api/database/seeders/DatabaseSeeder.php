@@ -17,6 +17,8 @@ class DatabaseSeeder extends Seeder
             DemoOrgSeeder::class,
             AttendanceSeeder::class,
             LeaveSeeder::class,
+            RequestTypesSeeder::class,
+            TaskSeeder::class,
         ]);
     }
 }

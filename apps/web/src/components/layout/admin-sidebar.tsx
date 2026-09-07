@@ -11,10 +11,15 @@ import {
   Check,
   ClipboardCheck,
   Clock,
+  FileCog,
+  FileText,
+  GitBranch,
   Home,
+  Inbox,
   LogOut,
   Palette,
   QrCode,
+  Settings2,
   Users,
   UsersRound,
 } from 'lucide-react';
@@ -40,7 +45,12 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/organization/devices', label: 'أجهزة QR', icon: QrCode },
   { href: '/organization/leave-types', label: 'أنواع الإجازات', icon: Palette },
   { href: '/leaves', label: 'الإجازات', icon: Check },
+  { href: '/requests', label: 'الطلبات', icon: FileText },
+  { href: '/approvals', label: 'صندوق الموافقات', icon: Inbox },
+  { href: '/workflows', label: 'مسارات العمل', icon: GitBranch },
+  { href: '/request-types', label: 'أنواع الطلبات', icon: FileCog },
   { href: '/tasks', label: 'المهام', icon: ClipboardCheck },
+  { href: '/tasks-config/statuses', label: 'إعدادات المهام', icon: Settings2 },
 ];
 
 function isActivePath(pathname: string | null, href: string) {
