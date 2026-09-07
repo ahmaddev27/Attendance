@@ -8,7 +8,7 @@ on:
 
 jobs:
   api-tests:
-    name: API (PHP 8.3 / Pest)
+    name: API (PHP 8.4 / Pest)
     runs-on: ubuntu-latest
 
     # Mirrors the credentials used by docker-compose.yml / infra/docker/mysql/init.sql
@@ -42,10 +42,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup PHP 8.3
+      - name: Setup PHP 8.4
         uses: shivammathur/setup-php@v2
         with:
-          php-version: "8.3"
+          # Must match infra/docker/api/Dockerfile — some deps (symfony/clock 8.1,
+          # nesbot/carbon 3.13) hard-require PHP >= 8.4.1 in composer.lock.
+          php-version: "8.4"
           extensions: mbstring, pdo_mysql, redis, gd, zip, bcmath, exif, pcntl, opcache
           coverage: none
 
