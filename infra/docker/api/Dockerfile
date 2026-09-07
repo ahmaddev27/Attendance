@@ -1,12 +1,15 @@
 # syntax=docker/dockerfile:1
 #
-# TAQAT API — Laravel 11 (PHP 8.3)
+# TAQAT API — Laravel 11 (PHP 8.4)
 # Build context: ./apps/api  (see docker-compose.yml / docker-compose.prod.yml)
+#
+# NOTE: PHP 8.4 is required — symfony/clock 8.1 and nesbot/carbon 3.13 (locked
+# in composer.lock via laravel/framework 11) both hard-require PHP >= 8.4.1.
 
 ############################################
 # Stage 1 — composer: install PHP dependencies
 ############################################
-FROM php:8.3-cli-alpine AS composer_build
+FROM php:8.4-cli-alpine AS composer_build
 
 # mbstring + zip are needed just to run `composer install` for a Laravel app:
 # laravel/framework's composer.json hard-requires ext-mbstring, and several
@@ -27,13 +30,19 @@ COPY . .
 RUN composer install --no-dev --optimize-autoloader --prefer-dist --no-interaction
 
 ############################################
-# Stage 2 — runtime: PHP 8.3 FPM Alpine
+# Stage 2 — runtime: PHP 8.4 FPM Alpine
 ############################################
-FROM php:8.3-fpm-alpine AS runtime
+FROM php:8.4-fpm-alpine AS runtime
 
 # --- System libraries + PHP extensions --------------------------------------
-# pdo_mysql, redis, gd, zip, bcmath, opcache, exif, pcntl: required by spec.
+# pdo_mysql, gd, zip, bcmath, opcache, exif, pcntl: required by spec.
 # mbstring: required by laravel/framework itself (composer.json + runtime).
+#
+# NOTE: we deliberately do NOT install the phpredis extension. The API uses
+# the pure-PHP `predis/predis` client (REDIS_CLIENT=predis) so we skip the
+# `pecl install redis` step — pecl often fails to resolve a release compatible
+# with the current PHP version (No releases available), and predis matches
+# Laravel's Redis facade one-for-one.
 RUN apk add --no-cache \
         libzip \
         libpng \
@@ -60,10 +69,14 @@ RUN apk add --no-cache \
         exif \
         pcntl \
         opcache \
-    && pecl install redis \
-    && docker-php-ext-enable redis \
     && apk del .build-deps \
     && rm -rf /tmp/pear /var/cache/apk/*
+
+# --- PHP-FPM listen address --------------------------------------------------
+# The default php-fpm config binds to 127.0.0.1:9000, but nginx (in another
+# container) reaches us over the Docker network — that needs a TCP listener on
+# all interfaces. Same as `listen = 0.0.0.0:9000` in www.conf.
+RUN sed -i 's|^listen = .*|listen = 0.0.0.0:9000|' /usr/local/etc/php-fpm.d/www.conf
 
 ENV TZ=Asia/Amman
 

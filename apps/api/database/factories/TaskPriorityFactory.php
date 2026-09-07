@@ -21,7 +21,9 @@ class TaskPriorityFactory extends Factory
     {
         return [
             'name' => ucfirst($this->faker->unique()->word()),
-            'code' => $this->faker->unique()->slug(2, false),
+            // slug(2) can exceed 20 chars (schema limit) with long dictionary
+            // words. lexify gives a fixed 8-char code that always fits.
+            'code' => strtoupper($this->faker->unique()->lexify('PRI-????')),
             'color' => $this->faker->hexColor(),
             'sort_order' => 0,
         ];
