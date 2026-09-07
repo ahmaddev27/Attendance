@@ -5,6 +5,7 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -27,6 +28,7 @@ class User extends Authenticatable
         'phone',
         'password',
         'is_active',
+        'employee_id',
     ];
 
     /**
@@ -53,5 +55,15 @@ class User extends Authenticatable
             'is_active' => 'boolean',
             'password' => 'hashed',
         ];
+    }
+
+    /**
+     * The employee profile linked to this login account, if any.
+     *
+     * @return BelongsTo<Employee, $this>
+     */
+    public function employee(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class);
     }
 }

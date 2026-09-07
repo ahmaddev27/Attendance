@@ -1,0 +1,72 @@
+import { apiClient } from '../client';
+import { publicApiClient } from '../public-client';
+import type {
+  ApiResource,
+  Attendance,
+  AttendanceStatus,
+  MonthlyAttendanceSummary,
+  PaginatedResponse,
+  ScanDeviceInfo,
+  ScanResponse,
+} from '../types';
+
+export type AttendanceListParams = {
+  page?: number;
+  per_page?: number;
+  employee_id?: number;
+  from?: string;
+  to?: string;
+  status?: AttendanceStatus;
+};
+
+export type AttendanceExportParams = Omit<AttendanceListParams, 'page' | 'per_page'>;
+
+export const attendanceApi = {
+  list: (params: AttendanceListParams = {}) =>
+    apiClient
+      .get<PaginatedResponse<Attendance>>('/attendance', { params })
+      .then((r) => r.data),
+
+  get: (id: number) =>
+    apiClient.get<ApiResource<Attendance>>(`/attendance/${id}`).then((r) => r.data.data),
+
+  monthlySummary: (employeeId: number, year: number, month: number) =>
+    apiClient
+      .get<ApiResource<MonthlyAttendanceSummary>>(
+        `/attendance/employee/${employeeId}/monthly/${year}/${month}`
+      )
+      .then((r) => r.data.data),
+
+  /** Downloads the filtered attendance log as a CSV blob. */
+  exportCsv: (params: AttendanceExportParams = {}) =>
+    apiClient
+      .get('/attendance', {
+        params: { ...params, format: 'csv' },
+        responseType: 'blob',
+      })
+      .then((r) => r.data as Blob),
+};
+
+export type ScanCheckPayload = {
+  employee_number: number;
+  qr_token: string;
+  latitude?: number;
+  longitude?: number;
+};
+
+/**
+ * Public, unauthenticated calls made from the kiosk scan page. Uses
+ * publicApiClient (no auth header, no 401 -> /login redirect).
+ */
+export const scanApi = {
+  deviceInfo: (qrToken: string) =>
+    publicApiClient
+      .get<ApiResource<ScanDeviceInfo> | ScanDeviceInfo>(`/scan/device/${qrToken}`)
+      .then((r) => ('data' in r.data ? r.data.data : r.data)),
+
+  checkIn: (payload: ScanCheckPayload) =>
+    publicApiClient.post<ScanResponse>('/scan/check-in', payload).then((r) => r.data),
+
+  checkOut: (payload: ScanCheckPayload) =>
+    publicApiClient.post<ScanResponse>('/scan/check-out', payload).then((r) => r.data),
+};
