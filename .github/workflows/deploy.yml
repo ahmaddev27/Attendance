@@ -140,6 +140,11 @@ jobs:
 
             cd "$APP_PATH"
 
+            # If the SSH user (often root) differs from the directory owner,
+            # git refuses with 'dubious ownership'. Safe here — the workflow
+            # owns the deploy path — so we mark it trusted for git.
+            git config --global --add safe.directory "$APP_PATH" || true
+
             echo "════════════════════════════════════════"
             echo "▶ 1/6  Pulling latest code from origin/main"
             echo "════════════════════════════════════════"
