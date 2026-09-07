@@ -1,23 +1,47 @@
-/.phpunit.cache
-/node_modules
-/public/build
-/public/hot
-/public/storage
-/storage/*.key
-/storage/pail
-/vendor
+# Node
+node_modules/
+.next/
+.turbo/
+out/
+
+# PHP
+vendor/
+composer.phar
+
+# Laravel
+apps/api/.env
+apps/api/storage/*.key
+apps/api/storage/framework/cache/*
+apps/api/storage/framework/sessions/*
+apps/api/storage/framework/views/*
+apps/api/storage/logs/*
+apps/api/storage/app/private/*
+apps/api/storage/app/public/*
+apps/api/bootstrap/cache/*.php
+apps/api/public/build/
+apps/api/public/hot
+!apps/api/storage/framework/cache/.gitignore
+!apps/api/storage/framework/sessions/.gitignore
+!apps/api/storage/framework/views/.gitignore
+!apps/api/storage/logs/.gitignore
+
+# Next.js
+apps/web/.env
+apps/web/.env.local
+apps/web/next-env.d.ts
+
+# Docker / VPS
 .env
-.env.backup
+.env.local
 .env.production
-.phpactor.json
-.phpunit.result.cache
-Homestead.json
-Homestead.yaml
-npm-debug.log
-yarn-error.log
-/auth.json
-/.fleet
-/.idea
-/.nova
-/.vscode
-/.zed
+docker-compose.override.yml
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Session/agent artifacts
+.claude/launch.json
+!_v1_artifacts/

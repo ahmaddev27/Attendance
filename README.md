@@ -1,92 +1,38 @@
-# Employee Attendance System
+# TAQAT Digital Workplace
 
-Laravel 11 app for QR-based employee attendance tracking and leave management, with SMS notifications via MTC (Jordan).
+Employee management, attendance, tasks, projects, sprints, requests, and AI-powered insights for TAQAT.
 
-## Features
+## Structure
 
-- **Public QR scan flow** — employees check in/out and submit leave requests by scanning a fixed office QR code (no login required)
-- **Admin dashboard** — manage employees, review leave requests, view attendance logs, configure anti-fraud rules
-- **Configurable fraud protection** — GPS geofence and IP whitelist, each independently toggleable
-- **SMS notifications** — employee onboarding + leave approval/rejection decisions via MTC SMS API
-- **Auto check-in/out detection** — first scan of the day = check-in, second = check-out
-- **Arabic RTL UI**
+```
+taqat/
+├── apps/
+│   ├── api/          Laravel 11 REST API (Sanctum + Spatie)
+│   └── web/          Next.js 15 SPA (React + TypeScript + Tailwind + shadcn/ui)
+├── infra/
+│   └── docker/       Dockerfiles for api, web, nginx
+├── docs/
+│   └── v2/           Architecture, ERD, phase plans
+├── docker-compose.yml       Local dev stack
+└── docker-compose.prod.yml  Production stack (VPS)
+```
 
-## Stack
-
-- Laravel 11 · PHP 8.3+
-- MySQL 8
-- Livewire 3 (admin dashboard)
-- Tailwind CSS + Alpine.js
-- Laravel Breeze (admin auth)
-- Pest (testing)
-- MTC SMS HTTP API
-
-## Quick Start
+## Quick start (dev)
 
 ```bash
-composer install
-npm install && npm run build
-cp .env.example .env
-php artisan key:generate
-php artisan migrate --seed
-php artisan queue:work &
-php artisan serve
+docker compose up -d
+docker compose exec api php artisan migrate --seed
 ```
 
-Default admin login: `admin@example.com` / `password`.
-Change the password immediately after first login.
+- API: http://localhost:8000
+- Web: http://localhost:3000
+- Reverb WS: ws://localhost:8080
+- MinIO: http://localhost:9001
 
-## Configuration
+## Docs
 
-All runtime settings live in the `/admin/settings` page — no `.env` edits needed after install:
-- GPS check (toggle, office lat/lng, geofence radius)
-- IP whitelist (toggle, list of IPs/CIDRs)
-- MTC SMS credentials (username, password, sender name)
-- Employee number starting value (default 1001)
+See [`docs/v2/`](docs/v2/) for the full planning package (overview, architecture, ERD, phase-1 plan).
 
-## Application URLs
+## History
 
-| URL | Purpose |
-|---|---|
-| `/scan` | Public QR landing page (no auth) |
-| `/scan/attendance` | Attendance form |
-| `/scan/leave` | Leave request form |
-| `/admin` | Admin dashboard (requires login) |
-| `/admin/employees` | Employee CRUD |
-| `/admin/attendance` | Attendance log |
-| `/admin/leaves` | Leave request review |
-| `/admin/settings` | System configuration |
-| `/admin/sms-logs` | SMS delivery audit log |
-
-## Testing
-
-```bash
-composer test
-```
-
-## Deployment
-
-- Run the queue worker as a supervisor process: `php artisan queue:work --tries=3 --backoff=60`
-- Set `Asia/Amman` timezone on the server
-- Serve behind HTTPS — browsers require secure context for the geolocation API used by the scan page
-- Generate a fresh `APP_KEY` per environment
-- Change the seeded admin password before exposing the admin panel
-- **Do not reuse the empty `DB_PASSWORD` from local development** in staging or production
-
-## Architecture
-
-Clean layered architecture:
-
-```
-Controllers/Livewire → Services → Repositories → Models
-```
-
-- **Controllers**: thin, HTTP validation and dispatch only
-- **Livewire Components**: reactive admin dashboard state (filters, tables, modals)
-- **Services**: all business logic (`EmployeeService`, `AttendanceService`, `LeaveService`, `FraudGuardService`, `SettingsService`, `SmsService`)
-- **Repositories**: all DB queries
-- **Models**: Eloquent relationships and casts only
-
-SMS is abstracted behind `SmsGatewayInterface` (production: `MtcSmsGateway`, tests: `FakeSmsGateway`).
-
-See `docs/superpowers/specs/` and `docs/superpowers/plans/` for the PRD and implementation plan.
+The v1 (single Laravel monolith with Livewire) is preserved in the `v1-final` git tag and in `_v1_artifacts/`.

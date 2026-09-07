@@ -1,0 +1,73 @@
+   TAQAT Design Tokens
+   ========================================================================== */
+
+:root {
+    --ground: #F7F8FB;
+    --surface: #FFFFFF;
+    --surface-2: #EEF1F6;
+    --ink: #17222E;
+    --ink-2: #47536A;
+    --muted: #5B6478;
+    --hairline: #E4E8EF;
+    --hairline-strong: #D2D8E1;
+
+    --brand: #2678C4;
+    --brand-hover: #1E63A6;
+    --brand-soft: #E6F0F8;
+    --brand-ink: #0F4A7F;
+
+    --accent: #F5A623;
+    --accent-soft: #FDF2DC;
+    --accent-ink: #9C6205;
+
+    --success: #1E9E7F;
+    --success-soft: #DDF0E9;
+    --warn: #F5A623;
+    --warn-soft: #FDF2DC;
+    --danger: #C74F35;
+    --danger-soft: #FBE5DE;
+
+    --shadow-sm: 0 1px 2px rgba(23, 34, 46, .04), 0 2px 8px rgba(23, 34, 46, .04);
+    --shadow: 0 1px 2px rgba(23, 34, 46, .05), 0 4px 12px rgba(23, 34, 46, .06);
+    --shadow-lg: 0 4px 12px rgba(23, 34, 46, .06), 0 20px 40px rgba(23, 34, 46, .08);
+
+    --radius: 12px;
+    --radius-sm: 8px;
+    --radius-lg: 20px;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ground: #0E1520;
+        --surface: #182231;
+        --surface-2: #202B3D;
+        --ink: #F0F3F8;
+        --ink-2: #C4CCDA;
+        --muted: #9BA6BB;
+        --hairline: #253046;
+        --hairline-strong: #303C56;
+
+        --brand: #4A97DE;
+        --brand-hover: #6BAAE5;
+        --brand-soft: #1A3350;
+        --brand-ink: #A5CDF0;
+
+        --accent: #F5B347;
+        --accent-soft: #3B2E15;
+        --accent-ink: #F5C876;
+
+        --success: #46B892;
+        --success-soft: #17352C;
+        --warn: #F5B347;
+        --warn-soft: #3B2E15;
+        --danger: #DE6F55;
+        --danger-soft: #3A211B;
+
+        --shadow-sm: 0 1px 2px rgba(0, 0, 0, .2), 0 2px 8px rgba(0, 0, 0, .2);
+        --shadow: 0 1px 2px rgba(0, 0, 0, .25), 0 4px 12px rgba(0, 0, 0, .3);
+        --shadow-lg: 0 4px 12px rgba(0, 0, 0, .3), 0 20px 40px rgba(0, 0, 0, .4);
+    }
+}
+
+/* ==========================================================================
+   Base
