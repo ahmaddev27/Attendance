@@ -143,6 +143,21 @@ jobs:
             echo "▶ 1/6  Pulling latest code from origin/main"
             echo "════════════════════════════════════════"
             git fetch origin main
+
+            # Rescue any untracked file that's now tracked upstream — git
+            # reset --hard refuses to clobber untracked files, and we'd
+            # rather rename than lose them. Idempotent: once tracked, the
+            # ls-files check makes this a no-op.
+            for f in docker-compose.simple.yml infra/docker/nginx/default.conf; do
+              if git ls-tree -r origin/main --name-only | grep -Fxq "$f"; then
+                if [ -e "$f" ] && ! git ls-files --error-unmatch "$f" >/dev/null 2>&1; then
+                  BACKUP="${f}.pre-track.$(date +%Y%m%d-%H%M%S)"
+                  echo "   ⚠ '$f' is now tracked upstream but currently untracked here — backing up to '$BACKUP'"
+                  mv "$f" "$BACKUP"
+                fi
+              fi
+            done
+
             BEFORE=$(git rev-parse HEAD)
             git reset --hard origin/main
             AFTER=$(git rev-parse HEAD)
