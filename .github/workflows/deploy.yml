@@ -8,8 +8,18 @@ on:
     workflows: ["CI"]
     branches: [main]
     types: [completed]
+  # Manual trigger: Actions tab → "Build & Push Images" → Run workflow.
+  # Useful for the very first deploy (workflow_run needs the file on main
+  # first) or to redeploy without re-running CI.
+  workflow_dispatch:
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # OPTIONAL: build & push images to GHCR.
+  # The VPS currently builds locally (see the `deploy` job below), so this is
+  # only useful if you later switch to `image:` pulls. Safe to keep — no cost
+  # to the deploy path.
+  # ---------------------------------------------------------------------------
   build-api:
     name: Build & push API image
     if: github.event.workflow_run.conclusion == 'success'
@@ -70,7 +80,6 @@ jobs:
           # infra/docker/web/Dockerfile) so they must be supplied here, not on
           # the VPS's .env. None of these are secret — they ship in the public
           # JS bundle by design — so they're repo Variables, not Secrets.
-          # Configure them under Settings -> Secrets and variables -> Actions -> Variables.
           build-args: |
             NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
             NEXT_PUBLIC_REVERB_HOST=${{ vars.NEXT_PUBLIC_REVERB_HOST }}
@@ -83,34 +92,139 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ---------------------------------------------------------------------------
-  # Deploy to the VPS over SSH. Disabled until the VPS is provisioned.
+  # Deploy to the VPS over SSH.
   #
-  # Requires GitHub secrets: VPS_HOST, VPS_USER, VPS_SSH_KEY, GHCR_TOKEN (or GITHUB_TOKEN)
-  # (GHCR auth above already reuses the built-in GITHUB_TOKEN — you only need a
-  # separate GHCR_TOKEN if the VPS pulls images itself using a PAT instead of
-  # `docker login` with a token you provision another way.)
+  # SAFETY GUARANTEES (this job intentionally NEVER):
+  #   - overwrites .env or apps/api/.env  (both are .gitignored)
+  #   - drops / truncates / seeds the database
+  #   - deletes untracked files on the VPS (no `git clean`)
+  #   - runs `migrate:fresh` — only `migrate --force` (adds new migrations)
   #
-  # To enable:
-  #   1. Provision the VPS, install Docker + Docker Compose.
-  #   2. `git clone` this repo to /srv/taqat on the VPS.
-  #   3. Copy .env.example to /srv/taqat/.env and fill in real secrets.
-  #   4. Add the VPS_HOST / VPS_USER / VPS_SSH_KEY secrets in
-  #      Settings -> Secrets and variables -> Actions.
-  #   5. Uncomment the job below.
+  # WHAT IT DOES:
+  #   1. `git fetch && git reset --hard origin/main` — brings tracked files to
+  #      match the commit that just passed CI. Untracked files (docker-compose.simple.yml,
+  #      .env, database volumes) are left alone.
+  #   2. Rebuilds only the app images (api, web) and recreates their containers.
+  #      db/redis/minio containers keep running untouched.
+  #   3. Runs `php artisan migrate --force` — additive only, no destructive ops.
+  #   4. Caches config/route/view for prod.
+  #
+  # REQUIRED SECRETS (all already set in repo settings):
+  #   VPS_HOST, VPS_USER, VPS_SSH_KEY, VPS_SSH_PORT, VPS_APP_PATH
   # ---------------------------------------------------------------------------
-  # deploy:
-  #   name: Deploy to VPS
-  #   needs: [build-api, build-web]
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: appleboy/ssh-action@v1
-  #       with:
-  #         host: ${{ secrets.VPS_HOST }}
-  #         username: ${{ secrets.VPS_USER }}
-  #         key: ${{ secrets.VPS_SSH_KEY }}
-  #         script: |
-  #           cd /srv/taqat
-  #           git pull
-  #           docker compose -f docker-compose.prod.yml pull
-  #           docker compose -f docker-compose.prod.yml up -d
-  #           docker compose -f docker-compose.prod.yml exec -T api php artisan migrate --force
+  deploy:
+    name: Deploy to VPS
+    if: github.event.workflow_run.conclusion == 'success'
+    # Deliberately does NOT depend on build-api/build-web — VPS builds locally,
+    # so ghcr push failures shouldn't block the deploy.
+    runs-on: ubuntu-latest
+    concurrency:
+      group: vps-deploy
+      cancel-in-progress: false
+    steps:
+      - name: SSH → git pull → rebuild → migrate
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT }}
+          script_stop: true
+          command_timeout: 30m
+          script: |
+            set -euo pipefail
+
+            APP_PATH="${{ secrets.VPS_APP_PATH }}"
+            COMPOSE_FILE="docker-compose.simple.yml"
+
+            cd "$APP_PATH"
+
+            echo "════════════════════════════════════════"
+            echo "▶ 1/6  Pulling latest code from origin/main"
+            echo "════════════════════════════════════════"
+            git fetch origin main
+            BEFORE=$(git rev-parse HEAD)
+            git reset --hard origin/main
+            AFTER=$(git rev-parse HEAD)
+            echo "   $BEFORE → $AFTER"
+
+            # This deploy path REQUIRES the VPS-local docker-compose.simple.yml —
+            # a custom file (not in git) tailored for the shared cPanel host:
+            # binds only nginx:8180 / web:8181 / reverb:8182 and keeps db/redis/minio
+            # on the Docker network. The dev docker-compose.yml would collide with
+            # cPanel's Redis and expose ports we don't want public. Fail loudly
+            # rather than silently deploying with the wrong config.
+            if [ ! -f "$COMPOSE_FILE" ]; then
+              echo "✗ ERROR: $COMPOSE_FILE missing in $APP_PATH"
+              echo "  This file lives only on the VPS (untracked) — re-create it before retrying."
+              exit 1
+            fi
+            DC="docker compose -f $COMPOSE_FILE"
+
+            echo ""
+            echo "════════════════════════════════════════"
+            echo "▶ 2/6  Rebuilding api + web images"
+            echo "════════════════════════════════════════"
+            $DC build api web
+
+            echo ""
+            echo "════════════════════════════════════════"
+            echo "▶ 3/6  Recreating containers (db/redis/minio untouched)"
+            echo "════════════════════════════════════════"
+            # up -d only recreates containers whose image or config changed;
+            # db/redis/minio keep running since we didn't rebuild them.
+            $DC up -d --remove-orphans
+
+            echo ""
+            echo "════════════════════════════════════════"
+            echo "▶ 4/6  Waiting for api container to be ready"
+            echo "════════════════════════════════════════"
+            for i in $(seq 1 30); do
+              if $DC exec -T api php -v >/dev/null 2>&1; then
+                echo "   api ready after ${i}s"
+                break
+              fi
+              sleep 1
+            done
+
+            echo ""
+            echo "════════════════════════════════════════"
+            echo "▶ 5/6  Running migrations (additive only, --force, no seed)"
+            echo "════════════════════════════════════════"
+            $DC exec -T api php artisan migrate --force
+
+            echo ""
+            echo "════════════════════════════════════════"
+            echo "▶ 6/6  Rebuilding Laravel caches for prod"
+            echo "════════════════════════════════════════"
+            $DC exec -T api php artisan config:clear
+            $DC exec -T api php artisan config:cache
+            $DC exec -T api php artisan route:cache
+            $DC exec -T api php artisan view:cache
+            # Storage symlink (idempotent — silent no-op if it already exists)
+            $DC exec -T api php artisan storage:link 2>/dev/null || true
+
+            echo ""
+            echo "════════════════════════════════════════"
+            echo "✓ Deploy complete: $AFTER"
+            echo "════════════════════════════════════════"
+
+      - name: Post-deploy health check
+        run: |
+          set -e
+          echo "→ Checking https://attendees.taqatgaza.com/health"
+          for i in $(seq 1 12); do
+            if curl -sf --max-time 5 https://attendees.taqatgaza.com/health > /tmp/health.json; then
+              echo "✓ API healthy: $(cat /tmp/health.json)"
+              exit 0
+            fi
+            # Fall back to plain HTTP while SSL isn't set up yet
+            if curl -sf --max-time 5 http://attendees.taqatgaza.com/health > /tmp/health.json; then
+              echo "✓ API healthy (HTTP): $(cat /tmp/health.json)"
+              exit 0
+            fi
+            echo "   waiting for API (attempt ${i}/12)…"
+            sleep 5
+          done
+          echo "✗ API did not respond to /health within 60s"
+          exit 1

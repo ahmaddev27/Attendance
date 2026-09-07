@@ -3,7 +3,6 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
-use Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -13,9 +12,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        $middleware->api(prepend: [
-            EnsureFrontendRequestsAreStateful::class,
-        ]);
+        // Pure Bearer-token auth via Sanctum PersonalAccessTokens.
+        // We intentionally do NOT enable EnsureFrontendRequestsAreStateful:
+        // the SPA lives on the same origin as the API, so Sanctum would
+        // upgrade every request to a session-based (CSRF-required) request.
+        // Bearer tokens in Authorization headers work correctly without it.
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //
