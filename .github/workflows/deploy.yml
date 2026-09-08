@@ -140,25 +140,34 @@ jobs:
 
             cd "$APP_PATH"
 
-            # If the SSH user (often root) differs from the directory owner,
-            # git refuses with 'dubious ownership'. Safe here — the workflow
-            # owns the deploy path — so we mark it trusted for git.
+            # SSH user vs directory owner mismatch → git 'dubious ownership'
             git config --global --add safe.directory "$APP_PATH" || true
 
             echo "════════════════════════════════════════"
-            echo "▶ 1/6  Pulling latest code from origin/main"
+            echo "▶ 1/8  Pulling latest code from origin/main"
             echo "════════════════════════════════════════"
+
+            # HARD SAFETY: .env is never touched by the deploy path. Verify
+            # it is git-ignored so no reset can wipe it. If someone accidentally
+            # committed it, abort loudly rather than deploy over their secrets.
+            if git ls-files --error-unmatch .env >/dev/null 2>&1; then
+              echo "✗ FATAL: .env is tracked in git — deploy refuses to run"
+              echo "  Remove it from the index: git rm --cached .env && commit"
+              exit 1
+            fi
+            [ -f .env ] && cp .env .env.pre-deploy.$(date +%Y%m%d-%H%M%S) && \
+              echo "   ✓ .env backed up before pull"
+
             git fetch origin main
 
-            # Rescue any untracked file that's now tracked upstream — git
-            # reset --hard refuses to clobber untracked files, and we'd
-            # rather rename than lose them. Idempotent: once tracked, the
-            # ls-files check makes this a no-op.
+            # Rescue any file that's now tracked upstream but currently
+            # untracked here — git reset --hard refuses to clobber untracked
+            # files, so we rename rather than lose them.
             for f in docker-compose.simple.yml infra/docker/nginx/default.conf; do
               if git ls-tree -r origin/main --name-only | grep -Fxq "$f"; then
                 if [ -e "$f" ] && ! git ls-files --error-unmatch "$f" >/dev/null 2>&1; then
                   BACKUP="${f}.pre-track.$(date +%Y%m%d-%H%M%S)"
-                  echo "   ⚠ '$f' is now tracked upstream but currently untracked here — backing up to '$BACKUP'"
+                  echo "   ⚠ '$f' is tracked upstream but untracked here — backing up to '$BACKUP'"
                   mv "$f" "$BACKUP"
                 fi
               fi
@@ -169,72 +178,92 @@ jobs:
             AFTER=$(git rev-parse HEAD)
             echo "   $BEFORE → $AFTER"
 
-            # This deploy path REQUIRES the VPS-local docker-compose.simple.yml —
-            # a custom file (not in git) tailored for the shared cPanel host:
-            # binds only nginx:8180 / web:8181 / reverb:8182 and keeps db/redis/minio
-            # on the Docker network. The dev docker-compose.yml would collide with
-            # cPanel's Redis and expose ports we don't want public. Fail loudly
-            # rather than silently deploying with the wrong config.
+            # Detect what changed — informs which containers actually need rebuild
+            CHANGED_FILES=$(git diff --name-only "$BEFORE" "$AFTER" 2>/dev/null || echo "all")
+            echo "   Changed files: $(echo "$CHANGED_FILES" | wc -l) file(s)"
+
             if [ ! -f "$COMPOSE_FILE" ]; then
               echo "✗ ERROR: $COMPOSE_FILE missing in $APP_PATH"
-              echo "  This file lives only on the VPS (untracked) — re-create it before retrying."
               exit 1
             fi
             DC="docker compose -f $COMPOSE_FILE"
 
             echo ""
             echo "════════════════════════════════════════"
-            echo "▶ 2/6  Rebuilding api + web images"
+            echo "▶ 2/8  Sync composer.lock if composer.json changed"
             echo "════════════════════════════════════════"
-            $DC build api web
+            # If composer.json changed but composer.lock didn't (e.g. someone
+            # added a package manually), regenerate the lock via the composer
+            # image so 'composer install' inside the Dockerfile succeeds.
+            if echo "$CHANGED_FILES" | grep -q "^apps/api/composer.json$" && \
+               ! echo "$CHANGED_FILES" | grep -q "^apps/api/composer.lock$"; then
+              echo "   composer.json changed but lock did not — regenerating"
+              docker run --rm -v "$(pwd)/apps/api:/app" -w /app \
+                composer:2 config policy.advisories.block false >/dev/null 2>&1 || true
+              docker run --rm -v "$(pwd)/apps/api:/app" -w /app \
+                composer:2 update --no-scripts --no-interaction \
+                --ignore-platform-reqs --no-audit --lock
+            else
+              echo "   composer.lock is in sync — skipping"
+            fi
 
             echo ""
             echo "════════════════════════════════════════"
-            echo "▶ 3/6  Recreating containers (db/redis/minio untouched)"
+            echo "▶ 3/8  Rebuilding api + web images"
             echo "════════════════════════════════════════"
-            # up -d only recreates containers whose image or config changed;
-            # db/redis/minio keep running since we didn't rebuild them.
-            $DC up -d --remove-orphans
+            $DC build --pull api web
 
-            # nginx is not rebuilt, so `up -d` leaves it running with a
-            # cached (and now stale) IP for the fresh api container. Restart
-            # it so `resolver` picks the new upstream IP up right away — the
-            # config-level fix (variable fastcgi_pass) is layered on top of
-            # this and covers future ad-hoc recreates.
+            echo ""
+            echo "════════════════════════════════════════"
+            echo "▶ 4/8  Recreating containers (db/redis/minio untouched)"
+            echo "════════════════════════════════════════"
+            # --force-recreate ensures containers pick up new .env values even
+            # when only env vars (not the image) changed. db/redis/minio are
+            # intentionally listed EXCEPT so their data volumes stay attached
+            # and their processes are never interrupted.
+            $DC up -d --no-deps --force-recreate api web queue scheduler reverb
+
+            # nginx needs a restart AFTER api is recreated so its resolver
+            # picks up the fresh api container IP right away (the resolver
+            # 10s TTL is the safety net for future recreates).
             $DC restart nginx
 
             echo ""
             echo "════════════════════════════════════════"
-            echo "▶ 4/6  Waiting for api container to be ready"
+            echo "▶ 5/8  Waiting for api container to be ready"
             echo "════════════════════════════════════════"
-            for i in $(seq 1 30); do
-              if $DC exec -T api php -v >/dev/null 2>&1; then
+            for i in $(seq 1 60); do
+              if $DC exec -T api php artisan --version >/dev/null 2>&1; then
                 echo "   api ready after ${i}s"
                 break
+              fi
+              if [ "$i" = "60" ]; then
+                echo "   ✗ api never became ready — dumping logs"
+                $DC logs --tail=50 api
+                exit 1
               fi
               sleep 1
             done
 
             echo ""
             echo "════════════════════════════════════════"
-            echo "▶ 5/6  Running migrations (additive only, --force, no seed)"
+            echo "▶ 6/8  Running migrations (additive only)"
             echo "════════════════════════════════════════"
             $DC exec -T api php artisan migrate --force
 
             echo ""
             echo "════════════════════════════════════════"
-            echo "▶ 6/7  Rebuilding Laravel caches for prod"
+            echo "▶ 7/8  Rebuilding Laravel caches for prod"
             echo "════════════════════════════════════════"
             $DC exec -T api php artisan config:clear
             $DC exec -T api php artisan config:cache
             $DC exec -T api php artisan route:cache
             $DC exec -T api php artisan view:cache
-            # Storage symlink (idempotent — silent no-op if it already exists)
             $DC exec -T api php artisan storage:link 2>/dev/null || true
 
             echo ""
             echo "════════════════════════════════════════"
-            echo "▶ 7/7  Verifying containers + pruning old images"
+            echo "▶ 8/8  Verifying containers + pruning old images"
             echo "════════════════════════════════════════"
             # Every app service should be running post-deploy. If any is stuck
             # in Restarting / Exit, surface it here so the workflow fails
