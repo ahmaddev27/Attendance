@@ -223,7 +223,7 @@ jobs:
 
             echo ""
             echo "════════════════════════════════════════"
-            echo "▶ 6/6  Rebuilding Laravel caches for prod"
+            echo "▶ 6/7  Rebuilding Laravel caches for prod"
             echo "════════════════════════════════════════"
             $DC exec -T api php artisan config:clear
             $DC exec -T api php artisan config:cache
@@ -231,6 +231,36 @@ jobs:
             $DC exec -T api php artisan view:cache
             # Storage symlink (idempotent — silent no-op if it already exists)
             $DC exec -T api php artisan storage:link 2>/dev/null || true
+
+            echo ""
+            echo "════════════════════════════════════════"
+            echo "▶ 7/7  Verifying containers + pruning old images"
+            echo "════════════════════════════════════════"
+            # Every app service should be running post-deploy. If any is stuck
+            # in Restarting / Exit, surface it here so the workflow fails
+            # loudly instead of leaving a half-broken stack alive.
+            EXPECTED="db redis minio api nginx web queue scheduler reverb"
+            for svc in $EXPECTED; do
+              STATUS=$($DC ps --format '{{.State}}' "$svc" 2>/dev/null || echo "missing")
+              if [ "$STATUS" != "running" ]; then
+                echo "   ✗ $svc: $STATUS"
+                $DC logs --tail=30 "$svc" || true
+                exit 1
+              fi
+              echo "   ✓ $svc: running"
+            done
+
+            # Dangling images pile up after every rebuild (old layers no image
+            # tag points at). Prune them so /var/lib/docker doesn't grow
+            # forever. --filter until= keeps images built in the last hour so
+            # a rollback via `docker tag` still works.
+            echo ""
+            echo "→ Pruning dangling images older than 1h"
+            docker image prune -f --filter "until=60m" || true
+            # Cap the buildx cache to keep the disk in check without paying
+            # a full cold-build cost on every deploy.
+            echo "→ Trimming build cache to 3GB"
+            docker builder prune -f --keep-storage 3g || true
 
             echo ""
             echo "════════════════════════════════════════"
