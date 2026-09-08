@@ -7,6 +7,7 @@ namespace App\Modules\Tasks\Services;
 use App\Models\Task;
 use App\Models\TaskStatus;
 use App\Models\User;
+use App\Modules\Notifications\Services\NotificationService;
 use App\Modules\Tasks\Events\TaskCreated;
 use App\Modules\Tasks\Events\TaskUpdated;
 use App\Modules\Tasks\Repositories\TaskRepository;
@@ -38,6 +39,7 @@ class TaskService
         private readonly TaskRepository $tasks,
         private readonly TaskStatusRepository $statuses,
         private readonly TaskHistoryService $history,
+        private readonly NotificationService $notifier,
     ) {}
 
     /**
@@ -120,6 +122,10 @@ class TaskService
 
         TaskCreated::dispatch($task);
 
+        if (! empty($data['assigned_to'])) {
+            $this->notifier->taskAssigned($task->fresh(['assignee.user']));
+        }
+
         return $task;
     }
 
@@ -163,6 +169,12 @@ class TaskService
         });
 
         TaskUpdated::dispatch($updated, $changes);
+
+        // A reassignment (assigned_to change to a non-null value) triggers a
+        // notification to the new assignee. Skips no-op updates and unassigns.
+        if (array_key_exists('assigned_to', $changes) && $changes['assigned_to'][1] !== null) {
+            $this->notifier->taskAssigned($updated->fresh(['assignee.user']));
+        }
 
         return $updated;
     }

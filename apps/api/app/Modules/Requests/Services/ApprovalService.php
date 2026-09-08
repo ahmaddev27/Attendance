@@ -7,6 +7,7 @@ namespace App\Modules\Requests\Services;
 use App\Models\Employee;
 use App\Models\Request as RequestModel;
 use App\Models\WorkflowStep;
+use App\Modules\Notifications\Services\NotificationService;
 use App\Modules\Requests\Events\RequestApproved;
 use App\Modules\Requests\Repositories\ApprovalRepository;
 use App\Modules\Requests\Repositories\RequestRepository;
@@ -29,6 +30,7 @@ class ApprovalService
         private readonly RequestRepository $requests,
         private readonly ApprovalRepository $approvals,
         private readonly ApproverResolver $resolver,
+        private readonly NotificationService $notifier,
     ) {}
 
     public function approve(RequestModel $request, Employee $approver, ?string $comment = null): RequestModel
@@ -61,6 +63,7 @@ class ApprovalService
             $fresh = $this->requests->findOrFail($locked->id);
 
             RequestApproved::dispatch($fresh);
+            $this->notifier->requestDecided($fresh);
 
             return $fresh;
         });
@@ -92,7 +95,10 @@ class ApprovalService
                 'completed_at' => now(),
             ]);
 
-            return $this->requests->findOrFail($locked->id);
+            $fresh = $this->requests->findOrFail($locked->id);
+            $this->notifier->requestDecided($fresh);
+
+            return $fresh;
         });
     }
 
@@ -127,7 +133,10 @@ class ApprovalService
                 'current_step_id' => null,
             ]);
 
-            return $this->requests->findOrFail($locked->id);
+            $fresh = $this->requests->findOrFail($locked->id);
+            $this->notifier->requestDecided($fresh);
+
+            return $fresh;
         });
     }
 

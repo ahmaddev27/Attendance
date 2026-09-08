@@ -14,6 +14,7 @@ use App\Modules\Leaves\Controllers\LeaveTypeController;
 use App\Modules\Organization\Controllers\DepartmentController;
 use App\Modules\Organization\Controllers\PositionController;
 use App\Modules\Organization\Controllers\TeamController;
+use App\Modules\Notifications\Controllers\MyNotificationsController;
 use App\Modules\Reports\Controllers\AdminDashboardController;
 use App\Modules\Requests\Controllers\ApprovalInboxController;
 use App\Modules\Requests\Controllers\MyRequestsController;
@@ -179,4 +180,13 @@ Route::middleware('auth:sanctum')->group(function () {
     // sidebars and the endpoint returns aggregate counts, not per-employee
     // detail, so the current guard is sufficient.
     Route::get('/admin/dashboard/kpis', [AdminDashboardController::class, 'kpis']);
+
+    // Notifications (M7). Every user sees only their own inbox — the
+    // controller uses $request->user()->notifications, not a global list.
+    Route::prefix('me/notifications')->group(function () {
+        Route::get('/', [MyNotificationsController::class, 'index']);
+        Route::get('/unread-count', [MyNotificationsController::class, 'unreadCount']);
+        Route::post('/read-all', [MyNotificationsController::class, 'markAllRead']);
+        Route::post('/{id}/read', [MyNotificationsController::class, 'markRead']);
+    });
 });

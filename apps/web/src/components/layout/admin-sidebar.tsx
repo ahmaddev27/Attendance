@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
+  Bell,
   Briefcase,
   Building,
   Calendar,
@@ -51,6 +52,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/request-types', label: 'أنواع الطلبات', icon: FileCog },
   { href: '/tasks', label: 'المهام', icon: ClipboardCheck },
   { href: '/tasks-config/statuses', label: 'إعدادات المهام', icon: Settings2 },
+  { href: '/notifications', label: 'الإشعارات', icon: Bell },
 ];
 
 function isActivePath(pathname: string | null, href: string) {

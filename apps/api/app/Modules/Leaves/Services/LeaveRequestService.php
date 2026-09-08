@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Modules\Leaves\Repositories\LeaveBalanceRepository;
 use App\Modules\Leaves\Repositories\LeaveRequestRepository;
 use App\Modules\Leaves\Repositories\LeaveTypeRepository;
+use App\Modules\Notifications\Services\NotificationService;
 use App\Shared\Enums\LeaveStatus;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
@@ -37,6 +38,7 @@ class LeaveRequestService
         private readonly LeaveTypeRepository $leaveTypes,
         private readonly LeaveBalanceRepository $balances,
         private readonly LeaveWorkingDaysCalculator $calculator,
+        private readonly NotificationService $notifier,
     ) {}
 
     /**
@@ -152,7 +154,10 @@ class LeaveRequestService
                 $balance->increment('used', $locked->days);
             }
 
-            return $locked->fresh(['employee', 'leaveType', 'reviewer']);
+            $fresh = $locked->fresh(['employee.user', 'leaveType', 'reviewer']);
+            $this->notifier->leaveDecided($fresh);
+
+            return $fresh;
         });
     }
 
@@ -179,7 +184,10 @@ class LeaveRequestService
                 $balance->decrement('pending', $locked->days);
             }
 
-            return $locked->fresh(['employee', 'leaveType', 'reviewer']);
+            $fresh = $locked->fresh(['employee.user', 'leaveType', 'reviewer']);
+            $this->notifier->leaveDecided($fresh);
+
+            return $fresh;
         });
     }
 
