@@ -23,37 +23,29 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
-# Install dependencies before copying the rest of the app so this (slow) layer
-# stays cached as long as composer.json/composer.lock don't change.
-COPY composer.json composer.lock ./
-# Same three failure modes as CI: happy `install`, out-of-sync lock, or
-# a Packagist security-advisory block on a locked framework version.
-# The fallback disables the advisory policy for this build only and lets
-# `update -W` regenerate the lock in place. No `--no-audit` here — the
-# flag arrived in composer 2.6 and older base images still ship <2.6,
-# where the option is a hard error instead of a silent no-op.
-RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-interaction \
-    || (composer config policy.advisories.block false \
-        && composer update --no-dev --no-scripts --no-autoloader --prefer-dist --no-interaction \
-                          --with-all-dependencies --ignore-platform-reqs)
-
 COPY . .
-# Re-run install (not just dump-autoload) so composer verifies vendor/
-# actually holds every package installed.json claims. `dump-autoload`
-# alone happily generates references to files it never checks for on
-# disk — we hit this with symfony/polyfill-mbstring after the first
-# install's fallback partially recovered from a stale lock: autoloader
-# eagerly `require`s the polyfill bootstrap at every request, and any
-# missing file becomes a fatal error on the first hit.
+
+# Single-pass install after the full source is present, into a fresh
+# vendor/ directory. We used to split this into two steps (deps only,
+# then app + optimize-autoloader) for layer caching, but the split kept
+# leaving symfony/polyfill-* and symfony/deprecation-contracts files
+# out of vendor/ — the fallback `composer update` on the first step
+# would resolve them into installed.json but never actually download
+# them, then `composer install` on the second step saw "everything
+# installed" and just regenerated the autoloader, which eagerly
+# require's those missing files at every request.
 #
-# The same install || update fallback guards the same three failure
-# modes as step 1 (lock in sync / lock behind composer.json / advisory
-# block), and `--no-scripts` keeps package:discover deferred to the
-# runtime entrypoint (see below).
-RUN composer install --no-dev --optimize-autoloader --prefer-dist --no-interaction --no-scripts \
-    || (composer config policy.advisories.block false \
-        && composer update --no-dev --optimize-autoloader --prefer-dist --no-interaction \
-                          --with-all-dependencies --ignore-platform-reqs --no-scripts)
+# `rm -rf vendor` guarantees this install starts from empty, so
+# nothing is skipped as "already there". Same three failure modes as
+# CI (lock in sync / lock behind composer.json / advisory block) still
+# fall through to `composer update -W` with the same flag set.
+# `--no-scripts` keeps package:discover deferred to the runtime
+# entrypoint, where the real .env + services are actually reachable.
+RUN rm -rf vendor \
+    && (composer install --no-dev --optimize-autoloader --prefer-dist --no-interaction --no-scripts \
+        || (composer config policy.advisories.block false \
+            && composer update --no-dev --optimize-autoloader --prefer-dist --no-interaction \
+                              --with-all-dependencies --ignore-platform-reqs --no-scripts))
 
 ############################################
 # Stage 2 — runtime: PHP 8.4 FPM Alpine
