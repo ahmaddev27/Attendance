@@ -12,6 +12,16 @@
  *
  * Runtime caches live under distinct names so a schema change bumps only
  * the affected cache — no global cache-buster needed on deploys.
+ *
+ * CACHING POLICY (2026-09):
+ *   Users kept seeing broken pages after deploys because the stock
+ *   `defaultCache` uses StaleWhileRevalidate for HTML + JS chunks — a
+ *   fresh visitor got the OLD hashed shell that referenced OLD chunk
+ *   filenames, then Next.js's runtime hit 404 on those and rendered
+ *   the client-exception overlay. To fix, we serve HTML documents and
+ *   Next's runtime chunks with NetworkFirst (small timeout, offline
+ *   fallback intact) so a fresh deploy is visible on the very next
+ *   navigation instead of after a stale-then-revalidate cycle.
  */
 
 import { defaultCache } from '@serwist/next/worker';
@@ -52,10 +62,32 @@ const serwist = new Serwist({
         cacheName: 'taqat-scan-device',
       }),
     },
+    // Document navigations — NetworkFirst with a 2s timeout so a fresh
+    // deploy shows up immediately on the next request, while an offline
+    // user still gets the last-known-good HTML from the cache (and the
+    // /offline fallback below when even that misses).
+    {
+      matcher: ({ request }) => request.destination === 'document',
+      handler: new NetworkFirst({
+        cacheName: 'taqat-pages',
+        networkTimeoutSeconds: 2,
+      }),
+    },
+    // Next.js runtime bundles (`/_next/static/chunks/**`, `/_next/data`,
+    // `/sw.js`, etc.) — the chunk filenames are content-hashed, so a
+    // network request for an old hash 404s after a deploy. Serve them
+    // NetworkFirst so the fresh shell fetches its matching chunks, not
+    // the stale ones the SW cached last visit.
+    {
+      matcher: ({ url }) => url.pathname.startsWith('/_next/'),
+      handler: new NetworkFirst({
+        cacheName: 'taqat-next',
+        networkTimeoutSeconds: 3,
+      }),
+    },
     // Everything else — use Serwist's sensible defaults (images,
-    // static assets, fonts, next static chunks). Add BackgroundSync
-    // for the two mutating scan endpoints so a check-in submitted
-    // offline still lands the next time the SW gets network.
+    // static assets, fonts). The overrides above land first because
+    // Serwist runs the runtimeCaching entries in order.
     ...defaultCache,
   ],
   fallbacks: {

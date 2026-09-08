@@ -30,7 +30,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <QueryProvider>
           {children}
-          <Toaster position="top-center" closeButton />
+          {/* top-left in RTL is the reading END — where notifications
+              naturally live in Arabic UIs, and where they stay out of the
+              way of the sidebar (right) and primary content area. */}
+          <Toaster position="top-left" closeButton />
         </QueryProvider>
       </body>
     </html>

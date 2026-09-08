@@ -31,5 +31,17 @@
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
+        <!--
+            Scout: no-op driver in tests. `Searchable` models (Employee,
+            Task, Request, LeaveRequest) fire the Scout observer on every
+            save — with the default `meilisearch` driver that observer
+            tries to reach http://meilisearch:7700 which doesn't exist
+            in CI, and every test that persists one of those models
+            explodes with "cURL error 6: Could not resolve host". The
+            `null` driver stubs the entire indexer without touching the
+            models themselves, so search-related feature tests still
+            need to be written explicitly around the real driver.
+        -->
+        <env name="SCOUT_DRIVER" value="null"/>
     </php>
 </phpunit>
