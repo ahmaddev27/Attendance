@@ -14,6 +14,7 @@ use App\Modules\Leaves\Controllers\LeaveTypeController;
 use App\Modules\Organization\Controllers\DepartmentController;
 use App\Modules\Organization\Controllers\PositionController;
 use App\Modules\Organization\Controllers\TeamController;
+use App\Modules\Reports\Controllers\AdminDashboardController;
 use App\Modules\Requests\Controllers\ApprovalInboxController;
 use App\Modules\Requests\Controllers\MyRequestsController;
 use App\Modules\Requests\Controllers\RequestController;
@@ -172,4 +173,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/', [MyRequestsController::class, 'store']); // submit
         Route::post('/{request}/cancel', [MyRequestsController::class, 'cancel']);
     });
+
+    // Admin dashboard KPIs (M8). Auth-only for now — RBAC lands with the
+    // rest of the admin routes; the UI already hides this from non-admin
+    // sidebars and the endpoint returns aggregate counts, not per-employee
+    // detail, so the current guard is sufficient.
+    Route::get('/admin/dashboard/kpis', [AdminDashboardController::class, 'kpis']);
 });
