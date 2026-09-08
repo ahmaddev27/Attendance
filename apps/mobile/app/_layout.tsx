@@ -22,6 +22,11 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '../lib/queryClient';
 import { colors } from '../lib/theme';
 import { useAuthStore } from '../lib/auth-store';
+import { configureNotificationHandler, registerPushToken } from '../lib/push-notifications';
+
+// Set the foreground-push presentation policy at module load — this
+// runs once per JS bundle and is safe to call before the tree renders.
+configureNotificationHandler();
 
 // One-shot RTL flip. Skipped on subsequent launches once the platform has
 // already been persisted into RTL mode.
@@ -92,6 +97,19 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       router.replace('/(tabs)');
     }
   }, [ready, status, token, segments, router]);
+
+  // Re-register the push token on every authenticated launch — the OS
+  // can rotate Expo's push token silently (rare, but happens after an
+  // OTA update / long inactivity), and the upsert on (user, device_id)
+  // keeps the DB clean instead of piling up duplicate rows. Skipped
+  // for the /scan modal segment so re-opening the QR scanner from
+  // deep-link doesn't burn a permission prompt every time.
+  useEffect(() => {
+    if (!ready || !token) return;
+    registerPushToken().catch(() => {
+      /* silent — nothing else in the app hard-depends on push */
+    });
+  }, [ready, token]);
 
   if (!ready) {
     return null;

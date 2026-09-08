@@ -21,12 +21,16 @@ import { colors, radius, spacing, typography } from '../../lib/theme';
 export default function LoginScreen() {
   const { login } = useAuth();
 
-  const [employeeNumber, setEmployeeNumber] = useState('');
+  // Single "identifier" input — accepts email OR employee number.
+  // The backend LoginRequest.identifier() picks the right lookup by
+  // detecting `@` in the string, so the UI stays a single field
+  // instead of a mode toggle.
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const canSubmit = employeeNumber.trim().length > 0 && password.length > 0;
+  const canSubmit = identifier.trim().length > 0 && password.length > 0;
 
   async function onSubmit() {
     if (!canSubmit || submitting) return;
@@ -34,7 +38,7 @@ export default function LoginScreen() {
     setSubmitting(true);
     try {
       await login({
-        employee_number: Number(employeeNumber.trim()),
+        identifier: identifier.trim(),
         password,
       });
       // Root layout's AuthGate handles the redirect.
@@ -67,11 +71,12 @@ export default function LoginScreen() {
 
           <View style={styles.form}>
             <Field
-              label="الرقم الوظيفي"
-              value={employeeNumber}
-              onChangeText={setEmployeeNumber}
-              keyboardType="number-pad"
-              placeholder="مثال: 1024"
+              label="البريد الإلكتروني أو الرقم الوظيفي"
+              value={identifier}
+              onChangeText={setIdentifier}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              placeholder="admin@taqat.local أو 1024"
               autoComplete="username"
               textContentType="username"
               editable={!submitting}
