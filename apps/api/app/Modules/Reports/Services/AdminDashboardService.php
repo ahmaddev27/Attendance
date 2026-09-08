@@ -10,6 +10,7 @@ use App\Models\LeaveRequest;
 use App\Models\Request as RequestModel;
 use App\Models\Task;
 use App\Shared\Enums\AttendanceStatus;
+use App\Shared\Enums\EmployeeStatus;
 use App\Shared\Enums\LeaveStatus;
 use App\Shared\Enums\RequestStatus;
 use Carbon\CarbonImmutable;
@@ -56,20 +57,23 @@ class AdminDashboardService
      */
     private function employeeCounts(): array
     {
-        // Single grouped query instead of two separate COUNTs. The result
-        // set is at most 2 rows (is_active = 0 | 1) so no downside.
+        // Single grouped query — one row per EmployeeStatus value (active,
+        // inactive, on_leave, terminated). We collapse everything that
+        // isn't 'active' into the inactive bucket for the KPI card, since
+        // the sidebar's own filter treats on_leave/terminated as
+        // "temporarily not around" rather than a separate cohort.
         $rows = Employee::query()
-            ->selectRaw('is_active, COUNT(*) as c')
-            ->groupBy('is_active')
-            ->pluck('c', 'is_active');
+            ->selectRaw('status, COUNT(*) as c')
+            ->groupBy('status')
+            ->pluck('c', 'status');
 
-        $active = (int) ($rows->get(1) ?? 0);
-        $inactive = (int) ($rows->get(0) ?? 0);
+        $active = (int) ($rows->get(EmployeeStatus::Active->value) ?? 0);
+        $total = (int) $rows->sum();
 
         return [
-            'total' => $active + $inactive,
+            'total' => $total,
             'active' => $active,
-            'inactive' => $inactive,
+            'inactive' => $total - $active,
         ];
     }
 

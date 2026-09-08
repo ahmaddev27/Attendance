@@ -12,6 +12,7 @@ use App\Models\Workflow;
 use App\Models\WorkflowStep;
 use App\Shared\Enums\ApproverType;
 use App\Shared\Enums\AttendanceStatus;
+use App\Shared\Enums\EmployeeStatus;
 use App\Shared\Enums\LeaveStatus;
 use App\Shared\Enums\RequestStatus;
 
@@ -36,13 +37,15 @@ test('kpis returns the expected top-level shape', function () {
 
 test('employee counts split active vs inactive', function () {
     $this->actingAs(User::factory()->create(), 'sanctum');
-    Employee::factory()->count(3)->create(['is_active' => true]);
-    Employee::factory()->count(2)->create(['is_active' => false]);
+    Employee::factory()->count(3)->create(['status' => EmployeeStatus::Active]);
+    Employee::factory()->count(2)->create(['status' => EmployeeStatus::Inactive]);
+    Employee::factory()->create(['status' => EmployeeStatus::OnLeave]);
+    Employee::factory()->create(['status' => EmployeeStatus::Terminated]);
 
     $this->getJson('/api/admin/dashboard/kpis')
-        ->assertJsonPath('data.employees.total', 5)
+        ->assertJsonPath('data.employees.total', 7)
         ->assertJsonPath('data.employees.active', 3)
-        ->assertJsonPath('data.employees.inactive', 2);
+        ->assertJsonPath('data.employees.inactive', 4); // everything not 'active'
 });
 
 test('today attendance groups late+early_leave and folds remote/mission into present', function () {
