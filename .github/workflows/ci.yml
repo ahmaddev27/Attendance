@@ -64,14 +64,23 @@ jobs:
 
       # `composer install` runs Laravel's post-autoload-dump hook, which calls
       # `php artisan package:discover`. That command bootstraps the framework
-      # and needs a readable `.env` — without one the container-registered
-      # facades never resolve and the whole install fails with
-      # "A facade root has not been set." So .env has to exist first, and we
-      # pass `--no-scripts` on install so the hook only runs after we've
-      # generated a real APP_KEY below.
-      - name: Prepare .env for post-install scripts
+      # and Laravel 11's Application::configure() throws "A facade root has
+      # not been set" whenever APP_KEY is missing (the Encrypter binds itself
+      # eagerly, then the Facade layer explodes when the key is empty). So
+      # we need BOTH a readable .env AND a real APP_KEY before any artisan
+      # command runs. Seeding the key with `sed` avoids the chicken-and-egg
+      # of running `key:generate` (which is itself an artisan command that
+      # would boot the framework and hit the same wall).
+      - name: Prepare .env with a real APP_KEY for post-install scripts
         run: |
           [ -f .env ] || cp .env.example .env
+          KEY="base64:$(head -c 32 /dev/urandom | base64)"
+          # `|` delimiter because the key itself contains `/` and `+`
+          # (base64 alphabet) and would break the default `/` separator.
+          sed -i "s|^APP_KEY=.*|APP_KEY=$KEY|" .env
+          # SANITY: fail loud if the substitution didn't take — every
+          # downstream step assumes APP_KEY is set.
+          grep -q "^APP_KEY=base64:" .env
 
       - name: Install PHP dependencies
         # Three failure modes we've seen in practice:
@@ -97,15 +106,13 @@ jobs:
             || composer update --no-progress --prefer-dist --no-interaction \
                               --with-all-dependencies --ignore-platform-reqs --no-scripts
 
-      - name: Generate app key + discover packages
-        # `key:generate --force` writes APP_KEY into the .env we seeded above.
-        # `package:discover` is the same command Composer's post-autoload-dump
-        # hook runs — calling it here directly makes the failure mode obvious
-        # (a broken provider surfaces as its own step, not as a generic
-        # "composer run-script failed").
-        run: |
-          php artisan key:generate --force
-          php artisan package:discover --ansi
+      - name: Discover packages
+        # APP_KEY is already set in .env from the previous step, so artisan
+        # can boot cleanly. This is the same command Composer's
+        # post-autoload-dump hook would run — calling it directly here
+        # surfaces provider errors with Laravel's own message instead of
+        # composer's generic "run-script failed" wrapper.
+        run: php artisan package:discover --ansi
 
       - name: Run tests
         run: php artisan test

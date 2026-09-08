@@ -39,14 +39,20 @@ RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-in
 
 COPY . .
 # Laravel's post-autoload-dump hook runs `php artisan package:discover`,
-# which boots the framework and dies with "A facade root has not been set"
-# if there is no readable .env at all — .env.example alone doesn't satisfy
-# Laravel's environment repository. `.env` is .gitignored (real values are
-# supplied via env_file at runtime), so seed a build-time placeholder that
-# never leaves this stage and never becomes the runtime .env. The two
-# stateful env vars that must be present (APP_KEY and any early-boot
-# services) come from `.env.example`; we just make sure the file exists.
-RUN [ -f .env ] || cp .env.example .env
+# which boots the framework. Two things have to be true before that boot
+# can succeed:
+#   1. A .env file exists (.env.example alone doesn't satisfy Laravel's
+#      environment repository, and .env itself is .gitignored).
+#   2. APP_KEY is set to a valid base64 string — Laravel 11's Encrypter
+#      binds itself eagerly and blows up with "A facade root has not
+#      been set" when the key is empty.
+# Both are build-time placeholders that never leave this stage: the
+# runtime container gets its real .env (with real APP_KEY) via env_file
+# in docker-compose. The build-time key is regenerated on every image
+# build so it never becomes a shared secret across builds.
+RUN [ -f .env ] || cp .env.example .env \
+    && KEY="base64:$(head -c 32 /dev/urandom | base64)" \
+    && sed -i "s|^APP_KEY=.*|APP_KEY=$KEY|" .env
 RUN composer install --no-dev --optimize-autoloader --prefer-dist --no-interaction
 
 ############################################
