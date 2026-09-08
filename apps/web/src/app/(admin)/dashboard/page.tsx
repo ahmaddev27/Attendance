@@ -1,6 +1,8 @@
 'use client';
 
+import * as React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
@@ -20,7 +22,7 @@ import {
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { adminDashboardApi, type AdminDashboardKpis } from '@/lib/api/endpoints/admin-dashboard';
-import { useAuthStore } from '@/lib/stores/auth-store';
+import { isAdminUser, useAuthStore } from '@/lib/stores/auth-store';
 import { cn } from '@/lib/utils';
 
 // Arabic day/month labels — no Intl dep, no browser locale drift.
@@ -36,11 +38,26 @@ function formatArabicDate(iso: string): string {
 }
 
 export default function AdminDashboardPage() {
+  const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const firstName = user?.name?.trim()?.split(' ')[0];
 
+  // Non-admin employees who typed /dashboard directly, or whose login
+  // redirect misfired, land here — and the admin-only KPIs endpoint
+  // returns 403. Redirect them to their own /home page instead of
+  // rendering an empty error state.
+  React.useEffect(() => {
+    if (user && !isAdminUser(user)) {
+      router.replace('/home');
+    }
+  }, [user, router]);
+
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin', 'dashboard', 'kpis'],
+    // Only fire the fetch for admin users — a regular employee's request
+    // would 403 before the redirect above kicked in on the next tick,
+    // adding a spurious error to the console.
+    enabled: user ? isAdminUser(user) : false,
     queryFn: async () => (await adminDashboardApi.kpis()).data.data,
     // Refresh every minute so counters like "present today" stay live
     // without hammering the endpoint.

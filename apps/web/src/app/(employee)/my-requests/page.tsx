@@ -65,11 +65,11 @@ export default function MyRequestsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold text-ink">طلباتي</h1>
         <Button onClick={() => setPickerOpen(true)} className="gap-2 bg-brand text-white hover:bg-brand-hover">
           <Plus className="h-4 w-4" />
           طلب جديد
         </Button>
-        <h1 className="text-2xl font-bold text-ink">طلباتي</h1>
       </div>
 
       <div className="rounded-xl border border-hairline bg-surface">

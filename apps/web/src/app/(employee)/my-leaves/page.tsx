@@ -70,11 +70,11 @@ export default function MyLeavesPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold text-ink">إجازاتي</h1>
         <Button onClick={() => setSubmitOpen(true)} className="gap-2 bg-brand text-white hover:bg-brand-hover">
           <Plus className="h-4 w-4" />
           طلب إجازة جديد
         </Button>
-        <h1 className="text-2xl font-bold text-ink">إجازاتي</h1>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
