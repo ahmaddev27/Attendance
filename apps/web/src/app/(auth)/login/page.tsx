@@ -13,7 +13,7 @@ import { useAuthStore, isAdminUser } from '@/lib/stores/auth-store';
 import { Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
-  const [employeeNumber, setEmployeeNumber] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const setAuth = useAuthStore((s) => s.setAuth);
@@ -23,8 +23,10 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
+      // Backend accepts either an email or an employee_number under the
+      // 'identifier' field. Auto-detects by looking for '@'.
       const { data } = await apiClient.post('/auth/login', {
-        employee_number: employeeNumber,
+        identifier: identifier.trim(),
         password,
       });
       setAuth(data.user, data.token);
@@ -53,16 +55,21 @@ export default function LoginPage() {
           </div>
           <form onSubmit={submit} className="space-y-4">
             <div>
-              <Label htmlFor="employee_number" className="text-xs font-semibold text-ink-2">الرقم الوظيفي</Label>
+              <Label htmlFor="identifier" className="text-xs font-semibold text-ink-2">
+                البريد الإلكتروني أو الرقم الوظيفي
+              </Label>
               <Input
-                id="employee_number"
-                type="number"
-                value={employeeNumber}
-                onChange={(e) => setEmployeeNumber(e.target.value)}
+                id="identifier"
+                type="text"
+                inputMode="email"
+                autoComplete="username"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
                 required
                 autoFocus
                 dir="ltr"
-                className="mt-1.5 text-right num"
+                placeholder="admin@taqat.local  أو  1000"
+                className="mt-1.5 text-left"
               />
             </div>
             <div>
@@ -70,15 +77,16 @@ export default function LoginPage() {
               <Input
                 id="password"
                 type="password"
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 dir="ltr"
-                className="mt-1.5 text-right"
+                className="mt-1.5 text-left"
               />
             </div>
             <Button type="submit" disabled={loading} className="w-full bg-brand hover:bg-brand-hover text-white">
-              {loading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+              {loading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
               دخول
             </Button>
           </form>

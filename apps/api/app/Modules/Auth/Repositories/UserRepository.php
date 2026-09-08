@@ -22,4 +22,17 @@ class UserRepository
             ->where('is_active', true)
             ->first();
     }
+
+    /**
+     * Find an active user by their email address. Case-insensitive on the
+     * left of the '@' — most SMTPs normalize casing anyway and admins
+     * shouldn't fail login over an inconsistent shift-lock.
+     */
+    public function findActiveByEmail(string $email): ?User
+    {
+        return User::query()
+            ->whereRaw('LOWER(email) = ?', [strtolower(trim($email))])
+            ->where('is_active', true)
+            ->first();
+    }
 }

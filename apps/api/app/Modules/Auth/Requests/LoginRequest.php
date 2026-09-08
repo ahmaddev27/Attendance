@@ -22,8 +22,23 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'employee_number' => ['required', 'integer'],
+            // `identifier` is the new canonical field — accepts either the
+            // numeric employee_number or an email address. Kept
+            // `employee_number` as a legacy alias so existing clients
+            // (the mobile app, the old web bundle) keep working while
+            // they update.
+            'identifier' => ['required_without:employee_number', 'string'],
+            'employee_number' => ['required_without:identifier'],
             'password' => ['required', 'string'],
         ];
+    }
+
+    /**
+     * Normalize legacy `employee_number` payloads into the new `identifier`
+     * shape so downstream code has one field to read.
+     */
+    public function identifier(): string
+    {
+        return (string) ($this->input('identifier') ?? $this->input('employee_number'));
     }
 }

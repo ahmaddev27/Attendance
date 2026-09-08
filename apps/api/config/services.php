@@ -35,4 +35,20 @@ return [
         ],
     ],
 
+    /*
+    | MTC SMS gateway (Jordan Telecom).
+    | Credentials live in env — the SmsGateway binding in
+    | AppServiceProvider picks the real gateway when username/password
+    | are set and `fake=false`, otherwise the FakeSmsGateway is used
+    | (also always used in the `testing` env).
+    */
+    'mtc_sms' => [
+        'username' => env('MTC_SMS_USERNAME'),
+        'password' => env('MTC_SMS_PASSWORD'),
+        'sender' => env('MTC_SMS_SENDER', 'TAQAT'),
+        'endpoint' => env('MTC_SMS_ENDPOINT'),
+        'timeout' => (int) env('MTC_SMS_TIMEOUT', 10),
+        'fake' => (bool) env('MTC_SMS_FAKE', false),
+    ],
+
 ];

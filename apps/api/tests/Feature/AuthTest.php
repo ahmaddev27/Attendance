@@ -39,7 +39,7 @@ test('login with wrong password is rejected', function () {
     ]);
 
     $response->assertUnprocessable()
-        ->assertJsonValidationErrors('employee_number');
+        ->assertJsonValidationErrors('identifier');
 });
 
 test('login with an inactive user is rejected', function () {
@@ -54,7 +54,7 @@ test('login with an inactive user is rejected', function () {
     ]);
 
     $response->assertUnprocessable()
-        ->assertJsonValidationErrors('employee_number');
+        ->assertJsonValidationErrors('identifier');
 });
 
 test('login with an unknown employee number is rejected', function () {
@@ -64,7 +64,7 @@ test('login with an unknown employee number is rejected', function () {
     ]);
 
     $response->assertUnprocessable()
-        ->assertJsonValidationErrors('employee_number');
+        ->assertJsonValidationErrors('identifier');
 });
 
 test('me returns the authenticated user', function () {
@@ -80,6 +80,36 @@ test('me is rejected without authentication', function () {
     $response = $this->getJson('/api/auth/me');
 
     $response->assertUnauthorized();
+});
+
+test('login with email + password returns a token', function () {
+    $user = User::factory()->create([
+        'employee_number' => 5000,
+        'email' => 'admin@example.test',
+        'password' => bcrypt('secret-password'),
+    ]);
+
+    $response = $this->postJson('/api/auth/login', [
+        'identifier' => 'admin@example.test',
+        'password' => 'secret-password',
+    ]);
+
+    $response->assertOk()
+        ->assertJsonPath('user.email', $user->email);
+});
+
+test('login by email is case-insensitive', function () {
+    User::factory()->create([
+        'email' => 'admin@example.test',
+        'password' => bcrypt('secret-password'),
+    ]);
+
+    $response = $this->postJson('/api/auth/login', [
+        'identifier' => 'ADMIN@Example.TEST',
+        'password' => 'secret-password',
+    ]);
+
+    $response->assertOk();
 });
 
 test('logout revokes the current access token', function () {

@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Modules\Notifications\Notifications;
 
+use App\Modules\Sms\Notifications\Channels\SmsChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\BroadcastMessage;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Str;
 
 /**
  * Single generic in-app notification.
@@ -18,11 +21,20 @@ use Illuminate\Notifications\Notification;
  * and the frontend bell can render any notification without a switch on
  * `type`. See NotificationService for the callers.
  *
- * Both delivery paths are used:
+ * Delivery paths:
  *   - database  : durable, powers the /me/notifications list + unread count
  *   - broadcast : real-time push via Reverb; the bell subscribes on connect
  *                 and invalidates its react-query cache so a fresh
  *                 notification appears without waiting for the 30s poll.
+ *   - mail      : added automatically when the app is configured with a
+ *                 real mail transport (i.e. not `log` / `array`) AND the
+ *                 recipient has an email address on file. Delivered via
+ *                 Resend in production (see config/mail.php).
+ *   - sms       : OPT-IN per notification via the $sendSms flag. Added
+ *                 only when MTC credentials are configured AND the
+ *                 recipient's linked Employee has a phone. Kept opt-in
+ *                 because SMS is metered and most in-app notifications
+ *                 don't warrant a text.
  */
 class TaqatNotification extends Notification
 {
@@ -37,6 +49,14 @@ class TaqatNotification extends Notification
      *                                    window — the DB row is still written
      *                                    (durable inbox) but Reverb is skipped
      *                                    to avoid toast/counter double-fires.
+     * @param  bool  $suppressMail  Opt-out for high-volume events (e.g. every
+     *                               approver on a step) that would otherwise
+     *                               flood inboxes. Database + broadcast still
+     *                               fire as usual.
+     * @param  bool  $sendSms  Opt-IN to also send this notification as an SMS
+     *                          via MTC. Defaults false because SMS costs money;
+     *                          only fires when MTC credentials are configured
+     *                          and the recipient's employee has a phone.
      */
     public function __construct(
         public readonly string $title,
@@ -45,6 +65,8 @@ class TaqatNotification extends Notification
         public readonly ?string $icon = null,
         public readonly array $meta = [],
         public readonly bool $suppressBroadcast = false,
+        public readonly bool $suppressMail = false,
+        public readonly bool $sendSms = false,
     ) {}
 
     /**
@@ -52,13 +74,52 @@ class TaqatNotification extends Notification
      */
     public function via(mixed $notifiable): array
     {
-        // Database is always written — it's the durable inbox.
+        $channels = ['database'];
+
         // Broadcast is added when Reverb is configured AND the caller
         // didn't ask us to suppress it (see $suppressBroadcast).
-        if ($this->suppressBroadcast || config('broadcasting.default') === 'null') {
-            return ['database'];
+        if (! $this->suppressBroadcast && config('broadcasting.default') !== 'null') {
+            $channels[] = 'broadcast';
         }
-        return ['database', 'broadcast'];
+
+        // Mail is added only when a real transport is configured (Resend/SMTP
+        // etc — never for `log` or `array`, which are dev/test-only) AND the
+        // recipient actually has an email address on file. suppressMail lets
+        // high-volume callers opt out without touching the transport config.
+        if (! $this->suppressMail && $this->hasRealMailTransport() && ! empty($notifiable->email ?? null)) {
+            $channels[] = 'mail';
+        }
+
+        // SMS is opt-in per notification and only fires when MTC is
+        // provisioned (username set OR fake driver enabled for smoke
+        // tests) AND the recipient's employee has a phone we can dial.
+        if ($this->sendSms && $this->smsIsSendable($notifiable)) {
+            $channels[] = SmsChannel::class;
+        }
+
+        return $channels;
+    }
+
+    /**
+     * True when the recipient can receive an SMS via MTC — i.e. the
+     * gateway is provisioned (real credentials OR the fake driver is
+     * explicitly enabled for local/staging smoke tests) AND we can
+     * resolve a phone from the notifiable's linked Employee. Guards
+     * every hop because either half can legitimately be missing (an
+     * admin User without an Employee, or an Employee without a phone).
+     */
+    private function smsIsSendable(mixed $notifiable): bool
+    {
+        $hasCredentials = ! empty(config('services.mtc_sms.username'))
+            || (bool) config('services.mtc_sms.fake', false);
+
+        if (! $hasCredentials) {
+            return false;
+        }
+
+        $phone = $notifiable->employee?->phone ?? null;
+
+        return is_string($phone) && $phone !== '';
     }
 
     /**
@@ -83,5 +144,59 @@ class TaqatNotification extends Notification
     public function toBroadcast(mixed $notifiable): BroadcastMessage
     {
         return new BroadcastMessage($this->toArray($notifiable));
+    }
+
+    /**
+     * Build the transactional email. Uses the default Notification blade
+     * (which renders RTL naturally with our Arabic copy) — a bespoke
+     * template can be introduced later without touching callers.
+     */
+    public function toMail(mixed $notifiable): MailMessage
+    {
+        $mail = (new MailMessage())
+            ->subject($this->title)
+            ->greeting('مرحبًا ' . ($notifiable->name ?? ''))
+            ->line($this->body ?? '');
+
+        if ($this->url !== null && $this->url !== '') {
+            // Deep-link back into the frontend SPA. APP_URL is expected to
+            // point at the FE origin (config/app.php reads it from env).
+            $mail->action('عرض التفاصيل', rtrim((string) config('app.url'), '/') . $this->url);
+        }
+
+        return $mail
+            ->line('شكرًا لاستخدامك منصة TAQAT.')
+            ->salutation('فريق TAQAT');
+    }
+
+    /**
+     * Payload delivered over the SmsChannel. Kept short — a standard
+     * GSM-7 SMS is 160 characters; anything longer either splits (extra
+     * cost) or is silently truncated by the carrier. We pre-truncate
+     * with an ellipsis so the recipient sees an intentional cut-off.
+     *
+     * Title + body are concatenated with " - " so the SMS reads as one
+     * self-contained sentence; when body is empty we send the title alone.
+     */
+    public function toSms(mixed $notifiable): string
+    {
+        $composed = $this->body !== null && $this->body !== ''
+            ? $this->title.' - '.$this->body
+            : $this->title;
+
+        return Str::limit($composed, 157, '...');
+    }
+
+    /**
+     * True when Laravel's default mailer will actually try to send — i.e.
+     * anything other than the dev-only `log` and test-only `array` drivers.
+     * Keeps us from wiring 'mail' into via() during phpunit runs (which
+     * default to `array`) or local `MAIL_MAILER=log` setups.
+     */
+    private function hasRealMailTransport(): bool
+    {
+        $driver = (string) config('mail.default');
+
+        return $driver !== '' && $driver !== 'log' && $driver !== 'array';
     }
 }
