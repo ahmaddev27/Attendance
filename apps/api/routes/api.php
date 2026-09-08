@@ -72,6 +72,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::apiResource('employees', EmployeeController::class);
     Route::post('/employees/{employee}/restore', [EmployeeController::class, 'restore']);
+    // Admin-only: hand the employee a new password + create a User for
+    // them if one doesn't already exist. Returns the plaintext once.
+    Route::post('/employees/{employee}/reset-password', [EmployeeController::class, 'resetPassword'])
+        ->middleware('permission:manage-users');
 });
 
 // M3 — Attendance + Working Hours Engine.

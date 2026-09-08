@@ -143,6 +143,23 @@ jobs:
             # SSH user vs directory owner mismatch → git 'dubious ownership'
             git config --global --add safe.directory "$APP_PATH" || true
 
+            # If an operator ran `git fetch` (or any git write op) as
+            # root over SSH, .git/FETCH_HEAD (or the whole .git/objects
+            # tree) ends up owned by root. The deploy SSH user then hits
+            # "cannot open '.git/FETCH_HEAD': Permission denied" on the
+            # next pull. Re-take ownership of .git before every fetch so
+            # a manual root fetch on the box doesn't break the pipeline.
+            # `stat -c '%U:%G' .` reads the working-tree owner/group so
+            # we align .git with whatever the deploy user actually is,
+            # no hardcoded username needed.
+            OWNER="$(stat -c '%U:%G' .)"
+            if [ -w .git ] && [ "$(stat -c '%U:%G' .git)" != "$OWNER" ]; then
+              echo "   ⚠ .git owned by $(stat -c '%U:%G' .git), realigning to $OWNER"
+              sudo chown -R "$OWNER" .git 2>/dev/null \
+                || chown -R "$OWNER" .git 2>/dev/null \
+                || echo "   (chown failed — deploy may still fail if FETCH_HEAD is root-owned)"
+            fi
+
             echo "════════════════════════════════════════"
             echo "▶ 1/8  Pulling latest code from origin/main"
             echo "════════════════════════════════════════"

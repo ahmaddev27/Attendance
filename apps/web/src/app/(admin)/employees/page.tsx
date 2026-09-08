@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { CalendarDays, Pencil, Plus, Trash2 } from 'lucide-react';
+import { CalendarDays, KeyRound, Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { DataTable, type DataTableColumn } from '@/components/data-table/data-table';
@@ -12,6 +12,7 @@ import { FilterSelect } from '@/components/data-table/filter-select';
 import { EmployeeAvatar } from '@/components/employees/employee-avatar';
 import { DeleteEmployeeDialog } from '@/components/employees/delete-employee-dialog';
 import { EmployeeFormDialog } from '@/components/employees/employee-form-dialog';
+import { ResetPasswordDialog } from '@/components/employees/reset-password-dialog';
 import { EmployeeStatusBadge } from '@/components/employees/employee-status-badge';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { departmentsApi } from '@/lib/api/endpoints/departments';
@@ -33,6 +34,7 @@ export default function EmployeesPage() {
   const [formOpen, setFormOpen] = React.useState(false);
   const [editingEmployee, setEditingEmployee] = React.useState<Employee | null>(null);
   const [deletingEmployee, setDeletingEmployee] = React.useState<Employee | null>(null);
+  const [resetPasswordEmployee, setResetPasswordEmployee] = React.useState<Employee | null>(null);
 
   const debouncedSearch = useDebouncedValue(search);
 
@@ -185,12 +187,18 @@ export default function EmployeesPage() {
             onClick: (employee) => router.push(`/employees/${employee.id}/leaves`),
           },
           { label: 'تعديل', icon: Pencil, onClick: openEditDialog },
+          { label: 'إعادة تعيين كلمة السر', icon: KeyRound, onClick: setResetPasswordEmployee },
           { label: 'حذف', icon: Trash2, variant: 'destructive', onClick: setDeletingEmployee },
         ]}
         pagination={data ? { meta: data.meta, onPageChange: setPage } : undefined}
       />
 
       <EmployeeFormDialog open={formOpen} onOpenChange={setFormOpen} employee={editingEmployee} />
+      <ResetPasswordDialog
+        employee={resetPasswordEmployee}
+        open={!!resetPasswordEmployee}
+        onOpenChange={(open) => !open && setResetPasswordEmployee(null)}
+      />
       <DeleteEmployeeDialog
         employee={deletingEmployee}
         open={!!deletingEmployee}
