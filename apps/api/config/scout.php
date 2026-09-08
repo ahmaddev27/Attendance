@@ -2,10 +2,13 @@
 
 declare(strict_types=1);
 
-use App\Models\Employee;
-use App\Models\LeaveRequest;
-use App\Models\Request as RequestModel;
-use App\Models\Task;
+// NOTE: no `use App\Models\...` here — config files are loaded during
+// bootstrap, BEFORE service providers register and BEFORE facades are
+// available. Instantiating an Eloquent model (`new Employee()`) at that
+// stage triggers Model::__construct → Facade access → the whole boot
+// dies with "A facade root has not been set". Hardcode the index keys
+// (each model's `searchableAs()` defaults to its table name) so this
+// file stays a pure array literal that can load at any time.
 
 return [
 
@@ -132,20 +135,22 @@ return [
         | well out of the box — no custom analyzer needed for Phase 1.
         */
         'index-settings' => [
-            (new Employee())->searchableAs() => [
+            // Keys match each model's default `searchableAs()` (its table name).
+            // See note at top of file for why we don't `new Employee()` here.
+            'employees' => [
                 'filterableAttributes' => ['id', 'employee_number'],
                 'sortableAttributes' => ['employee_number'],
                 'searchableAttributes' => ['full_name', 'employee_number', 'email', 'phone'],
             ],
-            (new Task())->searchableAs() => [
+            'tasks' => [
                 'filterableAttributes' => ['id'],
                 'searchableAttributes' => ['title', 'description'],
             ],
-            (new RequestModel())->searchableAs() => [
+            'requests' => [
                 'filterableAttributes' => ['id'],
                 'searchableAttributes' => ['request_number', 'form_data'],
             ],
-            (new LeaveRequest())->searchableAs() => [
+            'leave_requests' => [
                 'filterableAttributes' => ['id'],
                 'searchableAttributes' => ['reason', 'employee_name'],
             ],
