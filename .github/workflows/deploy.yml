@@ -143,21 +143,34 @@ jobs:
             # SSH user vs directory owner mismatch → git 'dubious ownership'
             git config --global --add safe.directory "$APP_PATH" || true
 
-            # Fix: `.git/FETCH_HEAD: Permission denied` happens when an
-            # operator SSHed into the box as a DIFFERENT user (root, or
-            # `deploy`) and ran a git write op, leaving files inside .git
-            # owned by that user. The GitHub Actions SSH deploy user
-            # then can't write to them.
+            # Fix: `.git/FETCH_HEAD: Permission denied` or `insufficient
+            # permission for adding an object to repository database
+            # .git/objects` happen when an operator SSHed into the box as
+            # a DIFFERENT user (root, or `deploy`) and ran a git write op,
+            # leaving files anywhere under .git owned by that user. The
+            # GitHub Actions SSH deploy user then can't write to them.
             #
-            # Test-based (not comparison-based) — actually try to touch
-            # a probe file inside .git; if the write fails, chown the
-            # entire tree to whoever we're running as right now. Comparing
-            # owners doesn't catch the case where .git looks "fine" to
-            # stat but is owned by a peer user (e.g. `deploy:deploy`)
-            # while the SSH session is a third user (e.g. `taqat`).
-            if ! touch .git/.taqat-write-probe 2>/dev/null; then
-              CURRENT="$(id -un):$(id -gn)"
-              echo "   ⚠ Cannot write to .git as $CURRENT — realigning ownership"
+            # We probe MULTIPLE spots — top-level .git for FETCH_HEAD, and
+            # .git/objects for object writes (the second-most-common
+            # failure surface). Any probe failure triggers a recursive
+            # chown of the whole .git tree, plus we use `find` to walk
+            # .git looking for files owned by anyone else — that catches
+            # a partial mismatch where the parent dirs are writable but
+            # a nested subdir isn't.
+            CURRENT="$(id -un):$(id -gn)"
+            NEEDS_CHOWN=0
+            touch .git/.taqat-write-probe 2>/dev/null && rm -f .git/.taqat-write-probe || NEEDS_CHOWN=1
+            [ -d .git/objects ] && { touch .git/objects/.taqat-write-probe 2>/dev/null && rm -f .git/objects/.taqat-write-probe || NEEDS_CHOWN=1; }
+            # Also detect files under .git owned by someone else — quick
+            # for a normal-sized repo, and covers the case where our
+            # probes happen to land in dirs we CAN write to but a git
+            # write op will still hit a foreign-owned file elsewhere.
+            if [ $NEEDS_CHOWN -eq 0 ]; then
+              FOREIGN="$(find .git -not -user "$(id -un)" -print -quit 2>/dev/null)"
+              [ -n "$FOREIGN" ] && NEEDS_CHOWN=1
+            fi
+            if [ $NEEDS_CHOWN -eq 1 ]; then
+              echo "   ⚠ .git tree has foreign-owned files (running as $CURRENT) — realigning"
               sudo chown -R "$CURRENT" .git 2>/dev/null \
                 || chown -R "$CURRENT" .git 2>/dev/null \
                 || {
@@ -165,14 +178,18 @@ jobs:
                   echo "     sudo chown -R $CURRENT $APP_PATH/.git"
                   exit 1
                 }
-              # Re-probe — if we still can't write, exit loudly instead
-              # of letting git fetch fail with the same cryptic error.
-              if ! touch .git/.taqat-write-probe 2>/dev/null; then
+              # Verify with the same two probes — abort loudly instead of
+              # letting git fetch fail with the same cryptic error.
+              touch .git/.taqat-write-probe 2>/dev/null && rm -f .git/.taqat-write-probe || {
                 echo "   ✗ Still cannot write to .git after chown — aborting deploy"
                 exit 1
-              fi
+              }
+              [ -d .git/objects ] && { touch .git/objects/.taqat-write-probe 2>/dev/null && rm -f .git/objects/.taqat-write-probe || {
+                echo "   ✗ Still cannot write to .git/objects after chown — aborting deploy"
+                exit 1
+              }; }
+              echo "   ✓ .git ownership realigned to $CURRENT"
             fi
-            rm -f .git/.taqat-write-probe
 
             echo "════════════════════════════════════════"
             echo "▶ 1/8  Pulling latest code from origin/main"
