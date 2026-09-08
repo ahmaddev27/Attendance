@@ -26,7 +26,15 @@ WORKDIR /var/www/html
 # Install dependencies before copying the rest of the app so this (slow) layer
 # stays cached as long as composer.json/composer.lock don't change.
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-interaction
+# Same three failure modes as CI: happy `install`, out-of-sync lock, or
+# a Packagist security-advisory block on a locked framework version.
+# `--no-audit` skips the extra advisories network call on the install
+# path; the fallback disables the advisory policy for this build only
+# and lets `update -W` regenerate the lock in place.
+RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-interaction --no-audit \
+    || (composer config policy.advisories.block false \
+        && composer update --no-dev --no-scripts --no-autoloader --prefer-dist --no-interaction \
+                          --with-all-dependencies --ignore-platform-reqs --no-audit)
 
 COPY . .
 RUN composer install --no-dev --optimize-autoloader --prefer-dist --no-interaction

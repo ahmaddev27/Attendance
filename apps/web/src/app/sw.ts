@@ -16,7 +16,7 @@
 
 import { defaultCache } from '@serwist/next/worker';
 import type { PrecacheEntry, SerwistGlobalConfig } from 'serwist';
-import { Serwist } from 'serwist';
+import { NetworkFirst, Serwist, StaleWhileRevalidate } from 'serwist';
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -39,22 +39,18 @@ const serwist = new Serwist({
     // interactive without network.
     {
       matcher: /^\/scan\//,
-      handler: 'NetworkFirst',
-      options: {
+      handler: new NetworkFirst({
         cacheName: 'taqat-scan',
         networkTimeoutSeconds: 3,
-        expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 7 },
-      },
+      }),
     },
     // Public GETs from the API (device_info) — brief cache so a re-open
     // within the same shift is instant.
     {
       matcher: /^\/api\/scan\/device\//,
-      handler: 'StaleWhileRevalidate',
-      options: {
+      handler: new StaleWhileRevalidate({
         cacheName: 'taqat-scan-device',
-        expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 4 },
-      },
+      }),
     },
     // Everything else — use Serwist's sensible defaults (images,
     // static assets, fonts, next static chunks). Add BackgroundSync

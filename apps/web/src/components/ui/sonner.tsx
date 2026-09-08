@@ -28,25 +28,27 @@ const Toaster = ({ ...props }: ToasterProps) => {
         duration: 4500,
         unstyled: false,
         classNames: {
+          // `!` on bg/text/border wins over sonner's own inline defaults,
+          // which otherwise paint a dark background for the success/error
+          // variants regardless of `richColors=false`. The start-edge
+          // accent uses logical `border-s-4` + a per-type color so the
+          // stripe stays on the reading start (right in RTL, left in LTR).
           toast:
-            'group toast flex w-full items-start gap-3 rounded-xl border border-hairline bg-surface p-4 text-sm text-ink shadow-[0_8px_30px_rgb(15_23_42/0.08)] ' +
-            // Colored start-edge accent, one per severity. Uses
-            // logical `border-s` so the accent stays on the reading
-            // start (right in RTL, left in LTR).
-            'group-[.toaster]:border-s-4 ' +
-            'data-[type=success]:border-s-success data-[type=error]:border-s-danger data-[type=warning]:border-s-warn data-[type=info]:border-s-brand',
-          title: 'text-sm font-semibold leading-6 text-ink',
-          description: 'text-xs text-muted',
+            'group toast flex w-full items-start gap-3 rounded-xl !border !border-hairline !bg-surface p-4 text-sm !text-ink shadow-[0_8px_30px_rgb(15_23_42/0.08)] ' +
+            'group-[.toaster]:!border-s-4 ' +
+            'data-[type=success]:!border-s-success data-[type=error]:!border-s-danger data-[type=warning]:!border-s-warn data-[type=info]:!border-s-brand',
+          title: '!text-sm !font-semibold !leading-6 !text-ink',
+          description: '!text-xs !text-muted',
           actionButton:
-            'group-[.toast]:bg-brand group-[.toast]:text-white group-[.toast]:hover:bg-brand-hover group-[.toast]:rounded-md group-[.toast]:px-3 group-[.toast]:py-1.5 group-[.toast]:text-xs group-[.toast]:font-semibold',
+            'group-[.toast]:!bg-brand group-[.toast]:!text-white group-[.toast]:hover:!bg-brand-hover group-[.toast]:!rounded-md group-[.toast]:!px-3 group-[.toast]:!py-1.5 group-[.toast]:!text-xs group-[.toast]:!font-semibold',
           cancelButton:
-            'group-[.toast]:bg-surface-2 group-[.toast]:text-ink-2 group-[.toast]:hover:bg-hairline group-[.toast]:rounded-md group-[.toast]:px-3 group-[.toast]:py-1.5 group-[.toast]:text-xs group-[.toast]:font-semibold',
+            'group-[.toast]:!bg-surface-2 group-[.toast]:!text-ink-2 group-[.toast]:hover:!bg-hairline group-[.toast]:!rounded-md group-[.toast]:!px-3 group-[.toast]:!py-1.5 group-[.toast]:!text-xs group-[.toast]:!font-semibold',
           closeButton:
-            'group-[.toast]:bg-surface-2 group-[.toast]:text-ink-2 group-[.toast]:border-hairline',
-          success: 'group-[.toaster]:!bg-surface group-[.toaster]:!text-ink [&_[data-icon]]:!text-success',
-          error: 'group-[.toaster]:!bg-surface group-[.toaster]:!text-ink [&_[data-icon]]:!text-danger',
-          warning: 'group-[.toaster]:!bg-surface group-[.toaster]:!text-ink [&_[data-icon]]:!text-warn-ink',
-          info: 'group-[.toaster]:!bg-surface group-[.toaster]:!text-ink [&_[data-icon]]:!text-brand',
+            'group-[.toast]:!bg-surface-2 group-[.toast]:!text-ink-2 group-[.toast]:!border-hairline',
+          success: '!bg-surface !text-ink [&_[data-icon]]:!text-success',
+          error: '!bg-surface !text-ink [&_[data-icon]]:!text-danger',
+          warning: '!bg-surface !text-ink [&_[data-icon]]:!text-warn-ink',
+          info: '!bg-surface !text-ink [&_[data-icon]]:!text-brand',
         },
       }}
       {...props}

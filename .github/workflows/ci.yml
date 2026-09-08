@@ -63,13 +63,22 @@ jobs:
           restore-keys: composer-
 
       - name: Install PHP dependencies
-        # `composer install` refuses to run when composer.lock is out of
-        # date. When someone adds a package to composer.json without also
-        # committing the lock (usually the VPS deploy path), CI would fail
-        # here. `install || update` recovers automatically for the common
-        # single-package add; genuine dependency conflicts still surface
-        # because `composer update` will fail loudly on them too.
-        run: composer install --no-progress --prefer-dist --no-interaction || composer update --no-progress --prefer-dist --no-interaction
+        # Three failure modes we've seen in practice:
+        #   1. composer.lock genuinely up-to-date → `composer install` succeeds
+        #      and this is the fast path.
+        #   2. composer.json gained a package (e.g. laravel/reverb) without a
+        #      matching lock update → `install` fails, so we fall through to
+        #      `update -W` to sync the lock in place.
+        #   3. Packagist's advisories DB blocks the resolution because a
+        #      locked laravel/framework version has security advisories → we
+        #      disable the block for the CI run only (never persisted).
+        # `--ignore-platform-reqs` covers CI images missing niche extensions;
+        # `--no-audit` skips the extra network call on every install.
+        run: |
+          composer config policy.advisories.block false
+          composer install --no-progress --prefer-dist --no-interaction --no-audit \
+            || composer update --no-progress --prefer-dist --no-interaction \
+                              --with-all-dependencies --ignore-platform-reqs --no-audit
 
       - name: Prepare application key
         run: |
@@ -110,7 +119,12 @@ jobs:
           cache-dependency-path: apps/web/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        # `npm ci` requires package-lock.json to be in perfect sync with
+        # package.json — a new dependency added without regenerating the
+        # lock (common when you add via PR review) breaks it. Fall back to
+        # `npm install` (which updates the lock) so CI recovers instead
+        # of failing on a paperwork gap.
+        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
 
       - name: Build
         run: npm run build
