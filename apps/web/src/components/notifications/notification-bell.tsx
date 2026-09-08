@@ -4,20 +4,29 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell, CheckCheck } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { notificationsApi, type TaqatNotification } from '@/lib/api/endpoints/notifications';
+import { getEcho } from '@/lib/echo';
+import { useAuthStore } from '@/lib/stores/auth-store';
 import { cn } from '@/lib/utils';
 
 /**
- * The bell + dropdown in the admin header. Polls unread-count every 30s
- * so a fresh notification shows up without a full page reload; the list
- * itself is fetched only when the user opens the popover, so the constant
- * poll stays cheap.
+ * The bell + dropdown in the admin header.
+ *
+ * Two update channels:
+ *   1. React-Query poll of /me/notifications/unread-count every 30s — the
+ *      fallback that guarantees the badge is eventually correct even if the
+ *      WebSocket is down.
+ *   2. Laravel Echo subscription to the user's private channel — when
+ *      Reverb delivers a BroadcastNotificationCreated event we invalidate
+ *      the query keys, so the count and popover list refresh instantly.
  */
 export function NotificationBell() {
   const [open, setOpen] = React.useState(false);
   const queryClient = useQueryClient();
+  const user = useAuthStore((s) => s.user);
 
   const { data: countRes } = useQuery({
     queryKey: ['notifications', 'unread-count'],
@@ -25,6 +34,34 @@ export function NotificationBell() {
     refetchInterval: 30_000,
   });
   const unread = countRes?.count ?? 0;
+
+  // Subscribe to the user's private channel while they're signed in.
+  // Effect re-runs when user.id changes (login/logout/user switch); disconnect
+  // is handled by leaving the channel in the cleanup.
+  React.useEffect(() => {
+    if (!user?.id) return;
+    const echo = getEcho();
+    if (!echo) return; // env vars missing or SSR — silent no-op
+
+    const channelName = `App.Models.User.${user.id}`;
+    const channel = echo.private(channelName);
+
+    // Laravel emits '.Illuminate\\Notifications\\Events\\BroadcastNotificationCreated'
+    // with the notification payload; Echo's `.notification()` helper subscribes
+    // to that event and hands us the payload directly.
+    channel.notification((payload: { title?: string; body?: string; url?: string }) => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      // Small toast so the user notices even when they're on another page
+      // and the popover is closed — the badge alone can be missed.
+      if (payload?.title) {
+        toast(payload.title, { description: payload.body ?? undefined });
+      }
+    });
+
+    return () => {
+      echo.leave(channelName);
+    };
+  }, [user?.id, queryClient]);
 
   const { data: listRes, isLoading } = useQuery({
     queryKey: ['notifications', 'list', 'preview'],

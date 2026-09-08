@@ -31,6 +31,7 @@ use App\Modules\Tasks\Controllers\TaskTagController;
 use App\Modules\Workflow\Controllers\RequestTypeController;
 use App\Modules\Workflow\Controllers\WorkflowController;
 use App\Modules\Workflow\Controllers\WorkflowStepController;
+use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', function () {
@@ -39,6 +40,12 @@ Route::get('/health', function () {
         'time' => now()->toIso8601String(),
     ]);
 });
+
+// Reverb / Echo channel-auth endpoint (POST /api/broadcasting/auth).
+// Sanctum-guarded because our frontend already sends a Bearer token; the
+// auth callback in routes/channels.php only needs to check "is this user
+// the channel owner", not re-verify session cookies.
+Broadcast::routes(['prefix' => 'api', 'middleware' => ['auth:sanctum']]);
 
 Route::prefix('auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);

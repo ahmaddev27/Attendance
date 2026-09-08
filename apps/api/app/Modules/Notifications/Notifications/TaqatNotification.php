@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Notifications\Notifications;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Notifications\Messages\BroadcastMessage;
 use Illuminate\Notifications\Notification;
 
 /**
@@ -16,6 +17,12 @@ use Illuminate\Notifications\Notification;
  * shape ({title, body, url, icon, meta}) so both the API list endpoint
  * and the frontend bell can render any notification without a switch on
  * `type`. See NotificationService for the callers.
+ *
+ * Both delivery paths are used:
+ *   - database  : durable, powers the /me/notifications list + unread count
+ *   - broadcast : real-time push via Reverb; the bell subscribes on connect
+ *                 and invalidates its react-query cache so a fresh
+ *                 notification appears without waiting for the 30s poll.
  */
 class TaqatNotification extends Notification
 {
@@ -38,10 +45,13 @@ class TaqatNotification extends Notification
      */
     public function via(mixed $notifiable): array
     {
-        // Database only for M7. Broadcast (Reverb) and mail land in a
-        // follow-up commit once the front-end bell + queue worker are
-        // both proven end-to-end.
-        return ['database'];
+        // 'broadcast' only fires when BROADCAST_CONNECTION is set to
+        // something concrete ('reverb'); when it's 'null' (dev without
+        // Reverb, or a misconfigured VPS) Laravel silently drops the
+        // broadcast path and the database record is still written.
+        return config('broadcasting.default') === 'null'
+            ? ['database']
+            : ['database', 'broadcast'];
     }
 
     /**
@@ -56,5 +66,15 @@ class TaqatNotification extends Notification
             'icon' => $this->icon,
             'meta' => $this->meta,
         ];
+    }
+
+    /**
+     * Payload delivered over Reverb. Kept identical to toArray() so the
+     * bell can render the same DTO either way — it uses whichever it
+     * receives first (broadcast for realtime, database on refresh).
+     */
+    public function toBroadcast(mixed $notifiable): BroadcastMessage
+    {
+        return new BroadcastMessage($this->toArray($notifiable));
     }
 }
