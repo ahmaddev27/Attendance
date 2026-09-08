@@ -84,20 +84,28 @@ jobs:
         #      locked laravel/framework version has security advisories → we
         #      disable the block for the CI run only (never persisted).
         # `--ignore-platform-reqs` covers CI images missing niche extensions;
-        # `--no-audit` skips the extra network call on every install;
         # `--no-scripts` defers package:discover to the next step so the
         # command runs against a fully-prepared env instead of aborting on
         # a missing APP_KEY.
+        # NOTE: no `--no-audit` here — that flag arrived in composer 2.6 and
+        # the shivammathur runner sometimes lands us on an older composer;
+        # the older one hard-errors with "The --no-audit option does not
+        # exist" instead of ignoring it.
         run: |
           composer config policy.advisories.block false
-          composer install --no-progress --prefer-dist --no-interaction --no-audit --no-scripts \
+          composer install --no-progress --prefer-dist --no-interaction --no-scripts \
             || composer update --no-progress --prefer-dist --no-interaction \
-                              --with-all-dependencies --ignore-platform-reqs --no-audit --no-scripts
+                              --with-all-dependencies --ignore-platform-reqs --no-scripts
 
-      - name: Generate app key + run deferred composer scripts
+      - name: Generate app key + discover packages
+        # `key:generate --force` writes APP_KEY into the .env we seeded above.
+        # `package:discover` is the same command Composer's post-autoload-dump
+        # hook runs — calling it here directly makes the failure mode obvious
+        # (a broken provider surfaces as its own step, not as a generic
+        # "composer run-script failed").
         run: |
           php artisan key:generate --force
-          composer run-script post-autoload-dump --no-interaction
+          php artisan package:discover --ansi
 
       - name: Run tests
         run: php artisan test

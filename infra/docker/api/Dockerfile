@@ -28,13 +28,14 @@ WORKDIR /var/www/html
 COPY composer.json composer.lock ./
 # Same three failure modes as CI: happy `install`, out-of-sync lock, or
 # a Packagist security-advisory block on a locked framework version.
-# `--no-audit` skips the extra advisories network call on the install
-# path; the fallback disables the advisory policy for this build only
-# and lets `update -W` regenerate the lock in place.
-RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-interaction --no-audit \
+# The fallback disables the advisory policy for this build only and lets
+# `update -W` regenerate the lock in place. No `--no-audit` here — the
+# flag arrived in composer 2.6 and older base images still ship <2.6,
+# where the option is a hard error instead of a silent no-op.
+RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-interaction \
     || (composer config policy.advisories.block false \
         && composer update --no-dev --no-scripts --no-autoloader --prefer-dist --no-interaction \
-                          --with-all-dependencies --ignore-platform-reqs --no-audit)
+                          --with-all-dependencies --ignore-platform-reqs)
 
 COPY . .
 # Laravel's post-autoload-dump hook runs `php artisan package:discover`,
