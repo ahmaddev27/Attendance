@@ -38,16 +38,22 @@ RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-in
                           --with-all-dependencies --ignore-platform-reqs)
 
 COPY . .
-# Regenerate the optimized autoloader against the full app/ tree.
-# `--no-scripts` matters: composer.json's post-autoload-dump hook runs
-# `php artisan package:discover`, which needs a fully-migrated DB and a
-# ready Redis/config to boot; neither is present at image-build time.
-# Discovery happens at container start instead (see entrypoint below),
-# where env_file has landed and the network is live. Skipping install
-# here (dump-autoload only) also means an out-of-sync host composer.lock
-# that just got re-COPY'd on top of the container's fixed one can't
-# undo the fallback resolve that succeeded a few layers up.
-RUN composer dump-autoload --optimize --no-dev --classmap-authoritative --no-scripts
+# Re-run install (not just dump-autoload) so composer verifies vendor/
+# actually holds every package installed.json claims. `dump-autoload`
+# alone happily generates references to files it never checks for on
+# disk — we hit this with symfony/polyfill-mbstring after the first
+# install's fallback partially recovered from a stale lock: autoloader
+# eagerly `require`s the polyfill bootstrap at every request, and any
+# missing file becomes a fatal error on the first hit.
+#
+# The same install || update fallback guards the same three failure
+# modes as step 1 (lock in sync / lock behind composer.json / advisory
+# block), and `--no-scripts` keeps package:discover deferred to the
+# runtime entrypoint (see below).
+RUN composer install --no-dev --optimize-autoloader --prefer-dist --no-interaction --no-scripts \
+    || (composer config policy.advisories.block false \
+        && composer update --no-dev --optimize-autoloader --prefer-dist --no-interaction \
+                          --with-all-dependencies --ignore-platform-reqs --no-scripts)
 
 ############################################
 # Stage 2 — runtime: PHP 8.4 FPM Alpine
