@@ -1,284 +1,289 @@
-# TAQAT — منصة العمل الرقمية
+<div align="center">
 
-> نظام متكامل لإدارة الحضور والإجازات والمهام والطلبات لموظفي شركة TAQAT.
+# TAQAT — Digital Workplace Platform
 
-**Stack:** Laravel 11 API + Next.js 15 (App Router) + React Native (Expo) + Docker + MySQL 8 + Redis + MinIO + Reverb (WebSocket) + Meilisearch  
-**اللغة الرئيسية:** العربية (RTL بشكل كامل)  
-**الحالة:** Production-ready • Phase 1 مكتمل 100% • Phase 2/3/4 مزايا مسبقة
+**Comprehensive HR + Attendance + Tasks + Requests + Realtime Notifications platform for TAQAT employees.**
+
+[![CI](https://img.shields.io/github/actions/workflow/status/ahmaddev27/Attendance/ci.yml?branch=main&label=CI&style=for-the-badge&logo=github)](https://github.com/ahmaddev27/Attendance/actions/workflows/ci.yml)
+[![Deploy](https://img.shields.io/github/actions/workflow/status/ahmaddev27/Attendance/deploy.yml?branch=main&label=Deploy&style=for-the-badge&logo=github)](https://github.com/ahmaddev27/Attendance/actions/workflows/deploy.yml)
+[![Last commit](https://img.shields.io/github/last-commit/ahmaddev27/Attendance?style=for-the-badge&logo=git)](https://github.com/ahmaddev27/Attendance/commits/main)
+
+[![Phase 1](https://img.shields.io/badge/Phase%201-100%25-brightgreen?style=for-the-badge)](docs/v2/03-phase-1-plan.md)
+[![Phase 2](https://img.shields.io/badge/Phase%202-85%25-blue?style=for-the-badge)](docs/v2/03-phase-1-plan.md)
+[![Phase 3](https://img.shields.io/badge/Phase%203-35%25-yellow?style=for-the-badge)](docs/v2/03-phase-1-plan.md)
+[![Phase 4](https://img.shields.io/badge/Phase%204-40%25-orange?style=for-the-badge)](docs/v2/03-phase-1-plan.md)
+
+[![Laravel](https://img.shields.io/badge/Laravel-11-red?style=flat-square&logo=laravel)](https://laravel.com)
+[![Next.js](https://img.shields.io/badge/Next.js-15-black?style=flat-square&logo=nextdotjs)](https://nextjs.org)
+[![React Native](https://img.shields.io/badge/React%20Native-Expo%2051-blue?style=flat-square&logo=expo)](https://expo.dev)
+[![PHP](https://img.shields.io/badge/PHP-8.4-777bb4?style=flat-square&logo=php)](https://php.net)
+[![Node.js](https://img.shields.io/badge/Node.js-20-339933?style=flat-square&logo=node.js)](https://nodejs.org)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ed?style=flat-square&logo=docker)](https://docker.com)
+[![License](https://img.shields.io/badge/License-Proprietary-lightgrey?style=flat-square)](#license)
+
+</div>
 
 ---
 
-## المحتويات
+## 🎯 Overview
 
-- [الميزات](#الميزات)
-- [البنية المعمارية](#البنية-المعمارية)
-- [التقدم على الـ Phases](#التقدم-على-الـ-phases)
-- [الإعداد المحلي](#الإعداد-المحلي)
-- [النشر (Deployment)](#النشر-deployment)
-- [متغيرات البيئة](#متغيرات-البيئة)
-- [الاختبارات](#الاختبارات)
-- [الوصول والصلاحيات](#الوصول-والصلاحيات)
-- [البنية داخل الريبو](#البنية-داخل-الريبو)
+**Stack:** Laravel 11 API · Next.js 15 (App Router) · React Native (Expo) · MySQL 8 · Redis · MinIO · Reverb WebSocket · Meilisearch · Docker Compose
+**Language:** Arabic (100% RTL) — brand tokens: `#2678C4` (blue) + `#F5A623` (accent orange)
+**Status:** Production-ready — Phase 1 complete, Phase 2/3/4 features shipped ahead of schedule
 
 ---
 
-## الميزات
+## 📚 Table of Contents
 
-### 🔐 المصادقة والصلاحيات
-- تسجيل دخول بالبريد الإلكتروني **أو** الرقم الوظيفي (auto-detect)
-- Sanctum Personal Access Tokens (Bearer) — يعمل مع الـ SPA والموبايل
-- RBAC حقيقي (spatie/laravel-permission) على `/admin/*`
-- 5 أدوار: `super-admin` / `management` / `department-manager` / `team-leader` / `employee`
+- [Features](#-features)
+- [Architecture](#-architecture)
+- [Phase Progress](#-phase-progress)
+- [Quick Start](#-quick-start)
+- [Deployment](#-deployment)
+- [Environment Variables](#-environment-variables)
+- [Testing](#-testing)
+- [Access & RBAC](#-access--rbac)
+- [Repo Layout](#-repo-layout)
+- [What's Not Built Yet](#-whats-not-built-yet)
 
-### 👥 الموظفون والهيكل التنظيمي
-- CRUD كامل للموظفين مع رفع صور شخصية (MinIO S3-compatible)
-- ترقيم متسلسل للموظفين (race-safe عبر lockForUpdate)
-- الأقسام، الفرق، المسميات الوظيفية، جداول العمل، العطل الرسمية
+---
 
-### 📱 الحضور
-- QR check-in/check-out عبر أجهزة الـ scan
-- Working Hours Engine (يحسب الحضور، التأخير، المغادرة المبكرة، الوقت الإضافي)
-- ملخص شهري للحضور
-- سجل حضور مفصل قابل للبحث والفلترة
+## ✨ Features
 
-### 🌴 الإجازات
-- أنواع إجازات متعددة (مدفوعة/غير مدفوعة، بحد أقصى/بدون، تحتاج مرفق/لا)
-- أرصدة سنوية + تتبع pending/used/entitled
-- Workflow موافقة متعدد الخطوات
-- Self-service للموظف: طلب/إلغاء إجازة
+### 🔐 Authentication & Authorization
+- Login by **email or employee number** (auto-detects `@`)
+- Sanctum Personal Access Tokens (Bearer) — works for SPA and mobile
+- Real RBAC via [spatie/laravel-permission](https://spatie.be/docs/laravel-permission) on `/admin/*` routes
+- 5 roles: `super-admin` / `management` / `department-manager` / `team-leader` / `employee`
 
-### 📝 مسارات العمل والطلبات العامة
-- Workflow Engine قابل للتوسع (أنواع طلبات مخصصة)
-- Approvers متعددون (Department Manager, Team Leader, Custom)
-- Approve / Reject / Return / Forward
-- Approval Inbox للمديرين
+### 👥 Employees & Organization
+- Full employee CRUD with avatar upload (MinIO S3-compatible)
+- Race-safe sequential employee numbers (`lockForUpdate`)
+- Departments, teams, positions, work schedules, holidays
 
-### 📌 المهام
-- Tasks مع Subtasks + Priorities + Statuses + Tags قابلة للتخصيص
-- Comments + File Attachments (signed URLs)
+### 📱 Attendance
+- QR-based check-in/check-out via scan devices
+- Working Hours Engine (present, late, early-leave, overtime)
+- Monthly attendance summary
+- Detailed attendance log with search + filters
+
+### 🌴 Leaves
+- Multi-type leaves (paid/unpaid, capped/uncapped, attachment-required)
+- Annual balances with pending/used/entitled tracking
+- Multi-step approval workflow
+- Self-service submit/cancel for employees
+
+### 📝 Workflow Engine & Generic Requests
+- Extensible workflow engine (custom request types)
+- Multiple approver strategies (Department Manager, Team Leader, Custom)
+- Approve / Reject / Return / Forward actions
+- Approval Inbox for managers
+
+### 📌 Tasks
+- Tasks with subtasks, custom priorities/statuses/tags
+- Comments + file attachments (signed URLs)
 - Kanban board (drag & drop)
-- تعيين تلقائي بناءً على المسؤول
+- Assignee-based visibility
 
-### 🔔 الإشعارات (Multi-channel)
-- **قاعدة البيانات** (durable inbox + bell counter)
-- **Reverb WebSocket** (realtime toast — dedup لتجنب flood)
-- **البريد الإلكتروني** عبر Resend
-- **SMS** عبر MTC Jordan
-- **WhatsApp** عبر Meta Cloud API
-- كل قناة اختيارية per notification (`sendSms`, `sendWhatsapp`)
+### 🔔 Multi-channel Notifications
+- **Database** (durable inbox + bell counter)
+- **Reverb WebSocket** (realtime toast — with dedup to avoid flood)
+- **Email** via Resend
+- **SMS** via MTC Jordan
+- **WhatsApp** via Meta Cloud API
+- Every channel is opt-in per notification (`sendSms`, `sendWhatsapp`)
 
 ### 🤖 AI Motivation (Anthropic Claude)
-- رسالة تحفيزية يومية personalized لكل موظف
-- سياق مبني على: attendance streak, task completion, upcoming leave
-- Fallback library في حال فشل الـ API — dashboard لا 500
-- Cached 24h/user في Redis
+- Daily personalized motivational message per employee
+- Context includes: attendance streak, task completion, upcoming leave
+- Fallback library if Claude API fails — dashboard never 500s
+- Cached 24h per user in Redis
 - Scheduled warmup daily at 07:00 (Asia/Amman)
 
-### 📊 التقارير والـ Analytics
-- Admin Dashboard مع KPIs حية (refetch كل 60s):
-  - إجمالي الموظفين / حاضرين اليوم / بانتظار الموافقة / مهام مفتوحة
-- Employee Home مع KPIs شخصية
-- تقارير الحضور الشهرية بصيغ **CSV / Excel / PDF**
-- تصدير Excel: RTL sheet + brand header + frozen pane
-- تصدير PDF: Arabic font (Amiri) + brand-blue table
-- سجل النشاط (Audit Log) عبر spatie/laravel-activitylog
+### 📊 Reports & Analytics
+- **Admin Dashboard** with live KPIs (60s refetch)
+- **Employee Home** with personal KPIs
+- Monthly attendance reports in **CSV / Excel / PDF** formats
+- Excel: RTL sheet + brand header + frozen pane
+- PDF: Arabic font (Amiri) + brand-blue table
+- Audit log via [spatie/laravel-activitylog](https://spatie.be/docs/laravel-activitylog)
 
-### 🔍 البحث العام (Meilisearch)
+### 🔍 Global Search (Meilisearch)
 - Cmd/Ctrl+K palette
-- بحث فوري cross-index: الموظفون، المهام، الطلبات، الإجازات
+- Cross-index search: employees, tasks, requests, leaves
 - Typo-tolerant + Arabic tokenization
-- Debounced (300ms)
+- 300ms debounce
 
-### ⚙️ إعدادات النظام
-- Admin Settings page — تعديل runtime بدون redeploy
-- Mail (Resend key, from address, from name)
-- SMS (MTC username, password, sender, endpoint, fake mode)
-- WhatsApp (access token, phone number ID, business ID)
-- AI (Anthropic API key, Claude model)
-- Sensitive values **مشفّرة** في DB (Crypt::encryptString)
+### ⚙️ System Settings
+- Admin Settings page — runtime edit without redeploy
+- **Mail** (Resend key, from address, from name)
+- **SMS** (MTC username, password, sender, endpoint, fake mode)
+- **WhatsApp** (access token, phone number ID, business ID)
+- **AI** (Anthropic API key, Claude model)
+- Sensitive values encrypted at rest (`Crypt::encryptString`)
 - Cache-first reads (1h TTL)
 
-### 📱 التطبيقات
-- **Web Admin Panel** (Next.js 15) — RTL بالكامل، بـ shadcn/ui، طوابع لوني TAQAT
+### 📱 Applications
+- **Web Admin Panel** (Next.js 15) — fully RTL, shadcn/ui + TAQAT tokens
 - **Mobile App** (React Native + Expo) — Login, Tasks, Leaves, QR Scanner, Push notifications
-- **PWA** — Serwist service worker + offline shell للـ /scan + install prompt
+- **PWA** — Serwist service worker + offline shell for `/scan` + install prompt
 
 ---
 
-## البنية المعمارية
+## 🏛️ Architecture
 
 ### Backend (Laravel 11 — Modular Monolith)
 ```
-apps/api/
-├── app/Modules/
-│   ├── AI/                 ← Claude client + Motivation service
-│   ├── Auth/               ← Login (email/employee_number) + Sanctum
-│   ├── Attendance/         ← QR devices + scan flow + WHM calculator
-│   ├── Employees/          ← Employee CRUD + org tree
-│   ├── Leaves/             ← Types + Balances + Requests + Workflow
-│   ├── Notifications/      ← TaqatNotification + dedup dispatch
-│   ├── Organization/       ← Departments + Teams + Positions
-│   ├── Reports/            ← Admin/Employee dashboards + CSV/Excel/PDF exports + Audit log
-│   ├── Requests/           ← Generic Request submissions + Approvals
-│   ├── Search/             ← Meilisearch cross-index search
-│   ├── Settings/           ← DB-backed key/value with encryption
-│   ├── Sms/                ← MTC gateway + queued jobs
-│   ├── Tasks/              ← Tasks + Comments + Attachments + Kanban
-│   ├── Whatsapp/           ← Meta Cloud API gateway
-│   └── Workflow/           ← Workflow steps + approver resolver
-├── routes/api.php          ← Single source of truth for routes
-├── routes/channels.php     ← Broadcast auth (Reverb)
-└── config/                 ← broadcasting, reverb, mail, services, scout, ...
+apps/api/app/Modules/
+├── AI/                 Claude client + Motivation service
+├── Auth/               Login (email/number) + Sanctum tokens
+├── Attendance/         QR devices + scan flow + WHM calculator
+├── Employees/          Employee CRUD + org tree
+├── Leaves/             Types + balances + requests + workflow
+├── Notifications/      TaqatNotification + dedup dispatcher
+├── Organization/       Departments + teams + positions
+├── Reports/            Dashboards + CSV/Excel/PDF exports + Audit log
+├── Requests/           Generic request submissions + approvals
+├── Search/             Meilisearch cross-index search
+├── Settings/           DB-backed key/value with encryption
+├── Sms/                MTC gateway + queued jobs
+├── Tasks/              Tasks + comments + attachments + kanban
+├── Whatsapp/           Meta Cloud API gateway
+└── Workflow/           Workflow steps + approver resolver
 ```
 
 ### Frontend (Next.js 15 App Router)
 ```
-apps/web/src/
-├── app/
-│   ├── (auth)/login        ← Public login
-│   ├── (admin)/            ← Admin routes with AdminSidebar (RBAC-filtered)
-│   │   ├── dashboard, employees, organization/*, attendance, leaves,
-│   │   ├── requests, approvals, workflows, request-types,
-│   │   ├── tasks, tasks-config/*, reports/attendance, audit,
-│   │   ├── notifications, settings
-│   ├── (employee)/         ← Employee routes with slim sidebar
-│   │   └── home, my-tasks, my-leaves, my-requests
-│   ├── (public)/scan       ← QR check-in (offline-capable via SW)
-│   ├── offline             ← PWA offline fallback
-│   ├── sw.ts               ← Serwist service worker
-│   └── manifest.ts         ← PWA manifest
-├── components/
-│   ├── layout/             ← AdminSidebar, EmployeeSidebar, headers
-│   ├── notifications/      ← Bell with Reverb + polling
-│   ├── search/             ← Global search (Cmd+K palette)
-│   ├── pwa/                ← Install prompt
-│   ├── ui/                 ← shadcn primitives (TAQAT-branded)
-│   └── {feature}/          ← Feature-specific components
-├── lib/
-│   ├── api/                ← Axios client + typed endpoints
-│   ├── stores/             ← Zustand (auth-store)
-│   └── echo.ts             ← Laravel Echo + Reverb setup
+apps/web/src/app/
+├── (auth)/login              Public login
+├── (admin)/                  Admin routes with sidebar (RBAC-filtered)
+│   ├── dashboard, employees, organization/*, attendance
+│   ├── leaves, requests, approvals, workflows, request-types
+│   ├── tasks, tasks-config/*, reports/attendance, audit
+│   ├── notifications, settings
+├── (employee)/               Employee routes with slim sidebar
+│   └── home, my-tasks, my-leaves, my-requests
+├── (public)/scan             QR check-in (offline-capable via SW)
+├── offline                   PWA offline fallback
+├── sw.ts                     Serwist service worker
+└── manifest.ts               PWA manifest
 ```
 
 ### Mobile (React Native + Expo)
 ```
-apps/mobile/
-├── app/
-│   ├── (auth)/login        ← Login screen
-│   ├── (tabs)/             ← Home / Tasks / Leaves / Profile
-│   └── scan                ← QR scanner modal
-├── lib/                    ← api, auth-store, theme, queryClient
-├── components/             ← Button, Card (TAQAT-branded)
-└── hooks/                  ← useAuth
+apps/mobile/app/
+├── (auth)/login              Login screen
+├── (tabs)/                   Home / Tasks / Leaves / Profile
+└── scan                      QR scanner modal
 ```
 
 ### Infrastructure (Docker Compose)
 ```
 docker-compose.simple.yml
-├── db (MySQL 8, healthchecked)
-├── redis (7-alpine, healthchecked)
-├── minio (S3-compatible)
-├── meilisearch (v1.10, private)
-├── api (php-fpm, custom-built)
-├── nginx (fronts php-fpm)
-├── web (Next.js standalone)
-├── queue (php artisan queue:work)
-├── scheduler (php artisan schedule:work)
-└── reverb (php artisan reverb:start)
+├── db              MySQL 8 (healthchecked)
+├── redis           Redis 7-alpine
+├── minio           S3-compatible storage
+├── meilisearch     v1.10, private
+├── api             php-fpm 8.4 (custom-built)
+├── nginx           fronts php-fpm
+├── web             Next.js standalone
+├── queue           php artisan queue:work
+├── scheduler       php artisan schedule:work
+└── reverb          php artisan reverb:start
 ```
 
 ---
 
-## التقدم على الـ Phases
+## 📈 Phase Progress
 
-| Phase | المحدد الأصلي | الحالة | ملاحظات |
-|-------|--------------|--------|---------|
-| **Phase 1** (MVP — M1-M8) | 12 أسبوع | ✅ **100%** | كل الميزات + Realtime + PWA |
-| **Phase 2** (Projects + Scrum + Polish) | 8 أسابيع | ✅ **~85%** | Excel/PDF ✅ · WhatsApp ✅ · Meilisearch ✅ · Kanban ✅ · Mail ✅ — Projects/Sprints فقط ناقصان |
-| **Phase 3** (AI + Executive) | 6 أسابيع | ✅ **~35%** | AI Motivation ✅ · Manager Assistant + Executive Dashboard ⏸ |
-| **Phase 4** (Scale + Mobile) | 4+ أسابيع | ✅ **~40%** | Mobile RN scaffold ✅ · 2FA/SSO/SAML ⏸ |
+| Phase | Original scope | Status | Notes |
+|-------|---------------|--------|-------|
+| **Phase 1** (MVP — M1-M8) | 12 weeks | ✅ **100%** | All milestones + Realtime + PWA |
+| **Phase 2** (Projects + Scrum + Polish) | 8 weeks | ✅ **~85%** | Excel/PDF ✅ · WhatsApp ✅ · Meilisearch ✅ · Kanban ✅ · Mail ✅ · Projects/Sprints ⏸ |
+| **Phase 3** (AI + Executive) | 6 weeks | ✅ **~35%** | AI Motivation ✅ · Manager Assistant + Executive Dashboard ⏸ |
+| **Phase 4** (Scale + Mobile) | 4+ weeks | ✅ **~40%** | Mobile RN scaffold ✅ · 2FA/SSO/SAML ⏸ |
 
-**سبقنا الجدول الأصلي بـ ~3-4 أشهر عمل.**
+**We are ~3-4 months ahead of the original schedule.**
 
 ---
 
-## الإعداد المحلي
+## 🚀 Quick Start
 
-### المتطلبات
+### Prerequisites
 - Docker Desktop 4.30+
-- Node.js 20+ (للـ mobile app)
+- Node.js 20+ (for mobile app)
 - Git
 
-### التشغيل السريع
+### Local development
 ```bash
 git clone https://github.com/ahmaddev27/Attendance.git taqat
 cd taqat
 
-# نسخ متغيرات البيئة
+# Environment
 cp .env.example .env
-# → افتح .env وضع قيم حقيقية (see "متغيرات البيئة" أدناه)
+# → Edit .env with real values (see "Environment Variables" below)
 
-# رفع الحاويات
+# Bring the stack up
 docker compose -f docker-compose.simple.yml up -d --build
 
-# تشغيل الـ migrations + seeder الأدمن
+# Migrations + admin seeder
 docker compose -f docker-compose.simple.yml exec -T api php artisan migrate --seed --force
 
-# افتح المتصفح
+# Open in browser
 open http://localhost:8181
 # Admin: admin@taqat.local / password
 ```
 
-### الموبايل
+### Mobile app
 ```bash
 cd apps/mobile
 cp .env.example .env
-# EXPO_PUBLIC_API_URL=http://192.168.x.x  ← IP الجهاز في نفس شبكة الوايفاي
+# Set EXPO_PUBLIC_API_URL=http://<your-lan-ip>  (same wifi as your phone)
 npm install
 npx expo start
-# سكن QR على Expo Go
+# Scan QR with Expo Go
 ```
 
 ---
 
-## النشر (Deployment)
+## 🚢 Deployment
 
 ### Auto-deploy (GitHub Actions → VPS)
-كل push على `main` بيشغّل:
+Every push to `main` triggers:
 1. **CI** (api-tests + web-build)
-2. **Build & Push Images** (GHCR)
-3. **Deploy to VPS** (SSH → git pull → composer sync → docker build → up -d --force-recreate → migrate --force → cache config)
+2. **Build & Push Images** (to GHCR)
+3. **Deploy to VPS** — SSH → `git pull` → composer sync → docker build → `up -d --force-recreate` → `migrate --force` → cache config
 
-الـ deploy job:
-- ✅ لا يلمس `.env` أبداً (backup تلقائي قبل git reset)
-- ✅ يعيد بناء api + web فقط (db/redis/minio تبقى)
-- ✅ يعيد resolve DNS للـ nginx بعد تجديد api container
-- ✅ Health check post-deploy — fail loudly إذا أي container مش running
+The deploy job:
+- ✅ Never touches `.env` (auto-backup before `git reset`)
+- ✅ Only rebuilds `api` + `web` (db/redis/minio remain untouched)
+- ✅ Restarts nginx to re-resolve api container IP
+- ✅ Post-deploy health check — fails loudly if any container isn't `running`
 
-**الأسرار المطلوبة** في GitHub Settings → Secrets:
+**Required GitHub Secrets** (in repo Settings → Secrets):
 - `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_SSH_PORT`, `VPS_APP_PATH`
 
-راجع `docs/deployment/vps-deploy.md` للتفاصيل الكاملة.
+See [`docs/deployment/vps-deploy.md`](docs/deployment/vps-deploy.md) for full details.
 
 ### Apache Reverse Proxy (cPanel)
-- `infra/apache/proxy.conf` — انسخه لـ `/etc/apache2/conf.d/userdata/{std,ssl}/2_4/<user>/<domain>/proxy.conf`
-- يفوّض: `/api → nginx:8180` · `/app,/apps → reverb:8182` (WebSocket) · `/` → next.js:8181
+- [`infra/apache/proxy.conf`](infra/apache/proxy.conf) — copy to `/etc/apache2/conf.d/userdata/{std,ssl}/2_4/<user>/<domain>/proxy.conf`
+- Forwards: `/api → nginx:8180` · `/app,/apps → reverb:8182` (WebSocket) · `/` → next.js:8181
 - Force HTTPS redirect + Let's Encrypt AutoSSL
 
 ---
 
-## متغيرات البيئة
+## 🔧 Environment Variables
 
 ### Application
-```
+```bash
 APP_URL=https://attendees.taqatgaza.com
 APP_ENV=production
 APP_DEBUG=false
 APP_KEY=base64:...
 ```
 
-### Database (MySQL — Docker internal)
-```
+### Database (MySQL)
+```bash
 DB_HOST=db
 DB_DATABASE=taqat
 DB_USERNAME=taqat
@@ -287,18 +292,18 @@ DB_ROOT_PASSWORD=...
 ```
 
 ### Redis
-```
+```bash
 REDIS_HOST=redis
 REDIS_PASSWORD=...
 REDIS_CLIENT=predis
 ```
 
 ### Reverb (Realtime)
-```
+```bash
 # Internal (Laravel → Reverb via Docker network)
 REVERB_HOST=reverb
-REVERB_PORT=8182               ← host port binding
-REVERB_SERVER_PORT=8080        ← inside container
+REVERB_PORT=8182                # host port binding
+REVERB_SERVER_PORT=8080         # inside container
 REVERB_SCHEME=http
 REVERB_APP_ID=taqat
 REVERB_APP_KEY=<random>
@@ -313,23 +318,23 @@ NEXT_PUBLIC_REVERB_SCHEME=https
 ```
 
 ### MinIO (S3 storage)
-```
+```bash
 MINIO_ROOT_USER=taqat_minio
 MINIO_ROOT_PASSWORD=...
 AWS_BUCKET=taqat-media
 AWS_ENDPOINT=http://minio:9000
 ```
 
-### Mail (Resend) — أو من admin UI
-```
+### Mail (Resend) — or from admin UI
+```bash
 MAIL_MAILER=resend
 MAIL_FROM_ADDRESS=noreply@taqatgaza.com
 MAIL_FROM_NAME=TAQAT
 RESEND_KEY=re_...
 ```
 
-### MTC SMS — أو من admin UI
-```
+### MTC SMS — or from admin UI
+```bash
 MTC_SMS_USERNAME=...
 MTC_SMS_PASSWORD=...
 MTC_SMS_SENDER=TAQAT
@@ -337,41 +342,42 @@ MTC_SMS_ENDPOINT=http://int.mtcsms.com/sendsms.aspx
 MTC_SMS_FAKE=false
 ```
 
-### WhatsApp (Meta Cloud API) — أو من admin UI
-```
+### WhatsApp (Meta Cloud API) — or from admin UI
+```bash
 WHATSAPP_ACCESS_TOKEN=...
 WHATSAPP_PHONE_NUMBER_ID=...
 WHATSAPP_BUSINESS_ACCOUNT_ID=...
 WHATSAPP_FAKE=false
 ```
 
-### AI (Anthropic Claude) — أو من admin UI
-```
+### AI (Anthropic Claude) — or from admin UI
+```bash
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 ### Search (Meilisearch)
-```
+```bash
 SCOUT_DRIVER=meilisearch
 MEILISEARCH_HOST=http://meilisearch:7700
 MEILISEARCH_KEY=<random master key>
 ```
 
-**💡 نصيحة:** الـ Mail + SMS + WhatsApp + AI credentials تقدر تحطها من الأدمن UI (`/settings`) بعد الـ deploy الأول، ما تحتاج تعدل `.env` كل مرة.
+**💡 Tip:** Mail + SMS + WhatsApp + AI credentials can be set from the admin UI (`/settings`) after the first deploy — no need to edit `.env` every time.
 
 ---
 
-## الاختبارات
+## 🧪 Testing
 
 ### Backend (Pest)
 ```bash
 docker compose exec -T api php artisan test
 ```
-تغطية:
-- Auth (login by email + employee_number, token issue, logout)
+
+Coverage:
+- Auth (login by email + number, token issue, logout)
 - Employees + Organization CRUD
 - Attendance (scan flow, fraud guard, monthly summary, race conditions)
-- Leaves (submit, approve, reject, cancel, balance mgmt)
+- Leaves (submit, approve, reject, cancel, balance management)
 - Workflow + Approvals
 - Tasks + Comments + Attachments (signed URLs)
 - Admin Dashboard KPIs (with RBAC gate)
@@ -386,84 +392,91 @@ docker compose exec -T api php artisan test
 cd apps/web && npx tsc --noEmit
 ```
 
-### CI (على GitHub Actions لكل push)
-- api-tests (PHP 8.4 + MySQL + Redis)
-- web-build (Node 20 + Next.js build)
-- deploy (بعد نجاح CI)
+### CI (GitHub Actions per push)
+- `api-tests` (PHP 8.4 + MySQL + Redis)
+- `web-build` (Node 20 + Next.js build)
+- `deploy` (after CI passes)
 
 ---
 
-## الوصول والصلاحيات
+## 🔒 Access & RBAC
 
 ### Default Admin
 - **Email:** `admin@taqat.local`
 - **Password:** `password`
 - **Employee Number:** `1000`
-- **Role:** `super-admin` (كل الـ permissions)
+- **Role:** `super-admin` (all permissions)
 
-### الأدوار والصلاحيات
+### Role Matrix
 | Role | manage-users | manage-departments | view-all-attendance | approve-leaves | create-tasks | manage-workflows | view-reports | view-audit-logs |
 |------|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | super-admin | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | management | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| department-manager | — | — | جزئي | ✅ | ✅ | — | — | — |
-| team-leader | — | — | جزئي | جزئي | ✅ | — | — | — |
-| employee | — | — | ذاته | — | — | — | — | — |
+| department-manager | — | — | ⚠️ dept-scoped | ✅ | ✅ | — | — | — |
+| team-leader | — | — | ⚠️ team-scoped | ⚠️ team-scoped | ✅ | — | — | — |
+| employee | — | — | own only | — | — | — | — | — |
 
-Sidebar يفلتر حسب صلاحيات المستخدم runtime.
+> ⚠️ **Scoped permissions** are boolean-granted today; per-department/per-team scoping is a planned enhancement (a policy/query-scope layer). See [What's Not Built Yet](#-whats-not-built-yet).
+
+Sidebar filters items by user permissions at runtime — a `team-leader` sees only the pages they can act on.
 
 ---
 
-## البنية داخل الريبو
+## 📁 Repo Layout
 
 ```
 taqat/
-├── .github/workflows/         ← CI + Deploy
+├── .github/workflows/         CI + Deploy pipelines
 ├── apps/
-│   ├── api/                   ← Laravel 11 backend
-│   ├── web/                   ← Next.js 15 admin/employee
-│   └── mobile/                ← React Native + Expo
+│   ├── api/                   Laravel 11 backend
+│   ├── web/                   Next.js 15 admin/employee panel
+│   └── mobile/                React Native + Expo
 ├── docs/
-│   ├── v2/                    ← Architecture + ERD + Phase plans
-│   └── deployment/            ← VPS deploy guide
+│   ├── v2/                    Architecture + ERD + Phase plans
+│   └── deployment/            VPS deploy guide
 ├── infra/
-│   ├── apache/proxy.conf      ← Reverse proxy config
-│   ├── docker/api/Dockerfile  ← PHP 8.4 image
-│   ├── docker/web/Dockerfile  ← Next.js standalone
-│   └── docker/nginx/          ← Nginx configs
-├── docker-compose.simple.yml  ← VPS production stack
-├── docker-compose.yml         ← Local dev stack
-└── .env.example               ← Environment template
+│   ├── apache/proxy.conf      Reverse proxy config
+│   ├── docker/api/Dockerfile  PHP 8.4 image
+│   ├── docker/web/Dockerfile  Next.js standalone
+│   └── docker/nginx/          Nginx configs
+├── docker-compose.simple.yml  VPS production stack
+├── docker-compose.yml         Local dev stack
+└── .env.example               Environment template
 ```
 
 ---
 
-## ما اللي لسا مش مبني
+## 🚧 What's Not Built Yet
 
-المزايا التالية من الـ SRS الموسّع مؤجلة (Phase 2/3/4):
+Features from the extended SRS deferred to a later phase:
 
-- **Projects + Sprints + Scrum ceremonies** (Kanban موجود بس بلا Projects)
-- **Manager AI Assistant** (Motivation فقط مبنية)
-- **Executive Dashboard** (KPIs للـ C-level)
+### Phase 2 remaining
+- **Projects + Sprints + Scrum ceremonies** (Kanban exists but without Projects grouping)
+- **Row-level scoping for permissions** — department-manager should only see their department's attendance/leaves (currently `view-all-attendance` is boolean-granted; adding a query scope layer would close the ⚠️ items in the RBAC matrix above)
+
+### Phase 3 remaining
+- **Manager AI Assistant** (Motivation only is built)
+- **Executive Dashboard** (C-level KPIs)
 - **Performance Reviews + KPI system**
+
+### Phase 4 remaining
 - **2FA / SSO / SAML**
 - **Multi-company (SaaS)**
-- **Global search — row-level scoping** (كل مستخدم يشوف كل شي حالياً)
-- **WhatsApp templates** للـ cold outreach خارج 24h session
-- **Firebase Push notifications** على الموبايل (جاهز للـ wire-up)
-- **App Store submission** للموبايل
+- **WhatsApp templates** for cold outreach outside 24h session window
+- **Firebase Push notifications** on mobile (framework ready, needs FCM config)
+- **App Store submission** for mobile
 
 ---
 
-## المرجعية
+## 🔗 References
 
 - **Backend API base:** `https://attendees.taqatgaza.com/api`
 - **Web admin:** `https://attendees.taqatgaza.com`
 - **Repository:** https://github.com/ahmaddev27/Attendance
-- **الوثائق الداخلية:** `docs/v2/` (Architecture + ERD + Phase 1 Plan)
+- **Internal docs:** [`docs/v2/`](docs/v2/) (Architecture + ERD + Phase 1 Plan)
 
 ---
 
-## License
+## 📜 License
 
 Proprietary — TAQAT © 2026
