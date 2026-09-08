@@ -15,6 +15,7 @@ use App\Modules\Organization\Controllers\DepartmentController;
 use App\Modules\Organization\Controllers\PositionController;
 use App\Modules\Organization\Controllers\TeamController;
 use App\Modules\AI\Controllers\MotivationController;
+use App\Modules\Analytics\Controllers\AnalyticsController;
 use App\Modules\Notifications\Controllers\MyNotificationsController;
 use App\Modules\Reports\Controllers\AdminDashboardController;
 use App\Modules\Reports\Controllers\AttendanceReportController;
@@ -200,6 +201,19 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::middleware('permission:view-reports')->group(function () {
             Route::get('/reports/attendance/monthly', [AttendanceReportController::class, 'monthly']);
         });
+
+        // Analytics dashboards (Phase 3). Same permission gate as reports;
+        // each endpoint returns the same {data, meta} envelope so the
+        // frontend can share the fetch layer.
+        Route::middleware('permission:view-reports')
+            ->prefix('analytics')
+            ->group(function () {
+                Route::get('/attendance/kpis',    [AnalyticsController::class, 'attendanceKpis']);
+                Route::get('/attendance/heatmap', [AnalyticsController::class, 'attendanceHeatmap']);
+                Route::get('/leaves/patterns',    [AnalyticsController::class, 'leavePatterns']);
+                Route::get('/tasks/performance',  [AnalyticsController::class, 'taskPerformance']);
+                Route::get('/employees/summary',  [AnalyticsController::class, 'employeeSummary']);
+            });
 
         // Audit log viewer
         Route::middleware('permission:view-audit-logs')

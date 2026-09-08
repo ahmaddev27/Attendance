@@ -24,6 +24,7 @@ import {
   QrCode,
   Settings,
   Settings2,
+  TrendingUp,
   Users,
   UsersRound,
 } from 'lucide-react';
@@ -62,6 +63,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/tasks', label: 'المهام', icon: ClipboardCheck, permissions: ['create-tasks'] },
   { href: '/tasks-config/statuses', label: 'إعدادات المهام', icon: Settings2, permissions: ['manage-workflows'] },
   { href: '/reports/attendance', label: 'تقارير الحضور', icon: BarChart3, permissions: ['view-reports'] },
+  { href: '/analytics', label: 'التحليلات', icon: TrendingUp, permissions: ['view-reports'] },
   { href: '/audit', label: 'سجل النشاط', icon: History, permissions: ['view-audit-logs'] },
   { href: '/notifications', label: 'الإشعارات', icon: Bell, permissions: [] },
   { href: '/settings', label: 'الإعدادات', icon: Settings, permissions: ['manage-users'] },
