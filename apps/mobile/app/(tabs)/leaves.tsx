@@ -1,12 +1,12 @@
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   RefreshControl,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 
 import { Button } from '../../components/Button';
@@ -29,11 +29,12 @@ interface Paginated<T> {
 }
 
 /**
- * "My leaves" tab. Requesting a new leave is deep enough to warrant its
- * own form screen — this scaffold surfaces a placeholder alert so the
- * navigation shape is correct, and leaves the form for a follow-up.
+ * "My leaves" tab. Requesting a new leave opens a dedicated modal screen
+ * (see app/leave-request.tsx) so the form can breathe without competing
+ * with the list.
  */
 export default function LeavesScreen() {
+  const router = useRouter();
   const { data, isLoading, isError, error, refetch, isRefetching } = useQuery({
     queryKey: ['me', 'leaves'],
     queryFn: async (): Promise<LeaveRequest[]> => {
@@ -43,10 +44,7 @@ export default function LeavesScreen() {
   });
 
   function onRequest() {
-    Alert.alert(
-      'طلب إجازة جديدة',
-      'شاشة إنشاء الطلب ستُضاف قريباً. سيتم فتحها من هنا.',
-    );
+    router.push('/leave-request');
   }
 
   return (

@@ -1,4 +1,13 @@
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 
 import { Card } from '../../components/Card';
@@ -24,6 +33,7 @@ interface Paginated<T> {
  * we tolerate both shapes.
  */
 export default function TasksScreen() {
+  const router = useRouter();
   const { data, isLoading, isError, error, refetch, isRefetching } = useQuery({
     queryKey: ['me', 'tasks'],
     queryFn: async (): Promise<TaskItem[]> => {
@@ -63,14 +73,22 @@ export default function TasksScreen() {
           tintColor={colors.primary}
         />
       }
-      renderItem={({ item }) => <TaskRow task={item} />}
+      renderItem={({ item }) => (
+        <TaskRow
+          task={item}
+          onPress={() =>
+            router.push({ pathname: '/task/[id]', params: { id: String(item.id) } })
+          }
+        />
+      )}
     />
   );
 }
 
-function TaskRow({ task }: { task: TaskItem }) {
+function TaskRow({ task, onPress }: { task: TaskItem; onPress: () => void }) {
   return (
-    <Card>
+    <Pressable onPress={onPress} style={({ pressed }) => pressed && { opacity: 0.85 }}>
+      <Card>
       <View style={styles.rowHeader}>
         <Text style={styles.title} numberOfLines={2}>
           {task.title}
@@ -105,7 +123,8 @@ function TaskRow({ task }: { task: TaskItem }) {
           <Text style={styles.metaLabel}>الاستحقاق: {task.due_date}</Text>
         ) : null}
       </View>
-    </Card>
+      </Card>
+    </Pressable>
   );
 }
 

@@ -57,6 +57,14 @@ export default function RootLayout() {
                 name="scan"
                 options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
               />
+              <Stack.Screen
+                name="leave-request"
+                options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+              />
+              <Stack.Screen
+                name="task/[id]"
+                options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+              />
             </Stack>
           </AuthGate>
         </View>
