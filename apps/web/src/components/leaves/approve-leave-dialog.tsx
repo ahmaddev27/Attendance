@@ -55,9 +55,15 @@ export function ApproveLeaveDialog({ leaveRequest, open, onOpenChange }: Approve
                   <div className="mt-1">
                     <LeaveTypeBadge leaveType={leaveRequest.leave_type} className="text-xs" />
                   </div>
-                  <p className="num mt-1 text-xs text-muted">
-                    {formatDate(leaveRequest.start_date)} — {formatDate(leaveRequest.end_date)} (
-                    {leaveRequest.days} يوم)
+                  <p className="mt-1 text-xs text-muted">
+                    <span className="num" dir="ltr">
+                      {formatDate(leaveRequest.start_date)} — {formatDate(leaveRequest.end_date)}
+                    </span>{' '}
+                    (
+                    <span className="num" dir="ltr">
+                      {leaveRequest.days}
+                    </span>{' '}
+                    يوم)
                   </p>
                 </div>
               )}
@@ -74,7 +80,7 @@ export function ApproveLeaveDialog({ leaveRequest, open, onOpenChange }: Approve
               if (leaveRequest) mutation.mutate(leaveRequest.id);
             }}
           >
-            {mutation.isPending && <Spinner className="text-white" />}
+            {mutation.isPending && <Spinner className="me-2 text-white" />}
             موافقة
           </AlertDialogAction>
         </AlertDialogFooter>

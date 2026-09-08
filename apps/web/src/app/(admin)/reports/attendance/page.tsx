@@ -7,9 +7,24 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
 import { departmentsApi } from '@/lib/api/endpoints/departments';
 import { reportsApi, type AttendanceReportRow } from '@/lib/api/endpoints/reports';
+
+type ExportFormat = 'csv' | 'xlsx' | 'pdf';
+
+const EXPORT_MIME: Record<ExportFormat, string> = {
+  csv: 'text/csv;charset=utf-8;',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  pdf: 'application/pdf',
+};
+
+const EXPORT_LABEL: Record<ExportFormat, string> = {
+  csv: 'CSV',
+  xlsx: 'Excel',
+  pdf: 'PDF',
+};
 
 const MONTHS_AR = [
   'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
@@ -21,7 +36,8 @@ export default function AttendanceReportPage() {
   const [year, setYear] = React.useState(now.getFullYear());
   const [month, setMonth] = React.useState(now.getMonth() + 1);
   const [departmentId, setDepartmentId] = React.useState<number | undefined>();
-  const [downloading, setDownloading] = React.useState(false);
+  const [downloading, setDownloading] = React.useState<ExportFormat | null>(null);
+  const [menuOpen, setMenuOpen] = React.useState(false);
 
   const { data: departments } = useQuery({
     queryKey: ['departments', 'filter-options'],
@@ -37,14 +53,24 @@ export default function AttendanceReportPage() {
 
   const rows: AttendanceReportRow[] = data ?? [];
 
-  const handleDownload = async () => {
+  const handleDownload = async (format: ExportFormat) => {
+    // Guard: axios' Blob transport returns application/json when Laravel
+    // sends a 4xx, so the caller re-types the blob per requested format.
+    const fetchers: Record<ExportFormat, () => Promise<{ data: Blob }>> = {
+      csv: () => reportsApi.attendanceMonthlyCsv({ year, month, department_id: departmentId }),
+      xlsx: () => reportsApi.attendanceMonthlyXlsx({ year, month, department_id: departmentId }),
+      pdf: () => reportsApi.attendanceMonthlyPdf({ year, month, department_id: departmentId }),
+    };
+
     try {
-      setDownloading(true);
-      const res = await reportsApi.attendanceMonthlyCsv({ year, month, department_id: departmentId });
-      const url = window.URL.createObjectURL(res.data);
+      setDownloading(format);
+      setMenuOpen(false);
+      const res = await fetchers[format]();
+      const blob = new Blob([res.data], { type: EXPORT_MIME[format] });
+      const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `attendance-${year}-${String(month).padStart(2, '0')}.csv`;
+      a.download = `attendance-${year}-${String(month).padStart(2, '0')}.${format}`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -52,7 +78,7 @@ export default function AttendanceReportPage() {
     } catch {
       toast.error('تعذّر تحميل الملف');
     } finally {
-      setDownloading(false);
+      setDownloading(null);
     }
   };
 
@@ -75,7 +101,7 @@ export default function AttendanceReportPage() {
         <h1 className="flex items-center gap-2 text-2xl font-bold text-ink">
           <BarChart3 className="h-6 w-6 text-brand" /> تقرير الحضور الشهري
         </h1>
-        <p className="mt-1 text-sm text-muted">ملخّص أيام الحضور والتأخير والغياب لكل موظف — قابل للتصدير كـ CSV.</p>
+        <p className="mt-1 text-sm text-muted">ملخّص أيام الحضور والتأخير والغياب لكل موظف — قابل للتصدير CSV / Excel / PDF.</p>
       </div>
 
       {/* Filters */}
@@ -120,15 +146,40 @@ export default function AttendanceReportPage() {
             </select>
           </label>
           <div className="flex items-end">
-            <Button
-              type="button"
-              className="w-full bg-brand hover:bg-brand-hover text-white"
-              onClick={handleDownload}
-              disabled={downloading || rows.length === 0}
-            >
-              {downloading ? <Loader2 className="ml-1 h-4 w-4 animate-spin" /> : <Download className="ml-1 h-4 w-4" />}
-              تصدير CSV
-            </Button>
+            <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  className="w-full bg-brand hover:bg-brand-hover text-white"
+                  disabled={downloading !== null || rows.length === 0}
+                >
+                  {downloading !== null ? (
+                    <Loader2 className="me-1 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="me-1 h-4 w-4" />
+                  )}
+                  تصدير
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-40 p-1">
+                {(['csv', 'xlsx', 'pdf'] as const).map((fmt) => (
+                  <button
+                    key={fmt}
+                    type="button"
+                    onClick={() => handleDownload(fmt)}
+                    disabled={downloading !== null}
+                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-ink hover:bg-surface-2 disabled:opacity-60"
+                  >
+                    {downloading === fmt ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
+                    {EXPORT_LABEL[fmt]}
+                  </button>
+                ))}
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
       </Card>
@@ -147,7 +198,7 @@ export default function AttendanceReportPage() {
       {/* Table */}
       <Card className="border-hairline bg-surface p-0">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-right text-sm">
+          <table className="w-full min-w-[720px] text-start text-sm">
             <thead className="border-b border-hairline bg-surface-2">
               <tr>
                 <Th>#</Th>

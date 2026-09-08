@@ -48,7 +48,7 @@ export function LeaveDetailsDialog({ leaveRequest, open, onOpenChange }: LeaveDe
                   {leaveRequest.employee.employee_number}
                 </p>
               </div>
-              <LeaveStatusBadge status={leaveRequest.status} className="mr-auto" />
+              <LeaveStatusBadge status={leaveRequest.status} className="ms-auto" />
             </div>
 
             <div className="mt-2">
@@ -56,13 +56,19 @@ export function LeaveDetailsDialog({ leaveRequest, open, onOpenChange }: LeaveDe
                 <LeaveTypeBadge leaveType={leaveRequest.leave_type} />
               </DetailRow>
               <DetailRow label="تاريخ البداية">
-                <span className="num">{formatDate(leaveRequest.start_date)}</span>
+                <span className="num" dir="ltr">
+                  {formatDate(leaveRequest.start_date)}
+                </span>
               </DetailRow>
               <DetailRow label="تاريخ النهاية">
-                <span className="num">{formatDate(leaveRequest.end_date)}</span>
+                <span className="num" dir="ltr">
+                  {formatDate(leaveRequest.end_date)}
+                </span>
               </DetailRow>
               <DetailRow label="عدد الأيام">
-                <span className="num">{leaveRequest.days}</span>
+                <span className="num" dir="ltr">
+                  {leaveRequest.days}
+                </span>
               </DetailRow>
               <DetailRow label="السبب">{leaveRequest.reason || '—'}</DetailRow>
               {leaveRequest.attachment_url && (
@@ -78,14 +84,18 @@ export function LeaveDetailsDialog({ leaveRequest, open, onOpenChange }: LeaveDe
                 </DetailRow>
               )}
               <DetailRow label="تاريخ الإنشاء">
-                <span className="num">{formatDate(leaveRequest.created_at)}</span>
+                <span className="num" dir="ltr">
+                  {formatDate(leaveRequest.created_at)}
+                </span>
               </DetailRow>
               {leaveRequest.reviewer && (
                 <DetailRow label="تمت المراجعة بواسطة">{leaveRequest.reviewer.name}</DetailRow>
               )}
               {leaveRequest.reviewed_at && (
                 <DetailRow label="تاريخ المراجعة">
-                  <span className="num">{formatDate(leaveRequest.reviewed_at)}</span>
+                  <span className="num" dir="ltr">
+                    {formatDate(leaveRequest.reviewed_at)}
+                  </span>
                 </DetailRow>
               )}
               {leaveRequest.status === 'rejected' && leaveRequest.rejection_reason && (

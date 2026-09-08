@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Notifications\Notifications;
 
 use App\Modules\Sms\Notifications\Channels\SmsChannel;
+use App\Modules\Whatsapp\Notifications\Channels\WhatsappChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\BroadcastMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -35,6 +36,14 @@ use Illuminate\Support\Str;
  *                 recipient's linked Employee has a phone. Kept opt-in
  *                 because SMS is metered and most in-app notifications
  *                 don't warrant a text.
+ *   - whatsapp  : OPT-IN per notification via the $sendWhatsapp flag.
+ *                 Added only when Meta Cloud API credentials are
+ *                 configured (or the fake driver is on for local /
+ *                 staging smoke tests) AND the recipient's linked
+ *                 Employee has a phone. Same rationale as SMS:
+ *                 templates cost money and free-form messages only work
+ *                 inside the 24h customer-service window, so every send
+ *                 is deliberate.
  */
 class TaqatNotification extends Notification
 {
@@ -57,6 +66,12 @@ class TaqatNotification extends Notification
      *                          via MTC. Defaults false because SMS costs money;
      *                          only fires when MTC credentials are configured
      *                          and the recipient's employee has a phone.
+     * @param  bool  $sendWhatsapp  Opt-IN to also send this notification over
+     *                               WhatsApp via Meta's Cloud API. Defaults
+     *                               false; only fires when WhatsApp
+     *                               credentials are configured (or the fake
+     *                               driver is on) AND the recipient's employee
+     *                               has a phone.
      */
     public function __construct(
         public readonly string $title,
@@ -67,6 +82,7 @@ class TaqatNotification extends Notification
         public readonly bool $suppressBroadcast = false,
         public readonly bool $suppressMail = false,
         public readonly bool $sendSms = false,
+        public readonly bool $sendWhatsapp = false,
     ) {}
 
     /**
@@ -97,6 +113,14 @@ class TaqatNotification extends Notification
             $channels[] = SmsChannel::class;
         }
 
+        // WhatsApp is opt-in per notification and only fires when Meta
+        // Cloud API is provisioned (access_token set OR fake driver
+        // enabled for smoke tests) AND the recipient's employee has a
+        // phone we can dial.
+        if ($this->sendWhatsapp && $this->whatsappIsSendable($notifiable)) {
+            $channels[] = WhatsappChannel::class;
+        }
+
         return $channels;
     }
 
@@ -112,6 +136,30 @@ class TaqatNotification extends Notification
     {
         $hasCredentials = ! empty(config('services.mtc_sms.username'))
             || (bool) config('services.mtc_sms.fake', false);
+
+        if (! $hasCredentials) {
+            return false;
+        }
+
+        $phone = $notifiable->employee?->phone ?? null;
+
+        return is_string($phone) && $phone !== '';
+    }
+
+    /**
+     * True when the recipient can receive a WhatsApp message via Meta's
+     * Cloud API — i.e. the gateway is provisioned (access_token AND
+     * phone_number_id set OR the fake driver is explicitly enabled for
+     * local/staging smoke tests) AND we can resolve a phone from the
+     * notifiable's linked Employee. Guards every hop because either
+     * half can legitimately be missing (an admin User without an
+     * Employee, or an Employee without a phone).
+     */
+    private function whatsappIsSendable(mixed $notifiable): bool
+    {
+        $hasCredentials = (! empty(config('services.whatsapp.access_token'))
+                && ! empty(config('services.whatsapp.phone_number_id')))
+            || (bool) config('services.whatsapp.fake', false);
 
         if (! $hasCredentials) {
             return false;
@@ -185,6 +233,22 @@ class TaqatNotification extends Notification
             : $this->title;
 
         return Str::limit($composed, 157, '...');
+    }
+
+    /**
+     * Payload delivered over the WhatsappChannel. WhatsApp accepts up to
+     * 4096 chars per free-form message, so unlike toSms() we don't
+     * truncate — the full title + body is sent verbatim (blank body
+     * degrades to title-only). We separate with a newline so the message
+     * reads as a subject + description on the recipient's handset.
+     */
+    public function toWhatsapp(mixed $notifiable): string
+    {
+        $composed = $this->body !== null && $this->body !== ''
+            ? $this->title."\n".$this->body
+            : $this->title;
+
+        return trim($composed);
     }
 
     /**

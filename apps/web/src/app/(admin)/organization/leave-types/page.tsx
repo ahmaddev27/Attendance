@@ -63,13 +63,13 @@ export default function LeaveTypesPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="text-right">الاسم</TableHead>
-              <TableHead className="text-right">الرمز</TableHead>
-              <TableHead className="text-right">مدفوعة</TableHead>
-              <TableHead className="text-right">تعتمد على رصيد</TableHead>
-              <TableHead className="text-right">الرصيد السنوي</TableHead>
-              <TableHead className="text-right">الحالة</TableHead>
-              <TableHead className="text-right">إجراءات</TableHead>
+              <TableHead className="text-start">الاسم</TableHead>
+              <TableHead className="text-start">الرمز</TableHead>
+              <TableHead className="text-start">مدفوعة</TableHead>
+              <TableHead className="text-start">تعتمد على رصيد</TableHead>
+              <TableHead className="text-start">الرصيد السنوي</TableHead>
+              <TableHead className="text-start">الحالة</TableHead>
+              <TableHead className="text-start">إجراءات</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -97,8 +97,10 @@ export default function LeaveTypesPage() {
                 <TableCell className="font-medium">
                   <LeaveTypeBadge leaveType={leaveType} />
                 </TableCell>
-                <TableCell className="num" dir="ltr">
-                  {leaveType.code}
+                <TableCell>
+                  <span className="num" dir="ltr">
+                    {leaveType.code}
+                  </span>
                 </TableCell>
                 <TableCell>
                   <Badge
@@ -122,7 +124,11 @@ export default function LeaveTypesPage() {
                     {leaveType.is_balance_based ? 'نعم' : 'لا'}
                   </Badge>
                 </TableCell>
-                <TableCell className="num">{leaveType.default_annual_entitlement}</TableCell>
+                <TableCell>
+                  <span className="num" dir="ltr">
+                    {leaveType.default_annual_entitlement}
+                  </span>
+                </TableCell>
                 <TableCell>
                   <Badge
                     className={

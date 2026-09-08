@@ -68,104 +68,110 @@ export default function MyLeavesPage() {
   const balanceBasedBalances = (balances ?? []).filter((balance) => balance.leave_type?.is_balance_based);
 
   return (
-    <div className="min-h-screen bg-ground p-6 md:p-10">
-      <div className="mx-auto max-w-5xl space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <Button onClick={() => setSubmitOpen(true)} className="gap-2 bg-brand text-white hover:bg-brand-hover">
-            <Plus className="h-4 w-4" />
-            طلب إجازة جديد
-          </Button>
-          <h1 className="text-2xl font-bold text-ink">إجازاتي</h1>
-        </div>
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <Button onClick={() => setSubmitOpen(true)} className="gap-2 bg-brand text-white hover:bg-brand-hover">
+          <Plus className="h-4 w-4" />
+          طلب إجازة جديد
+        </Button>
+        <h1 className="text-2xl font-bold text-ink">إجازاتي</h1>
+      </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {balancesLoading &&
-            Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-40 rounded-xl" />)}
-          {!balancesLoading &&
-            balanceBasedBalances.map((balance) => <BalanceCard key={balance.id} balance={balance} />)}
-        </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {balancesLoading &&
+          Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-40 rounded-xl" />)}
+        {!balancesLoading &&
+          balanceBasedBalances.map((balance) => <BalanceCard key={balance.id} balance={balance} />)}
+      </div>
 
-        <div className="rounded-xl border border-hairline bg-surface">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-right">التواريخ</TableHead>
-                <TableHead className="text-right">النوع</TableHead>
-                <TableHead className="text-right">الأيام</TableHead>
-                <TableHead className="text-right">الحالة</TableHead>
-                <TableHead className="text-right">السبب</TableHead>
-                <TableHead className="text-right">المراجعة</TableHead>
-                <TableHead className="text-right">إجراءات</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {leavesLoading &&
-                Array.from({ length: 4 }).map((_, i) => (
-                  <TableRow key={i}>
-                    {Array.from({ length: 7 }).map((__, j) => (
-                      <TableCell key={j}>
-                        <Skeleton className="h-4 w-full" />
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))}
-
-              {!leavesLoading && (leaves?.length ?? 0) === 0 && (
-                <TableRow>
-                  <TableCell colSpan={7} className="py-14 text-center">
-                    <div className="flex flex-col items-center gap-2 text-muted">
-                      <CalendarOff className="h-8 w-8" />
-                      <p className="text-sm">لا توجد طلبات إجازة بعد</p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              )}
-
-              {leaves?.map((leave) => (
-                <TableRow key={leave.id}>
-                  <TableCell className="num whitespace-nowrap">
-                    {formatDate(leave.start_date)} — {formatDate(leave.end_date)}
-                  </TableCell>
-                  <TableCell>
-                    <LeaveTypeBadge leaveType={leave.leave_type} />
-                  </TableCell>
-                  <TableCell className="num">{leave.days}</TableCell>
-                  <TableCell>
-                    <LeaveStatusBadge status={leave.status} />
-                  </TableCell>
-                  <TableCell className="max-w-[160px] truncate" title={leave.reason ?? undefined}>
-                    {leave.reason || '—'}
-                  </TableCell>
-                  <TableCell className="text-xs text-muted">
-                    {leave.reviewer ? (
-                      <>
-                        <p>{leave.reviewer.name}</p>
-                        <p className="num">{formatDate(leave.reviewed_at)}</p>
-                      </>
-                    ) : (
-                      '—'
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {CANCELLABLE_STATUSES.includes(leave.status) ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="text-danger hover:bg-danger-soft hover:text-danger"
-                        onClick={() => setCancelTarget(leave)}
-                      >
-                        إلغاء
-                      </Button>
-                    ) : (
-                      <span className="text-xs text-muted">—</span>
-                    )}
-                  </TableCell>
+      <div className="rounded-xl border border-hairline bg-surface">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-start">التواريخ</TableHead>
+              <TableHead className="text-start">النوع</TableHead>
+              <TableHead className="text-start">الأيام</TableHead>
+              <TableHead className="text-start">الحالة</TableHead>
+              <TableHead className="text-start">السبب</TableHead>
+              <TableHead className="text-start">المراجعة</TableHead>
+              <TableHead className="text-start">إجراءات</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {leavesLoading &&
+              Array.from({ length: 4 }).map((_, i) => (
+                <TableRow key={i}>
+                  {Array.from({ length: 7 }).map((__, j) => (
+                    <TableCell key={j}>
+                      <Skeleton className="h-4 w-full" />
+                    </TableCell>
+                  ))}
                 </TableRow>
               ))}
-            </TableBody>
-          </Table>
-        </div>
+
+            {!leavesLoading && (leaves?.length ?? 0) === 0 && (
+              <TableRow>
+                <TableCell colSpan={7} className="py-14 text-center">
+                  <div className="flex flex-col items-center gap-2 text-muted">
+                    <CalendarOff className="h-8 w-8" />
+                    <p className="text-sm">لا توجد طلبات إجازة بعد</p>
+                  </div>
+                </TableCell>
+              </TableRow>
+            )}
+
+            {leaves?.map((leave) => (
+              <TableRow key={leave.id}>
+                <TableCell className="whitespace-nowrap">
+                  <span className="num" dir="ltr">
+                    {formatDate(leave.start_date)} — {formatDate(leave.end_date)}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  <LeaveTypeBadge leaveType={leave.leave_type} />
+                </TableCell>
+                <TableCell>
+                  <span className="num" dir="ltr">
+                    {leave.days}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  <LeaveStatusBadge status={leave.status} />
+                </TableCell>
+                <TableCell className="max-w-[160px] truncate" title={leave.reason ?? undefined}>
+                  {leave.reason || '—'}
+                </TableCell>
+                <TableCell className="text-xs text-muted">
+                  {leave.reviewer ? (
+                    <>
+                      <p>{leave.reviewer.name}</p>
+                      <p className="num" dir="ltr">
+                        {formatDate(leave.reviewed_at)}
+                      </p>
+                    </>
+                  ) : (
+                    '—'
+                  )}
+                </TableCell>
+                <TableCell>
+                  {CANCELLABLE_STATUSES.includes(leave.status) ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="text-danger hover:bg-danger-soft hover:text-danger"
+                      onClick={() => setCancelTarget(leave)}
+                    >
+                      إلغاء
+                    </Button>
+                  ) : (
+                    <span className="text-xs text-muted">—</span>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </div>
 
       <SubmitLeaveDialog open={submitOpen} onOpenChange={setSubmitOpen} />
@@ -175,8 +181,15 @@ export default function MyLeavesPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>إلغاء طلب الإجازة</AlertDialogTitle>
             <AlertDialogDescription>
-              هل أنت متأكد من إلغاء طلب الإجازة من {cancelTarget && formatDate(cancelTarget.start_date)} إلى{' '}
-              {cancelTarget && formatDate(cancelTarget.end_date)}؟
+              هل أنت متأكد من إلغاء طلب الإجازة من{' '}
+              <span className="num" dir="ltr">
+                {cancelTarget && formatDate(cancelTarget.start_date)}
+              </span>{' '}
+              إلى{' '}
+              <span className="num" dir="ltr">
+                {cancelTarget && formatDate(cancelTarget.end_date)}
+              </span>
+              ؟
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -189,7 +202,7 @@ export default function MyLeavesPage() {
                 if (cancelTarget) cancelMutation.mutate(cancelTarget.id);
               }}
             >
-              {cancelMutation.isPending && <Spinner className="text-white" />}
+              {cancelMutation.isPending && <Spinner className="me-2 text-white" />}
               تأكيد الإلغاء
             </AlertDialogAction>
           </AlertDialogFooter>

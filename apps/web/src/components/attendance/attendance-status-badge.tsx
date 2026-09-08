@@ -58,14 +58,25 @@ export const ATTENDANCE_STATUS_META: Record<
   },
 };
 
+const UNKNOWN_STATUS_META = {
+  label: '—',
+  className: 'border-transparent bg-surface-2 text-muted',
+  dotClassName: 'bg-muted',
+} as const;
+
 export function AttendanceStatusBadge({
   status,
   className,
 }: {
-  status: AttendanceStatus;
+  status: AttendanceStatus | null | undefined;
   className?: string;
 }) {
-  const meta = ATTENDANCE_STATUS_META[status];
+  // Defensive lookup — a null/undefined status (or a value the backend
+  // introduced but the frontend hasn't shipped labels for yet) previously
+  // crashed the row when it tried to read `.label` off `undefined`; falling
+  // back to a neutral placeholder keeps the row visible so admins can still
+  // act on it.
+  const meta = (status && ATTENDANCE_STATUS_META[status]) || UNKNOWN_STATUS_META;
 
   return (
     <Badge className={cn(meta.className, 'font-medium', className)}>{meta.label}</Badge>

@@ -31,12 +31,15 @@ export function FilterBar({
       )}
     >
       <div className="relative w-full md:w-64">
-        <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+        {/* The search icon sits at the start of the field — RIGHT in RTL,
+            LEFT in LTR — so we use logical `start`/`ps` and the input
+            reserves matching padding for the icon overlay. */}
+        <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
         <Input
           value={searchValue}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder={searchPlaceholder}
-          className="pr-9"
+          className="ps-9"
         />
       </div>
       {children && <div className="flex flex-1 flex-wrap items-center gap-3">{children}</div>}

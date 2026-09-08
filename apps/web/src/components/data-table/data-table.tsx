@@ -75,7 +75,7 @@ export function DataTable<T>({
                 className={cn(
                   'whitespace-nowrap text-xs font-semibold text-ink-2',
                   col.align === 'center' && 'text-center',
-                  col.align === 'end' && 'text-left',
+                  col.align === 'end' && 'text-end',
                   col.className
                 )}
               >
@@ -83,7 +83,7 @@ export function DataTable<T>({
               </TableHead>
             ))}
             {hasActions && (
-              <TableHead className="w-1 whitespace-nowrap text-left text-xs font-semibold text-ink-2">
+              <TableHead className="w-1 whitespace-nowrap text-end text-xs font-semibold text-ink-2">
                 إجراءات
               </TableHead>
             )}
@@ -125,7 +125,7 @@ export function DataTable<T>({
                     key={col.key}
                     className={cn(
                       col.align === 'center' && 'text-center',
-                      col.align === 'end' && 'text-left',
+                      col.align === 'end' && 'text-end',
                       col.className
                     )}
                   >
@@ -185,8 +185,14 @@ function DataTablePagination({
   return (
     <div className="flex flex-col gap-3 border-t border-hairline px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
       <p className="text-xs text-muted">
-        عرض <span className="num">{from}</span>-<span className="num">{to}</span> من أصل{' '}
-        <span className="num">{total}</span>
+        عرض{' '}
+        <span className="num" dir="ltr">
+          {from}-{to}
+        </span>{' '}
+        من أصل{' '}
+        <span className="num" dir="ltr">
+          {total}
+        </span>
       </p>
       <div className="flex items-center gap-2">
         <Button
@@ -198,7 +204,7 @@ function DataTablePagination({
         >
           السابق
         </Button>
-        <span className="num text-xs text-ink-2">
+        <span className="num text-xs text-ink-2" dir="ltr">
           {current_page} / {last_page}
         </span>
         <Button

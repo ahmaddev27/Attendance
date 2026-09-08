@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Modules\AI\Services;
 
 use App\Modules\AI\Exceptions\MotivationUnavailableException;
+use App\Modules\Settings\Services\SettingsService;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Http;
 use Throwable;
 
@@ -23,20 +25,33 @@ use Throwable;
 class ClaudeClient
 {
     private const ENDPOINT = 'https://api.anthropic.com/v1/messages';
-    private const MODEL = 'claude-sonnet-5';
+    private const DEFAULT_MODEL = 'claude-sonnet-5';
     private const ANTHROPIC_VERSION = '2023-06-01';
     private const TIMEOUT_SECONDS = 15;
     private const RETRY_ATTEMPTS = 3; // one initial + two retries
     private const RETRY_BASE_MS = 500;
 
     private readonly string $apiKey;
+    private readonly string $model;
 
-    public function __construct(?string $apiKey = null)
+    public function __construct(?string $apiKey = null, ?string $model = null)
     {
-        // Env is read at construction so the container can hand out a
-        // fresh client per request. Tests can new one up with an
-        // explicit key without touching the environment.
-        $this->apiKey = $apiKey ?? (string) env('ANTHROPIC_API_KEY', '');
+        // Both key and model default to the admin-editable settings first,
+        // then fall back to env vars. Tests can pass explicit values.
+        $settings = null;
+        try {
+            $settings = App::make(SettingsService::class);
+        } catch (Throwable) {
+            // Container not booted yet — env fallback below is fine.
+        }
+
+        $this->apiKey = $apiKey
+            ?? ($settings?->get('ai.anthropic_api_key', 'services.anthropic.api_key'))
+            ?? (string) env('ANTHROPIC_API_KEY', '');
+
+        $this->model = $model
+            ?? ($settings?->get('ai.anthropic_model', 'services.anthropic.model', self::DEFAULT_MODEL))
+            ?? self::DEFAULT_MODEL;
     }
 
     /**
@@ -74,7 +89,7 @@ class ClaudeClient
                 )
                 ->throw()
                 ->post(self::ENDPOINT, [
-                    'model' => self::MODEL,
+                    'model' => $this->model,
                     'max_tokens' => $maxTokens,
                     'system' => $systemPrompt,
                     'messages' => [

@@ -116,7 +116,7 @@ export default function TasksPage() {
         <button
           type="button"
           onClick={() => setSelectedTaskId(task.id)}
-          className="max-w-[220px] truncate text-right font-medium text-brand-ink hover:underline"
+          className="max-w-[220px] truncate text-start font-medium text-brand-ink hover:underline"
           title={task.title}
         >
           {task.title}
@@ -152,7 +152,11 @@ export default function TasksPage() {
       cell: (task) => {
         if (!task.due_date) return <span className="text-xs text-muted">—</span>;
         const urgency = getDueDateUrgency(task.due_date, task.completed_at);
-        return <span className={cn('num text-xs font-medium', DUE_DATE_URGENCY_CLASSNAME[urgency])}>{formatDate(task.due_date)}</span>;
+        return (
+          <span className={cn('num text-xs font-medium', DUE_DATE_URGENCY_CLASSNAME[urgency])} dir="ltr">
+            {formatDate(task.due_date)}
+          </span>
+        );
       },
     },
     {
@@ -162,7 +166,9 @@ export default function TasksPage() {
       cell: (task) => (
         <div className="flex items-center gap-2">
           <TaskProgressBar value={task.progress_percent} className="w-16" />
-          <span className="num text-xs text-muted">{task.progress_percent}%</span>
+          <span className="num text-xs text-muted" dir="ltr">
+            {task.progress_percent}%
+          </span>
         </div>
       ),
     },

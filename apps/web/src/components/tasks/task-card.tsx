@@ -43,7 +43,7 @@ export function TaskCard({ task, onClick, dragOverlay = false }: TaskCardProps) 
         if (e.key === 'Enter') onClick?.();
       }}
       className={cn(
-        'space-y-2 rounded-lg border border-hairline bg-surface p-3 text-right shadow-sm outline-none transition-shadow hover:shadow-md focus-visible:ring-1 focus-visible:ring-ring',
+        'space-y-2 rounded-lg border border-hairline bg-surface p-3 text-start shadow-sm outline-none transition-shadow hover:shadow-md focus-visible:ring-1 focus-visible:ring-ring',
         !dragOverlay && 'cursor-pointer',
         isDragging && 'opacity-40',
         dragOverlay && 'rotate-2 cursor-grabbing shadow-lg'
@@ -66,14 +66,20 @@ export function TaskCard({ task, onClick, dragOverlay = false }: TaskCardProps) 
         <div className="flex items-center gap-2.5 text-xs text-muted">
           <span className="flex items-center gap-1">
             <MessageSquare className="h-3.5 w-3.5" />
-            <span className="num">{task.comments_count}</span>
+            <span className="num" dir="ltr">
+              {task.comments_count}
+            </span>
           </span>
           <span className="flex items-center gap-1">
             <Paperclip className="h-3.5 w-3.5" />
-            <span className="num">{task.attachments_count}</span>
+            <span className="num" dir="ltr">
+              {task.attachments_count}
+            </span>
           </span>
           {task.due_date && (
-            <span className={cn('num', DUE_DATE_URGENCY_CLASSNAME[urgency])}>{formatDate(task.due_date)}</span>
+            <span className={cn('num', DUE_DATE_URGENCY_CLASSNAME[urgency])} dir="ltr">
+              {formatDate(task.due_date)}
+            </span>
           )}
         </div>
         {task.assignee && <EmployeeAvatar employee={task.assignee} size={24} />}

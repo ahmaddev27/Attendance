@@ -61,7 +61,7 @@ export default function NotificationsPage() {
             {unreadOnly ? 'غير مقروء فقط' : 'الكل'}
           </button>
           <Button variant="outline" size="sm" onClick={markAllRead}>
-            <CheckCheck className="ml-1 h-4 w-4" />
+            <CheckCheck className="me-1 h-4 w-4" />
             تعليم الكل كمقروء
           </Button>
         </div>
@@ -135,7 +135,7 @@ function NotificationRow({ n, onOpen }: { n: TaqatNotification; onOpen: () => vo
   const body = (
     <div
       className={cn(
-        'flex items-start gap-3 px-6 py-4 text-right transition-colors hover:bg-surface-2',
+        'flex items-start gap-3 px-6 py-4 text-start transition-colors hover:bg-surface-2',
         !n.read_at && 'bg-brand-soft/30'
       )}
     >

@@ -19,7 +19,12 @@ const Switch = React.forwardRef<
   >
     <SwitchPrimitives.Thumb
       className={cn(
-        "pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0"
+        // The thumb needs to slide toward the LTR/RTL "end" edge on check.
+        // Physical `translate-x-4` always moves the thumb rightward, which
+        // in RTL slides it toward the visual "off" side (the right edge is
+        // now the start). Guard with `rtl:-translate-x-4` so it slides
+        // leftward under `dir="rtl"` and rightward under `dir="ltr"`.
+        "pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-4 rtl:data-[state=checked]:-translate-x-4 data-[state=unchecked]:translate-x-0"
       )}
     />
   </SwitchPrimitives.Root>

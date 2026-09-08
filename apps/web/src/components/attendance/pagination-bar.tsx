@@ -19,8 +19,19 @@ export function PaginationBar({
   return (
     <div className="flex items-center justify-between border-t border-hairline px-1 py-3">
       <p className="text-xs text-muted">
-        صفحة <span className="num">{currentPage}</span> من <span className="num">{lastPage}</span> (
-        <span className="num">{total}</span> سجل)
+        صفحة{' '}
+        <span className="num" dir="ltr">
+          {currentPage}
+        </span>{' '}
+        من{' '}
+        <span className="num" dir="ltr">
+          {lastPage}
+        </span>{' '}
+        (
+        <span className="num" dir="ltr">
+          {total}
+        </span>{' '}
+        سجل)
       </p>
       <div className="flex items-center gap-2">
         <Button

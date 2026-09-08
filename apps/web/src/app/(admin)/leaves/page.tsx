@@ -145,13 +145,13 @@ export default function LeavesPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="text-right">الموظف</TableHead>
-              <TableHead className="text-right">نوع الإجازة</TableHead>
-              <TableHead className="text-right">التواريخ</TableHead>
-              <TableHead className="text-right">الأيام</TableHead>
-              <TableHead className="text-right">السبب</TableHead>
-              <TableHead className="text-right">الحالة</TableHead>
-              <TableHead className="text-right">إجراءات</TableHead>
+              <TableHead className="text-start">الموظف</TableHead>
+              <TableHead className="text-start">نوع الإجازة</TableHead>
+              <TableHead className="text-start">التواريخ</TableHead>
+              <TableHead className="text-start">الأيام</TableHead>
+              <TableHead className="text-start">السبب</TableHead>
+              <TableHead className="text-start">الحالة</TableHead>
+              <TableHead className="text-start">إجراءات</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -191,10 +191,16 @@ export default function LeavesPage() {
                   <TableCell>
                     <LeaveTypeBadge leaveType={row.leave_type} />
                   </TableCell>
-                  <TableCell className="num whitespace-nowrap">
-                    {formatDate(row.start_date)} — {formatDate(row.end_date)}
+                  <TableCell className="whitespace-nowrap">
+                    <span className="num" dir="ltr">
+                      {formatDate(row.start_date)} — {formatDate(row.end_date)}
+                    </span>
                   </TableCell>
-                  <TableCell className="num">{row.days}</TableCell>
+                  <TableCell>
+                    <span className="num" dir="ltr">
+                      {row.days}
+                    </span>
+                  </TableCell>
                   <TableCell className="max-w-[180px] truncate" title={row.reason ?? undefined}>
                     {row.reason || '—'}
                   </TableCell>

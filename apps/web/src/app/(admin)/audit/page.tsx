@@ -86,7 +86,7 @@ export default function AuditLogPage() {
           {hasFilters && (
             <div className="flex items-end">
               <Button type="button" variant="outline" size="sm" onClick={clearFilters}>
-                <X className="ml-1 h-4 w-4" /> مسح الفلاتر
+                <X className="me-1 h-4 w-4" /> مسح الفلاتر
               </Button>
             </div>
           )}
@@ -124,7 +124,7 @@ export default function AuditLogPage() {
                     </p>
                     <p className="mt-0.5 text-xs text-muted">
                       {a.subject_type && (
-                        <span className="mr-2 rounded bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-ink-2">
+                        <span className="me-2 rounded bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-ink-2">
                           {a.subject_type}
                           {a.subject_id !== null && (
                             <span className="num" dir="ltr">

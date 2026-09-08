@@ -93,7 +93,11 @@ export default function TeamsPage() {
       key: 'employees_count',
       header: 'عدد الموظفين',
       align: 'center',
-      cell: (team) => <span className="num">{team.employees_count ?? 0}</span>,
+      cell: (team) => (
+        <span className="num" dir="ltr">
+          {team.employees_count ?? 0}
+        </span>
+      ),
     },
     {
       key: 'is_active',

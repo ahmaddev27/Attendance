@@ -83,7 +83,7 @@ export default function MyTasksPage() {
         <button
           type="button"
           onClick={() => setSelectedTaskId(task.id)}
-          className="max-w-[220px] truncate text-right font-medium text-brand-ink hover:underline"
+          className="max-w-[220px] truncate text-start font-medium text-brand-ink hover:underline"
           title={task.title}
         >
           {task.title}
@@ -127,77 +127,77 @@ export default function MyTasksPage() {
       cell: (task) => (
         <div className="flex items-center gap-2">
           <TaskProgressBar value={task.progress_percent} className="w-16" />
-          <span className="num text-xs text-muted">{task.progress_percent}%</span>
+          <span className="num text-xs text-muted" dir="ltr">
+            {task.progress_percent}%
+          </span>
         </div>
       ),
     },
   ];
 
   return (
-    <div className="min-h-screen bg-ground p-6 md:p-10">
-      <div className="mx-auto max-w-6xl space-y-6">
-        <div>
-          <p className="text-xs font-medium text-muted">مهامي</p>
-          <h1 className="mt-1 text-2xl font-bold text-ink">المهام</h1>
-        </div>
-
-        <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)}>
-          <TabsList>
-            <TabsTrigger value="assigned">المسندة إليّ</TabsTrigger>
-            <TabsTrigger value="created">التي أنشأتها</TabsTrigger>
-          </TabsList>
-
-          {/* One content pane, driven by `tab` — both tabs share the same
-              table shape and only the data source/column labels differ, so a
-              single dynamic panel avoids duplicating that markup. */}
-          <TabsContent value={tab} className="space-y-4">
-            <div className="grid grid-cols-1 gap-3 rounded-xl border border-hairline bg-surface p-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div>
-                <Label className="text-xs font-semibold text-ink-2">بحث</Label>
-                <Input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="ابحث بعنوان المهمة..."
-                  className="mt-1.5"
-                />
-              </div>
-              <div>
-                <Label className="text-xs font-semibold text-ink-2">الحالة</Label>
-                <Select value={statusId ?? '__all__'} onValueChange={(v) => setStatusId(v === '__all__' ? undefined : v)}>
-                  <SelectTrigger className="mt-1.5">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">كل الحالات</SelectItem>
-                    {(statuses ?? []).map((status) => (
-                      <SelectItem key={status.id} value={String(status.id)}>
-                        {status.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-xs font-semibold text-ink-2">الاستحقاق من</Label>
-                <Input type="date" dir="ltr" value={dueFrom} onChange={(e) => setDueFrom(e.target.value)} className="mt-1.5" />
-              </div>
-              <div>
-                <Label className="text-xs font-semibold text-ink-2">الاستحقاق إلى</Label>
-                <Input type="date" dir="ltr" value={dueTo} onChange={(e) => setDueTo(e.target.value)} className="mt-1.5" />
-              </div>
-            </div>
-
-            <DataTable
-              columns={columns}
-              data={data?.data ?? []}
-              rowKey={(task) => task.id}
-              isLoading={isLoading}
-              emptyMessage={tab === 'assigned' ? 'لا توجد مهام مسندة إليك' : 'لم تنشئ أي مهام بعد'}
-              pagination={data ? { meta: data.meta, onPageChange: setPage } : undefined}
-            />
-          </TabsContent>
-        </Tabs>
+    <div className="space-y-6">
+      <div>
+        <p className="text-xs font-medium text-muted">مهامي</p>
+        <h1 className="mt-1 text-2xl font-bold text-ink">المهام</h1>
       </div>
+
+      <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)}>
+        <TabsList>
+          <TabsTrigger value="assigned">المسندة إليّ</TabsTrigger>
+          <TabsTrigger value="created">التي أنشأتها</TabsTrigger>
+        </TabsList>
+
+        {/* One content pane, driven by `tab` — both tabs share the same
+            table shape and only the data source/column labels differ, so a
+            single dynamic panel avoids duplicating that markup. */}
+        <TabsContent value={tab} className="space-y-4">
+          <div className="grid grid-cols-1 gap-3 rounded-xl border border-hairline bg-surface p-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <Label className="text-xs font-semibold text-ink-2">بحث</Label>
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="ابحث بعنوان المهمة..."
+                className="mt-1.5"
+              />
+            </div>
+            <div>
+              <Label className="text-xs font-semibold text-ink-2">الحالة</Label>
+              <Select value={statusId ?? '__all__'} onValueChange={(v) => setStatusId(v === '__all__' ? undefined : v)}>
+                <SelectTrigger className="mt-1.5">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">كل الحالات</SelectItem>
+                  {(statuses ?? []).map((status) => (
+                    <SelectItem key={status.id} value={String(status.id)}>
+                      {status.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs font-semibold text-ink-2">الاستحقاق من</Label>
+              <Input type="date" dir="ltr" value={dueFrom} onChange={(e) => setDueFrom(e.target.value)} className="mt-1.5" />
+            </div>
+            <div>
+              <Label className="text-xs font-semibold text-ink-2">الاستحقاق إلى</Label>
+              <Input type="date" dir="ltr" value={dueTo} onChange={(e) => setDueTo(e.target.value)} className="mt-1.5" />
+            </div>
+          </div>
+
+          <DataTable
+            columns={columns}
+            data={data?.data ?? []}
+            rowKey={(task) => task.id}
+            isLoading={isLoading}
+            emptyMessage={tab === 'assigned' ? 'لا توجد مهام مسندة إليك' : 'لم تنشئ أي مهام بعد'}
+            pagination={data ? { meta: data.meta, onPageChange: setPage } : undefined}
+          />
+        </TabsContent>
+      </Tabs>
 
       <TaskDetailDialog
         taskId={selectedTaskId}

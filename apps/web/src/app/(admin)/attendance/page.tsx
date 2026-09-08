@@ -146,7 +146,7 @@ export default function AttendancePage() {
           <Button
             type="button"
             variant="outline"
-            className="w-full"
+            className="w-full gap-2"
             onClick={handleExport}
             disabled={exporting}
           >
@@ -160,16 +160,16 @@ export default function AttendancePage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="text-right">التاريخ</TableHead>
-              <TableHead className="text-right">الموظف</TableHead>
-              <TableHead className="text-right">وقت الحضور</TableHead>
-              <TableHead className="text-right">وقت الانصراف</TableHead>
-              <TableHead className="text-right">إجمالي الساعات</TableHead>
-              <TableHead className="text-right">التأخير</TableHead>
-              <TableHead className="text-right">الانصراف المبكر</TableHead>
-              <TableHead className="text-right">الإضافي</TableHead>
-              <TableHead className="text-right">الحالة</TableHead>
-              <TableHead className="text-right" />
+              <TableHead className="text-start">التاريخ</TableHead>
+              <TableHead className="text-start">الموظف</TableHead>
+              <TableHead className="text-start">وقت الحضور</TableHead>
+              <TableHead className="text-start">وقت الانصراف</TableHead>
+              <TableHead className="text-start">إجمالي الساعات</TableHead>
+              <TableHead className="text-start">التأخير</TableHead>
+              <TableHead className="text-start">الانصراف المبكر</TableHead>
+              <TableHead className="text-start">الإضافي</TableHead>
+              <TableHead className="text-start">الحالة</TableHead>
+              <TableHead className="text-start" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -195,19 +195,49 @@ export default function AttendancePage() {
             {!isLoading &&
               rows.map((row) => (
                 <TableRow key={row.id}>
-                  <TableCell className="num whitespace-nowrap">{row.date}</TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    <span className="num" dir="ltr">
+                      {row.date}
+                    </span>
+                  </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
                       <EmployeeAvatar employee={row.employee} size={28} />
-                      <span className="truncate font-medium text-ink">{row.employee.full_name}</span>
+                      <span className="min-w-0 truncate font-medium text-ink">
+                        {row.employee?.full_name || '—'}
+                      </span>
                     </div>
                   </TableCell>
-                  <TableCell className="num">{formatTime(row.check_in_at)}</TableCell>
-                  <TableCell className="num">{formatTime(row.check_out_at)}</TableCell>
-                  <TableCell className="num">{formatMinutesAsHours(row.total_minutes)}</TableCell>
-                  <TableCell className="num">{row.late_minutes ?? 0}</TableCell>
-                  <TableCell className="num">{row.early_leave_minutes ?? 0}</TableCell>
-                  <TableCell className="num">{row.overtime_minutes}</TableCell>
+                  <TableCell>
+                    <span className="num" dir="ltr">
+                      {formatTime(row.check_in_at)}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <span className="num" dir="ltr">
+                      {formatTime(row.check_out_at)}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <span className="num whitespace-nowrap" dir="ltr">
+                      {formatMinutesAsHours(row.total_minutes)}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <span className="num whitespace-nowrap" dir="ltr">
+                      {formatMinutesAsHours(row.late_minutes ?? 0)}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <span className="num whitespace-nowrap" dir="ltr">
+                      {formatMinutesAsHours(row.early_leave_minutes ?? 0)}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <span className="num whitespace-nowrap" dir="ltr">
+                      {formatMinutesAsHours(row.overtime_minutes)}
+                    </span>
+                  </TableCell>
                   <TableCell>
                     <AttendanceStatusBadge status={row.status} />
                   </TableCell>
@@ -236,7 +266,8 @@ export default function AttendancePage() {
       </div>
       {isFetching && !isLoading && (
         <p className="mt-2 flex items-center gap-2 text-xs text-muted">
-          <Spinner className="h-3 w-3" /> جارٍ التحديث...
+          <Spinner className="h-3 w-3" />
+          جارٍ التحديث...
         </p>
       )}
     </div>

@@ -58,7 +58,10 @@ const TableRow = React.forwardRef<
   <tr
     ref={ref}
     className={cn(
-      "border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted",
+      // TAQAT: `muted` is a dark ink tone (see tailwind.config.ts) — using it
+      // as a hover background gives the aggressive dark grey stripe the user
+      // reported. Swap to `surface-2` (light neutral) + a subtle brand tint.
+      "border-b border-hairline transition-colors hover:bg-brand-soft/40 data-[state=selected]:bg-brand-soft/60",
       className
     )}
     {...props}

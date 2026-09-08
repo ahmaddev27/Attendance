@@ -90,7 +90,7 @@ export default function RequestsPage() {
       cell: (request) => (
         <button type="button" onClick={() => setViewingRequestId(request.id)} className="flex items-center gap-2">
           <EmployeeAvatar employee={request.employee} size={28} />
-          <div className="min-w-0 text-right">
+          <div className="min-w-0 text-start">
             <p className="truncate font-medium text-ink">{request.employee.full_name}</p>
             <p className="num text-xs text-muted" dir="ltr">
               {request.employee.employee_number}
@@ -102,7 +102,11 @@ export default function RequestsPage() {
     {
       key: 'submitted_at',
       header: 'تاريخ الإرسال',
-      cell: (request) => <span className="num whitespace-nowrap">{formatDateTime(request.submitted_at)}</span>,
+      cell: (request) => (
+        <span className="num whitespace-nowrap" dir="ltr">
+          {formatDateTime(request.submitted_at)}
+        </span>
+      ),
     },
     {
       key: 'current_step',

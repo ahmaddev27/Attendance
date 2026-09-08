@@ -49,7 +49,9 @@ export function ApprovalTimeline({ approvals }: { approvals: RequestApproval[] }
                 <p className="text-xs text-muted">حُوّل إلى {approval.forwarded_to.full_name}</p>
               )}
               {approval.comment && <p className="text-sm text-ink-2">{approval.comment}</p>}
-              <p className="num text-xs text-muted">{formatDateTime(approval.decided_at)}</p>
+              <p className="num text-xs text-muted" dir="ltr">
+                {formatDateTime(approval.decided_at)}
+              </p>
             </div>
           </li>
         );

@@ -165,7 +165,7 @@ export default function AttendanceDevicesPage() {
           <p className="text-xs text-muted">إدارة النظام</p>
           <h1 className="mt-1 text-2xl font-bold text-ink">أجهزة QR للحضور</h1>
         </div>
-        <Button type="button" onClick={openCreate} className="bg-brand text-white hover:bg-brand-hover">
+        <Button type="button" onClick={openCreate} className="gap-2 bg-brand text-white hover:bg-brand-hover">
           <Plus className="h-4 w-4" />
           إضافة جهاز
         </Button>
@@ -175,11 +175,11 @@ export default function AttendanceDevicesPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="text-right">الاسم</TableHead>
-              <TableHead className="text-right">الموقع</TableHead>
-              <TableHead className="text-right">تقييد IP</TableHead>
-              <TableHead className="text-right">الحالة</TableHead>
-              <TableHead className="text-right">إجراءات</TableHead>
+              <TableHead className="text-start">الاسم</TableHead>
+              <TableHead className="text-start">الموقع</TableHead>
+              <TableHead className="text-start">تقييد IP</TableHead>
+              <TableHead className="text-start">الحالة</TableHead>
+              <TableHead className="text-start">إجراءات</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -205,12 +205,20 @@ export default function AttendanceDevicesPage() {
             {devices?.map((device) => (
               <TableRow key={device.id}>
                 <TableCell className="font-medium text-ink">{device.name}</TableCell>
-                <TableCell className="num">
-                  {device.allowed_lat != null && device.allowed_lng != null
-                    ? `${device.allowed_lat}, ${device.allowed_lng}`
-                    : 'غير محدد'}
+                <TableCell>
+                  {device.allowed_lat != null && device.allowed_lng != null ? (
+                    <span className="num" dir="ltr">
+                      {device.allowed_lat}, {device.allowed_lng}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted">غير محدد</span>
+                  )}
                 </TableCell>
-                <TableCell className="num">{device.ip_whitelist?.length ?? 0}</TableCell>
+                <TableCell>
+                  <span className="num" dir="ltr">
+                    {device.ip_whitelist?.length ?? 0}
+                  </span>
+                </TableCell>
                 <TableCell>
                   <Badge
                     className={
@@ -338,7 +346,7 @@ export default function AttendanceDevicesPage() {
               />
             </div>
             <DialogFooter>
-              <Button type="submit" disabled={saveMutation.isPending} className="bg-brand text-white hover:bg-brand-hover">
+              <Button type="submit" disabled={saveMutation.isPending} className="gap-2 bg-brand text-white hover:bg-brand-hover">
                 {saveMutation.isPending && <Spinner />}
                 حفظ
               </Button>
@@ -363,7 +371,7 @@ export default function AttendanceDevicesPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="w-full"
+                className="w-full gap-2"
                 disabled={rotateMutation.isPending}
                 onClick={() => rotateMutation.mutate(qrDevice.id)}
               >

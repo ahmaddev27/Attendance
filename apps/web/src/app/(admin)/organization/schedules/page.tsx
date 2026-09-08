@@ -171,7 +171,7 @@ export default function WorkSchedulesPage() {
           <p className="text-xs text-muted">إدارة النظام</p>
           <h1 className="mt-1 text-2xl font-bold text-ink">جداول العمل</h1>
         </div>
-        <Button type="button" onClick={openCreate} className="bg-brand text-white hover:bg-brand-hover">
+        <Button type="button" onClick={openCreate} className="gap-2 bg-brand text-white hover:bg-brand-hover">
           <Plus className="h-4 w-4" />
           إضافة جدول
         </Button>
@@ -235,18 +235,29 @@ export default function WorkSchedulesPage() {
 
                 <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted">
                   <p>
-                    الحد الأدنى للساعات: <span className="num font-semibold text-ink">{schedule.min_hours_per_day}</span>
+                    الحد الأدنى للساعات:{' '}
+                    <span className="num font-semibold text-ink" dir="ltr">
+                      {schedule.min_hours_per_day}
+                    </span>
                   </p>
                   <p>
-                    سماحية التأخير: <span className="num font-semibold text-ink">{schedule.grace_late_minutes}د</span>
+                    سماحية التأخير:{' '}
+                    <span className="num font-semibold text-ink" dir="ltr">
+                      {schedule.grace_late_minutes} د
+                    </span>
                   </p>
                   <p>
                     سماحية الانصراف المبكر:{' '}
-                    <span className="num font-semibold text-ink">{schedule.grace_early_leave_minutes}د</span>
+                    <span className="num font-semibold text-ink" dir="ltr">
+                      {schedule.grace_early_leave_minutes} د
+                    </span>
                   </p>
                   <p className="flex items-center gap-1">
                     <Users className="h-3.5 w-3.5" />
-                    <span className="num font-semibold text-ink">{schedule.employees_count ?? '—'}</span> موظف
+                    <span className="num font-semibold text-ink" dir="ltr">
+                      {schedule.employees_count ?? '—'}
+                    </span>{' '}
+                    موظف
                   </p>
                 </div>
               </CardContent>
@@ -369,7 +380,7 @@ export default function WorkSchedulesPage() {
             </div>
 
             <DialogFooter>
-              <Button type="submit" disabled={saveMutation.isPending} className="bg-brand text-white hover:bg-brand-hover">
+              <Button type="submit" disabled={saveMutation.isPending} className="gap-2 bg-brand text-white hover:bg-brand-hover">
                 {saveMutation.isPending && <Spinner />}
                 حفظ
               </Button>

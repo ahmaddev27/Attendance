@@ -211,7 +211,10 @@ export function CreateLeaveDialog({ open, onOpenChange }: CreateLeaveDialogProps
 
             {estimatedDays > 0 && (
               <p className="text-xs text-muted">
-                عدد الأيام (تقديري): <span className="num font-medium text-ink-2">{estimatedDays}</span>
+                عدد الأيام (تقديري):{' '}
+                <span className="num font-medium text-ink-2" dir="ltr">
+                  {estimatedDays}
+                </span>
               </p>
             )}
 

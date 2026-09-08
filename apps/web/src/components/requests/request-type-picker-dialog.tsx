@@ -62,7 +62,7 @@ export function RequestTypePickerDialog({ open, onOpenChange, onSelect }: Reques
                   key={requestType.id}
                   type="button"
                   onClick={() => onSelect(requestType)}
-                  className="flex items-start gap-3 rounded-xl border border-hairline bg-surface p-4 text-right transition-colors hover:border-brand hover:bg-brand-soft"
+                  className="flex items-start gap-3 rounded-xl border border-hairline bg-surface p-4 text-start transition-colors hover:border-brand hover:bg-brand-soft"
                 >
                   <div
                     className="grid h-10 w-10 shrink-0 place-items-center rounded-lg"

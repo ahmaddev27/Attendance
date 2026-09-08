@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bell, CheckCheck } from 'lucide-react';
+import { Bell, CheckCheck, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -99,7 +99,7 @@ export function NotificationBell() {
           <Bell className="h-5 w-5" />
           {unread > 0 && (
             <span
-              className="num absolute -top-1 -right-1 grid min-h-4 min-w-4 place-items-center rounded-full bg-danger px-1 text-[10px] font-bold text-white ring-2 ring-surface"
+              className="num absolute -top-1 -end-1 grid min-h-4 min-w-4 place-items-center rounded-full bg-danger px-1 text-[10px] font-bold text-white ring-2 ring-surface"
               dir="ltr"
             >
               {unread > 99 ? '99+' : unread}
@@ -148,9 +148,10 @@ export function NotificationBell() {
           <Link
             href="/notifications"
             onClick={() => setOpen(false)}
-            className="text-xs font-semibold text-brand hover:text-brand-hover"
+            className="inline-flex items-center gap-1 text-xs font-semibold text-brand hover:text-brand-hover"
           >
-            عرض كل الإشعارات ←
+            عرض كل الإشعارات
+            <ArrowLeft className="h-3.5 w-3.5" />
           </Link>
         </div>
       </PopoverContent>
@@ -168,7 +169,7 @@ function NotificationRow({
   const inner = (
     <div
       className={cn(
-        'flex items-start gap-3 px-4 py-3 text-right transition-colors hover:bg-surface-2',
+        'flex items-start gap-3 px-4 py-3 text-start transition-colors hover:bg-surface-2',
         !n.read_at && 'bg-brand-soft/30'
       )}
     >
@@ -205,8 +206,10 @@ function formatRelativeArabic(iso: string): string {
   const diff = Math.max(0, Math.floor((now - then) / 1000));
 
   if (diff < 60) return 'الآن';
-  if (diff < 3600) return `منذ ${Math.floor(diff / 60)} د`;
-  if (diff < 86400) return `منذ ${Math.floor(diff / 3600)} س`;
-  if (diff < 604800) return `منذ ${Math.floor(diff / 86400)} ي`;
+  // Non-breaking space between number and Arabic unit — keeps the pair
+  // together and readable inside the `.num` LTR-isolated span.
+  if (diff < 3600) return `منذ ${Math.floor(diff / 60)} د`;
+  if (diff < 86400) return `منذ ${Math.floor(diff / 3600)} س`;
+  if (diff < 604800) return `منذ ${Math.floor(diff / 86400)} ي`;
   return new Date(iso).toLocaleDateString('ar-EG');
 }

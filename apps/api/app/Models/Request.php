@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
+use Laravel\Scout\Searchable;
 
 /**
  * A single submitted instance of a RequestType, routed through that
@@ -29,7 +30,7 @@ use Illuminate\Support\Carbon;
 class Request extends Model
 {
     /** @use HasFactory<RequestFactory> */
-    use HasFactory;
+    use HasFactory, Searchable;
 
     /**
      * How long after a `forwarded` approval action the forwarded-to
@@ -212,6 +213,25 @@ class Request extends Model
             RequestStatus::Pending,
             RequestStatus::Returned,
         ], true);
+    }
+
+    /**
+     * `form_data` is a JSON column — flatten it to a searchable string so
+     * Meilisearch can match on values inside without needing to know each
+     * request type's schema. `id` is stringified per Meilisearch's own
+     * primary-key convention.
+     *
+     * @return array<string, mixed>
+     */
+    public function toSearchableArray(): array
+    {
+        $formData = $this->form_data;
+
+        return [
+            'id' => (string) $this->id,
+            'request_number' => (string) $this->request_number,
+            'form_data' => is_array($formData) ? json_encode($formData, JSON_UNESCAPED_UNICODE) : (string) $formData,
+        ];
     }
 
     /**

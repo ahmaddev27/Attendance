@@ -119,7 +119,7 @@ function EmployeeSidebarLogo() {
 /** Desktop, right-side (RTL) fixed sidebar — hidden below the md breakpoint. */
 export function EmployeeSidebar() {
   return (
-    <aside className="fixed inset-y-0 right-0 z-30 hidden w-60 flex-col gap-6 border-l border-hairline bg-surface p-4 md:flex">
+    <aside className="fixed inset-y-0 start-0 z-30 hidden w-60 flex-col gap-6 border-e border-hairline bg-surface p-4 md:flex">
       <EmployeeSidebarLogo />
       <EmployeeSidebarNav />
       <EmployeeUserFooter />

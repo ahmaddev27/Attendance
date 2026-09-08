@@ -20,6 +20,8 @@ use App\Modules\Reports\Controllers\AdminDashboardController;
 use App\Modules\Reports\Controllers\AttendanceReportController;
 use App\Modules\Reports\Controllers\AuditLogController;
 use App\Modules\Reports\Controllers\EmployeeDashboardController;
+use App\Modules\Search\Controllers\SearchController;
+use App\Modules\Settings\Controllers\SettingsController;
 use App\Modules\Requests\Controllers\ApprovalInboxController;
 use App\Modules\Requests\Controllers\MyRequestsController;
 use App\Modules\Requests\Controllers\RequestController;
@@ -202,6 +204,15 @@ Route::middleware('auth:sanctum')->group(function () {
         // Audit log viewer
         Route::middleware('permission:view-audit-logs')
             ->get('/audit-log', [AuditLogController::class, 'index']);
+
+        // System settings (mail + sms credentials, editable at runtime).
+        // Only super-admins should touch these — permission gate + spatie
+        // role check (super-admin implicitly gets every permission via
+        // RolePermissionSeeder).
+        Route::middleware('permission:manage-users')->group(function () {
+            Route::get('/settings', [SettingsController::class, 'index']);
+            Route::put('/settings', [SettingsController::class, 'update']);
+        });
     });
 
     // Employee's personal dashboard (M7). Scoped to $request->user()
@@ -221,4 +232,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // cached in redis and served with a canned fallback if the API
     // path fails, so the dashboard never 500s over an LLM outage.
     Route::get('/me/motivation', [MotivationController::class, 'show']);
+
+    // Global cross-index search. Every authenticated user may hit this;
+    // per-row visibility filtering is out of scope for M9 and lands in a
+    // follow-up milestone.
+    Route::get('/search', [SearchController::class, 'query']);
 });

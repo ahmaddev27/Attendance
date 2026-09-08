@@ -10,11 +10,12 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Laravel\Scout\Searchable;
 
 class LeaveRequest extends Model
 {
     /** @use HasFactory<LeaveRequestFactory> */
-    use HasFactory;
+    use HasFactory, Searchable;
 
     protected $fillable = [
         'employee_id',
@@ -135,5 +136,26 @@ class LeaveRequest extends Model
     public function canBeCancelled(): bool
     {
         return in_array($this->status, [LeaveStatus::Draft, LeaveStatus::Pending, LeaveStatus::Approved], true);
+    }
+
+    /**
+     * Load the employee relation so `full_name` doesn't trigger a per-row
+     * N+1 during a mass reindex.
+     */
+    public function makeSearchableUsing(\Illuminate\Database\Eloquent\Collection $models): \Illuminate\Database\Eloquent\Collection
+    {
+        return $models->load('employee');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toSearchableArray(): array
+    {
+        return [
+            'id' => (string) $this->id,
+            'reason' => (string) $this->reason,
+            'employee_name' => $this->employee?->full_name ?? '',
+        ];
     }
 }

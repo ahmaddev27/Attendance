@@ -63,12 +63,12 @@ export default function TaskStatusesPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="text-right">الاسم</TableHead>
-              <TableHead className="text-right">الرمز</TableHead>
-              <TableHead className="text-right">الترتيب</TableHead>
-              <TableHead className="text-right">اكتمال</TableHead>
-              <TableHead className="text-right">إلغاء</TableHead>
-              <TableHead className="text-right">إجراءات</TableHead>
+              <TableHead className="text-start">الاسم</TableHead>
+              <TableHead className="text-start">الرمز</TableHead>
+              <TableHead className="text-start">الترتيب</TableHead>
+              <TableHead className="text-start">اكتمال</TableHead>
+              <TableHead className="text-start">إلغاء</TableHead>
+              <TableHead className="text-start">إجراءات</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -96,10 +96,16 @@ export default function TaskStatusesPage() {
                 <TableCell className="font-medium">
                   <TaskStatusBadge status={status} />
                 </TableCell>
-                <TableCell className="num" dir="ltr">
-                  {status.code}
+                <TableCell>
+                  <span className="num" dir="ltr">
+                    {status.code}
+                  </span>
                 </TableCell>
-                <TableCell className="num">{status.sort_order}</TableCell>
+                <TableCell>
+                  <span className="num" dir="ltr">
+                    {status.sort_order}
+                  </span>
+                </TableCell>
                 <TableCell>
                   <Badge
                     className={

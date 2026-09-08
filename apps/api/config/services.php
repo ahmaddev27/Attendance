@@ -51,4 +51,22 @@ return [
         'fake' => (bool) env('MTC_SMS_FAKE', false),
     ],
 
+    /*
+    | Meta (Facebook) WhatsApp Cloud API.
+    | The WhatsappGateway binding in AppServiceProvider picks the real
+    | Meta gateway when access_token + phone_number_id are set and
+    | `fake=false`; otherwise the FakeWhatsappGateway is used (also
+    | always used in the `testing` env). `endpoint` overrides the Graph
+    | base URL used to build the /{phone_number_id}/messages URL — leave
+    | blank to use the default v20.0 production endpoint.
+    */
+    'whatsapp' => [
+        'access_token' => env('WHATSAPP_ACCESS_TOKEN'),
+        'phone_number_id' => env('WHATSAPP_PHONE_NUMBER_ID'),
+        'business_account_id' => env('WHATSAPP_BUSINESS_ACCOUNT_ID'),
+        'endpoint' => env('WHATSAPP_ENDPOINT'),
+        'timeout' => (int) env('WHATSAPP_TIMEOUT', 10),
+        'fake' => (bool) env('WHATSAPP_FAKE', false),
+    ],
+
 ];

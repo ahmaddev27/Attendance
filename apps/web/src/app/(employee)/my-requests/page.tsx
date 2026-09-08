@@ -63,87 +63,91 @@ export default function MyRequestsPage() {
   });
 
   return (
-    <div className="min-h-screen bg-ground p-6 md:p-10">
-      <div className="mx-auto max-w-5xl space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <Button onClick={() => setPickerOpen(true)} className="gap-2 bg-brand text-white hover:bg-brand-hover">
-            <Plus className="h-4 w-4" />
-            طلب جديد
-          </Button>
-          <h1 className="text-2xl font-bold text-ink">طلباتي</h1>
-        </div>
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <Button onClick={() => setPickerOpen(true)} className="gap-2 bg-brand text-white hover:bg-brand-hover">
+          <Plus className="h-4 w-4" />
+          طلب جديد
+        </Button>
+        <h1 className="text-2xl font-bold text-ink">طلباتي</h1>
+      </div>
 
-        <div className="rounded-xl border border-hairline bg-surface">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-right">رقم الطلب</TableHead>
-                <TableHead className="text-right">النوع</TableHead>
-                <TableHead className="text-right">تاريخ الإرسال</TableHead>
-                <TableHead className="text-right">الخطوة الحالية</TableHead>
-                <TableHead className="text-right">الحالة</TableHead>
-                <TableHead className="text-right">إجراءات</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading &&
-                Array.from({ length: 4 }).map((_, i) => (
-                  <TableRow key={i}>
-                    {Array.from({ length: 6 }).map((__, j) => (
-                      <TableCell key={j}>
-                        <Skeleton className="h-4 w-full" />
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))}
-
-              {!isLoading && (requests?.length ?? 0) === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6} className="py-14 text-center">
-                    <div className="flex flex-col items-center gap-2 text-muted">
-                      <Inbox className="h-8 w-8" />
-                      <p className="text-sm">لا توجد طلبات بعد</p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              )}
-
-              {requests?.map((request) => (
-                <TableRow key={request.id}>
-                  <TableCell className="num" dir="ltr">
-                    #{request.request_number}
-                  </TableCell>
-                  <TableCell>
-                    <RequestTypeBadge requestType={request.request_type} />
-                  </TableCell>
-                  <TableCell className="num whitespace-nowrap">{formatDateTime(request.submitted_at)}</TableCell>
-                  <TableCell>{request.current_step?.name ?? '—'}</TableCell>
-                  <TableCell>
-                    <RequestStatusBadge status={request.status} />
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Button type="button" variant="outline" size="sm" onClick={() => setViewingRequestId(request.id)}>
-                        عرض
-                      </Button>
-                      {CANCELLABLE_REQUEST_STATUSES.includes(request.status) && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="text-danger hover:bg-danger-soft hover:text-danger"
-                          onClick={() => setCancelTarget(request)}
-                        >
-                          إلغاء
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
+      <div className="rounded-xl border border-hairline bg-surface">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-start">رقم الطلب</TableHead>
+              <TableHead className="text-start">النوع</TableHead>
+              <TableHead className="text-start">تاريخ الإرسال</TableHead>
+              <TableHead className="text-start">الخطوة الحالية</TableHead>
+              <TableHead className="text-start">الحالة</TableHead>
+              <TableHead className="text-start">إجراءات</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading &&
+              Array.from({ length: 4 }).map((_, i) => (
+                <TableRow key={i}>
+                  {Array.from({ length: 6 }).map((__, j) => (
+                    <TableCell key={j}>
+                      <Skeleton className="h-4 w-full" />
+                    </TableCell>
+                  ))}
                 </TableRow>
               ))}
-            </TableBody>
-          </Table>
-        </div>
+
+            {!isLoading && (requests?.length ?? 0) === 0 && (
+              <TableRow>
+                <TableCell colSpan={6} className="py-14 text-center">
+                  <div className="flex flex-col items-center gap-2 text-muted">
+                    <Inbox className="h-8 w-8" />
+                    <p className="text-sm">لا توجد طلبات بعد</p>
+                  </div>
+                </TableCell>
+              </TableRow>
+            )}
+
+            {requests?.map((request) => (
+              <TableRow key={request.id}>
+                <TableCell>
+                  <span className="num" dir="ltr">
+                    #{request.request_number}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  <RequestTypeBadge requestType={request.request_type} />
+                </TableCell>
+                <TableCell className="whitespace-nowrap">
+                  <span className="num" dir="ltr">
+                    {formatDateTime(request.submitted_at)}
+                  </span>
+                </TableCell>
+                <TableCell>{request.current_step?.name ?? '—'}</TableCell>
+                <TableCell>
+                  <RequestStatusBadge status={request.status} />
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => setViewingRequestId(request.id)}>
+                      عرض
+                    </Button>
+                    {CANCELLABLE_REQUEST_STATUSES.includes(request.status) && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="text-danger hover:bg-danger-soft hover:text-danger"
+                        onClick={() => setCancelTarget(request)}
+                      >
+                        إلغاء
+                      </Button>
+                    )}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </div>
 
       <RequestTypePickerDialog
@@ -173,7 +177,11 @@ export default function MyRequestsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>إلغاء الطلب</AlertDialogTitle>
             <AlertDialogDescription>
-              هل أنت متأكد من إلغاء الطلب رقم <span className="num">#{cancelTarget?.request_number}</span>؟
+              هل أنت متأكد من إلغاء الطلب رقم{' '}
+              <span className="num" dir="ltr">
+                #{cancelTarget?.request_number}
+              </span>
+              ؟
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -186,7 +194,7 @@ export default function MyRequestsPage() {
                 if (cancelTarget) cancelMutation.mutate(cancelTarget.id);
               }}
             >
-              {cancelMutation.isPending && <Spinner className="text-white" />}
+              {cancelMutation.isPending && <Spinner className="me-2 text-white" />}
               تأكيد الإلغاء
             </AlertDialogAction>
           </AlertDialogFooter>

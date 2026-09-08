@@ -65,7 +65,10 @@ export function WorkflowStepCard({ step, dragHandle, onEdit, onDelete }: Workflo
           {step.sla_hours != null && (
             <span className="inline-flex items-center gap-1">
               <Clock className="h-3.5 w-3.5" />
-              <span className="num">{step.sla_hours}</span> ساعة
+              <span className="num" dir="ltr">
+                {step.sla_hours}
+              </span>{' '}
+              ساعة
             </span>
           )}
         </div>

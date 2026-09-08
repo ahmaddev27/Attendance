@@ -5,14 +5,24 @@
  * avoid touching a file outside this module's ownership.
  */
 
-/** "512" minutes -> "8س 32د". Returns a placeholder dash for null/undefined. */
+/**
+ * "512" minutes -> "8س 32د". Returns a placeholder dash for null/undefined.
+ *
+ * The caller MUST render this string inside an element that either has the
+ * `.num` class or an explicit `dir="ltr"`. Otherwise the surrounding RTL
+ * paragraph will reshuffle the hours/minutes runs (bidi neutrals like
+ * spaces flip toward the Arabic letters, producing "س4د8"). We also use
+ * a non-breaking space between number and unit so the pair never wraps
+ * onto two lines mid-value.
+ */
 export function formatMinutesAsHours(minutes: number | null | undefined): string {
   if (minutes === null || minutes === undefined) return '—';
   const sign = minutes < 0 ? '-' : '';
   const abs = Math.abs(Math.round(minutes));
   const hours = Math.floor(abs / 60);
   const mins = abs % 60;
-  return `${sign}${hours}س ${mins}د`;
+  // U+00A0 non-breaking space keeps the digit + Arabic unit letter together.
+  return `${sign}${hours} س ${mins} د`;
 }
 
 /** "2026-09-07T08:03:00Z" -> "08:03 ص", using the viewer's locale/timezone. */

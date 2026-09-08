@@ -76,8 +76,15 @@ export function RejectLeaveDialog({ leaveRequest, open, onOpenChange }: RejectLe
             <div className="mt-1">
               <LeaveTypeBadge leaveType={leaveRequest.leave_type} className="text-xs" />
             </div>
-            <p className="num mt-1 text-xs text-muted">
-              {formatDate(leaveRequest.start_date)} — {formatDate(leaveRequest.end_date)} ({leaveRequest.days} يوم)
+            <p className="mt-1 text-xs text-muted">
+              <span className="num" dir="ltr">
+                {formatDate(leaveRequest.start_date)} — {formatDate(leaveRequest.end_date)}
+              </span>{' '}
+              (
+              <span className="num" dir="ltr">
+                {leaveRequest.days}
+              </span>{' '}
+              يوم)
             </p>
           </div>
         )}
@@ -104,7 +111,7 @@ export function RejectLeaveDialog({ leaveRequest, open, onOpenChange }: RejectLe
               إلغاء
             </Button>
             <Button type="submit" disabled={mutation.isPending} className="bg-danger text-white hover:bg-danger/90">
-              {mutation.isPending && <Spinner className="text-white" />}
+              {mutation.isPending && <Spinner className="me-2 text-white" />}
               رفض الطلب
             </Button>
           </DialogFooter>

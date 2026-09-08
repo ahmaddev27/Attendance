@@ -22,6 +22,7 @@ import {
   LogOut,
   Palette,
   QrCode,
+  Settings,
   Settings2,
   Users,
   UsersRound,
@@ -63,6 +64,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/reports/attendance', label: 'تقارير الحضور', icon: BarChart3, permissions: ['view-reports'] },
   { href: '/audit', label: 'سجل النشاط', icon: History, permissions: ['view-audit-logs'] },
   { href: '/notifications', label: 'الإشعارات', icon: Bell, permissions: [] },
+  { href: '/settings', label: 'الإعدادات', icon: Settings, permissions: ['manage-users'] },
 ];
 
 function isActivePath(pathname: string | null, href: string) {
@@ -153,7 +155,7 @@ function SidebarLogo() {
 /** Desktop, right-side (RTL) fixed sidebar — hidden below the md breakpoint. */
 export function AdminSidebar() {
   return (
-    <aside className="fixed inset-y-0 right-0 z-30 hidden w-60 flex-col gap-6 border-l border-hairline bg-surface p-4 md:flex">
+    <aside className="fixed inset-y-0 start-0 z-30 hidden w-60 flex-col gap-6 border-e border-hairline bg-surface p-4 md:flex">
       <SidebarLogo />
       <SidebarNav />
       <UserFooter />

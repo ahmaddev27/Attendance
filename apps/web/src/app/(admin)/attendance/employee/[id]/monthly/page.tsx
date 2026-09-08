@@ -67,6 +67,8 @@ export default function EmployeeMonthlyAttendancePage() {
         { label: 'الفارق', value: formatMinutesAsHours(summary.difference_minutes) },
         { label: 'الوقت الإضافي', value: formatMinutesAsHours(summary.overtime_minutes) },
         { label: 'إجمالي التأخير', value: `${summary.late_minutes} د` },
+        // Spaces between number and Arabic unit ensure the rendered value
+        // stays LTR-isolated inside the KPI card's `.num dir="ltr"` span.
         { label: 'إجمالي الانصراف المبكر', value: `${summary.early_leave_minutes} د` },
       ]
     : [];
@@ -135,7 +137,9 @@ export default function EmployeeMonthlyAttendancePage() {
               <Card key={kpi.label} className="border-hairline bg-surface shadow-none">
                 <CardContent className="p-4">
                   <p className="text-xs text-muted">{kpi.label}</p>
-                  <p className="num mt-1.5 text-xl font-bold text-ink">{kpi.value}</p>
+                  <p className="num mt-1.5 text-xl font-bold text-ink" dir="ltr">
+                    {kpi.value}
+                  </p>
                 </CardContent>
               </Card>
             ))}
@@ -161,7 +165,9 @@ export default function EmployeeMonthlyAttendancePage() {
                   <div key={segment.key} className="flex items-center gap-1.5 text-xs text-ink-2">
                     <span className={`h-2.5 w-2.5 rounded-full ${ATTENDANCE_STATUS_META[segment.key].dotClassName}`} />
                     {ATTENDANCE_STATUS_META[segment.key].label}
-                    <span className="num font-semibold text-ink">{segment.days}</span>
+                    <span className="num font-semibold text-ink" dir="ltr">
+                      {segment.days}
+                    </span>
                   </div>
                 ))}
               </div>

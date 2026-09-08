@@ -81,7 +81,11 @@ export default function DepartmentsPage() {
       key: 'employees_count',
       header: 'عدد الموظفين',
       align: 'center',
-      cell: (department) => <span className="num">{department.employees_count ?? 0}</span>,
+      cell: (department) => (
+        <span className="num" dir="ltr">
+          {department.employees_count ?? 0}
+        </span>
+      ),
     },
     {
       key: 'is_active',

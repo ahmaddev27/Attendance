@@ -137,21 +137,25 @@ export function RequestDetailDialog({ requestId, open, onOpenChange, mode, force
                 <span className="num text-xs text-muted" dir="ltr">
                   #{detail.request_number}
                 </span>
-                <RequestStatusBadge status={detail.status} className="mr-auto" />
+                <RequestStatusBadge status={detail.status} className="ms-auto" />
               </div>
 
               <div>
                 <DetailRow label="تاريخ الإرسال">
-                  <span className="num">{formatDateTime(detail.submitted_at)}</span>
+                  <span className="num" dir="ltr">
+                    {formatDateTime(detail.submitted_at)}
+                  </span>
                 </DetailRow>
                 {detail.completed_at && (
                   <DetailRow label="تاريخ الإكمال">
-                    <span className="num">{formatDateTime(detail.completed_at)}</span>
+                    <span className="num" dir="ltr">
+                      {formatDateTime(detail.completed_at)}
+                    </span>
                   </DetailRow>
                 )}
                 {detail.current_step && (
                   <DetailRow label="الخطوة الحالية">
-                    <div className="text-left">
+                    <div className="text-end">
                       <p>{detail.current_step.name}</p>
                       <p className="text-xs text-muted">
                         {APPROVER_TYPE_LABELS[detail.current_step.approver_type]}

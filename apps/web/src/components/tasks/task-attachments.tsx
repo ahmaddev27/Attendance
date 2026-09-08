@@ -194,7 +194,9 @@ export function TaskAttachments({ taskId, initialAttachments }: TaskAttachmentsP
                 <p className="truncate text-sm font-medium text-ink">{attachment.file_name}</p>
                 <p className="text-xs text-muted">
                   {formatFileSize(attachment.size)} · {attachment.uploaded_by?.full_name ?? '—'} ·{' '}
-                  <span className="num">{formatDate(attachment.created_at.slice(0, 10))}</span>
+                  <span className="num" dir="ltr">
+                    {formatDate(attachment.created_at.slice(0, 10))}
+                  </span>
                 </p>
               </div>
               <Button

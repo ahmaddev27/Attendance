@@ -1,31 +1,57 @@
-"use client"
+'use client';
 
-import { useTheme } from "next-themes"
-import { Toaster as Sonner } from "sonner"
+import { Toaster as Sonner } from 'sonner';
 
-type ToasterProps = React.ComponentProps<typeof Sonner>
+type ToasterProps = React.ComponentProps<typeof Sonner>;
 
+/**
+ * TAQAT-themed toast overlay.
+ *
+ * Sonner's `richColors` mode ships with an aggressive dark green/red
+ * palette that clashed with our soft brand tokens (users flagged it as
+ * ugly). We opt out of richColors and paint success/error/info/warning
+ * ourselves via the design-token classes below, giving light-surface
+ * toasts with a colored left border + matching icon tint — same visual
+ * language as the cards and badges everywhere else in the app.
+ */
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme()
-
   return (
     <Sonner
-      theme={theme as ToasterProps["theme"]}
       className="toaster group"
+      // Kept 'light' explicitly so the parent's `system` dark-mode media
+      // query never flips the toast to a dark background — the underlying
+      // pages are still light-only for now.
+      theme="light"
       toastOptions={{
+        // Slightly longer than sonner's 4s default: Arabic labels tend to
+        // take a beat longer to scan than English single-word toasts.
+        duration: 4500,
+        unstyled: false,
         classNames: {
           toast:
-            "group toast group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg",
-          description: "group-[.toast]:text-muted-foreground",
+            'group toast flex w-full items-start gap-3 rounded-xl border border-hairline bg-surface p-4 text-sm text-ink shadow-[0_8px_30px_rgb(15_23_42/0.08)] ' +
+            // Colored start-edge accent, one per severity. Uses
+            // logical `border-s` so the accent stays on the reading
+            // start (right in RTL, left in LTR).
+            'group-[.toaster]:border-s-4 ' +
+            'data-[type=success]:border-s-success data-[type=error]:border-s-danger data-[type=warning]:border-s-warn data-[type=info]:border-s-brand',
+          title: 'text-sm font-semibold leading-6 text-ink',
+          description: 'text-xs text-muted',
           actionButton:
-            "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
+            'group-[.toast]:bg-brand group-[.toast]:text-white group-[.toast]:hover:bg-brand-hover group-[.toast]:rounded-md group-[.toast]:px-3 group-[.toast]:py-1.5 group-[.toast]:text-xs group-[.toast]:font-semibold',
           cancelButton:
-            "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
+            'group-[.toast]:bg-surface-2 group-[.toast]:text-ink-2 group-[.toast]:hover:bg-hairline group-[.toast]:rounded-md group-[.toast]:px-3 group-[.toast]:py-1.5 group-[.toast]:text-xs group-[.toast]:font-semibold',
+          closeButton:
+            'group-[.toast]:bg-surface-2 group-[.toast]:text-ink-2 group-[.toast]:border-hairline',
+          success: 'group-[.toaster]:!bg-surface group-[.toaster]:!text-ink [&_[data-icon]]:!text-success',
+          error: 'group-[.toaster]:!bg-surface group-[.toaster]:!text-ink [&_[data-icon]]:!text-danger',
+          warning: 'group-[.toaster]:!bg-surface group-[.toaster]:!text-ink [&_[data-icon]]:!text-warn-ink',
+          info: 'group-[.toaster]:!bg-surface group-[.toaster]:!text-ink [&_[data-icon]]:!text-brand',
         },
       }}
       {...props}
     />
-  )
-}
+  );
+};
 
-export { Toaster }
+export { Toaster };

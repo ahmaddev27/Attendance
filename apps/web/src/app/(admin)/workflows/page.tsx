@@ -50,7 +50,11 @@ export default function WorkflowsPage() {
       key: 'steps_count',
       header: 'عدد الخطوات',
       align: 'center',
-      cell: (workflow) => <span className="num">{workflow.steps.length}</span>,
+      cell: (workflow) => (
+        <span className="num" dir="ltr">
+          {workflow.steps?.length ?? 0}
+        </span>
+      ),
     },
     {
       key: 'is_active',

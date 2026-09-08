@@ -62,10 +62,10 @@ export default function TaskPrioritiesPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="text-right">الاسم</TableHead>
-              <TableHead className="text-right">الرمز</TableHead>
-              <TableHead className="text-right">الترتيب</TableHead>
-              <TableHead className="text-right">إجراءات</TableHead>
+              <TableHead className="text-start">الاسم</TableHead>
+              <TableHead className="text-start">الرمز</TableHead>
+              <TableHead className="text-start">الترتيب</TableHead>
+              <TableHead className="text-start">إجراءات</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -93,10 +93,16 @@ export default function TaskPrioritiesPage() {
                 <TableCell className="font-medium">
                   <TaskPriorityBadge priority={priority} />
                 </TableCell>
-                <TableCell className="num" dir="ltr">
-                  {priority.code}
+                <TableCell>
+                  <span className="num" dir="ltr">
+                    {priority.code}
+                  </span>
                 </TableCell>
-                <TableCell className="num">{priority.sort_order}</TableCell>
+                <TableCell>
+                  <span className="num" dir="ltr">
+                    {priority.sort_order}
+                  </span>
+                </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">
                     <Button type="button" variant="ghost" size="icon" title="تعديل" onClick={() => openEdit(priority)}>

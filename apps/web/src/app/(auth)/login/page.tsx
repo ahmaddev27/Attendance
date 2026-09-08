@@ -69,7 +69,7 @@ export default function LoginPage() {
                 autoFocus
                 dir="ltr"
                 placeholder="admin@taqat.local  أو  1000"
-                className="mt-1.5 text-left"
+                className="mt-1.5 text-start"
               />
             </div>
             <div>
@@ -82,11 +82,11 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 dir="ltr"
-                className="mt-1.5 text-left"
+                className="mt-1.5 text-start"
               />
             </div>
             <Button type="submit" disabled={loading} className="w-full bg-brand hover:bg-brand-hover text-white">
-              {loading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
+              {loading && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
               دخول
             </Button>
           </form>

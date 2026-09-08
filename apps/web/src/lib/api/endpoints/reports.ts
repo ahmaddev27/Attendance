@@ -20,6 +20,12 @@ export type AttendanceMonthlyParams = {
   department_id?: number;
 };
 
+/**
+ * File-format response helpers share the same Blob transport — only the
+ * `format` query param and the eventual Content-Type differ. Kept as
+ * separate helpers so callers get an obvious shape (and a stable
+ * queryKey slice) rather than passing the format around.
+ */
 export const reportsApi = {
   attendanceMonthly: (params: AttendanceMonthlyParams) =>
     apiClient.get<{ data: AttendanceReportRow[] }>('/admin/reports/attendance/monthly', {
@@ -33,6 +39,16 @@ export const reportsApi = {
   attendanceMonthlyCsv: (params: AttendanceMonthlyParams) =>
     apiClient.get<Blob>('/admin/reports/attendance/monthly', {
       params: { ...params, format: 'csv' },
+      responseType: 'blob',
+    }),
+  attendanceMonthlyXlsx: (params: AttendanceMonthlyParams) =>
+    apiClient.get<Blob>('/admin/reports/attendance/monthly', {
+      params: { ...params, format: 'xlsx' },
+      responseType: 'blob',
+    }),
+  attendanceMonthlyPdf: (params: AttendanceMonthlyParams) =>
+    apiClient.get<Blob>('/admin/reports/attendance/monthly', {
+      params: { ...params, format: 'pdf' },
       responseType: 'blob',
     }),
 };

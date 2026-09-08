@@ -300,7 +300,7 @@ export function TaskDetailDialog({ taskId, onOpenChange, onNavigate }: TaskDetai
                             <button
                               type="button"
                               onClick={() => onNavigate?.(subtask.id)}
-                              className="flex w-full items-center justify-between gap-2 rounded-md border border-hairline px-3 py-2 text-right hover:bg-surface-2"
+                              className="flex w-full items-center justify-between gap-2 rounded-md border border-hairline px-3 py-2 text-start hover:bg-surface-2"
                             >
                               <span className="min-w-0 truncate text-sm text-ink">{subtask.title}</span>
                               <TaskStatusBadge status={subtask.status} className="shrink-0" />
@@ -439,11 +439,16 @@ export function TaskDetailDialog({ taskId, onOpenChange, onNavigate }: TaskDetai
                   <div className="space-y-1.5 border-t border-hairline pt-4 text-xs text-muted">
                     <p>
                       أنشأها <span className="font-medium text-ink-2">{task.creator.full_name}</span> بتاريخ{' '}
-                      <span className="num">{formatDate(task.created_at.slice(0, 10))}</span>
+                      <span className="num" dir="ltr">
+                        {formatDate(task.created_at.slice(0, 10))}
+                      </span>
                     </p>
                     {task.completed_at && (
                       <p>
-                        اكتملت بتاريخ <span className="num">{formatDate(task.completed_at.slice(0, 10))}</span>
+                        اكتملت بتاريخ{' '}
+                        <span className="num" dir="ltr">
+                          {formatDate(task.completed_at.slice(0, 10))}
+                        </span>
                       </p>
                     )}
                   </div>

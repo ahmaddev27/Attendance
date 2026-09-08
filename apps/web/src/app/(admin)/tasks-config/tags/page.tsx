@@ -57,9 +57,9 @@ export default function TaskTagsPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="text-right">الاسم</TableHead>
-              <TableHead className="text-right">اللون</TableHead>
-              <TableHead className="text-right">إجراءات</TableHead>
+              <TableHead className="text-start">الاسم</TableHead>
+              <TableHead className="text-start">اللون</TableHead>
+              <TableHead className="text-start">إجراءات</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -87,8 +87,10 @@ export default function TaskTagsPage() {
                 <TableCell className="font-medium">
                   <TaskTagBadge tag={tag} />
                 </TableCell>
-                <TableCell className="num" dir="ltr">
-                  {tag.color}
+                <TableCell>
+                  <span className="num" dir="ltr">
+                    {tag.color}
+                  </span>
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">

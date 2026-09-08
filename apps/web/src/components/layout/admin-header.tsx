@@ -52,13 +52,13 @@ export function AdminHeader() {
       />
 
       {/* Bell — always visible; on desktop it's the only thing in the bar. */}
-      <div className="md:ml-auto">
+      <div className="md:ms-auto">
         <NotificationBell />
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="flex max-h-[80vh] flex-col gap-4 p-4">
-          <DialogTitle className="text-right text-sm font-semibold text-ink">القائمة</DialogTitle>
+          <DialogTitle className="text-start text-sm font-semibold text-ink">القائمة</DialogTitle>
           <SidebarNav onNavigate={() => setOpen(false)} />
           <UserFooter />
         </DialogContent>

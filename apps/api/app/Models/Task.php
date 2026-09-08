@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Laravel\Scout\Searchable;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 
@@ -22,7 +23,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 class Task extends Model implements HasMedia
 {
     /** @use HasFactory<TaskFactory> */
-    use HasFactory, InteractsWithMedia, SoftDeletes;
+    use HasFactory, InteractsWithMedia, Searchable, SoftDeletes;
 
     protected $fillable = [
         'parent_task_id',
@@ -135,5 +136,17 @@ class Task extends Model implements HasMedia
     public function tags(): BelongsToMany
     {
         return $this->belongsToMany(TaskTag::class, 'task_tag_task');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toSearchableArray(): array
+    {
+        return [
+            'id' => (string) $this->id,
+            'title' => (string) $this->title,
+            'description' => (string) $this->description,
+        ];
     }
 }

@@ -21,7 +21,9 @@ export function BalanceCard({ balance }: BalanceCardProps) {
     <Card className="border-hairline bg-surface p-5">
       {balance.leave_type && <LeaveTypeBadge leaveType={balance.leave_type} className="text-sm font-medium" />}
 
-      <p className="num mt-3 text-3xl font-bold text-ink">{balance.remaining}</p>
+      <p className="num mt-3 text-3xl font-bold text-ink" dir="ltr">
+        {balance.remaining}
+      </p>
       <p className="text-xs text-muted">يوم متبقٍ</p>
 
       <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
@@ -33,15 +35,24 @@ export function BalanceCard({ balance }: BalanceCardProps) {
 
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
         <span>
-          الرصيد: <span className="num font-medium text-ink-2">{total}</span>
+          الرصيد:{' '}
+          <span className="num font-medium text-ink-2" dir="ltr">
+            {total}
+          </span>
         </span>
         <span className="flex items-center gap-1">
           <span className="h-1.5 w-1.5 rounded-full bg-brand" />
-          <span className="num font-medium text-ink-2">{balance.used}</span> مستخدم
+          <span className="num font-medium text-ink-2" dir="ltr">
+            {balance.used}
+          </span>{' '}
+          مستخدم
         </span>
         <span className="flex items-center gap-1">
           <span className="h-1.5 w-1.5 rounded-full bg-warn" />
-          <span className="num font-medium text-ink-2">{balance.pending}</span> معلق
+          <span className="num font-medium text-ink-2" dir="ltr">
+            {balance.pending}
+          </span>{' '}
+          معلق
         </span>
       </div>
     </Card>

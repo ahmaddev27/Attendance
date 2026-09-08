@@ -88,7 +88,10 @@ export function AdjustBalanceDialog({ balance, open, onOpenChange }: AdjustBalan
           <DialogDescription>
             {balance?.leave_type ? (
               <span className="flex items-center gap-2">
-                <LeaveTypeBadge leaveType={balance.leave_type} />— سنة <span className="num">{balance.year}</span>
+                <LeaveTypeBadge leaveType={balance.leave_type} />— سنة{' '}
+                <span className="num" dir="ltr">
+                  {balance.year}
+                </span>
               </span>
             ) : (
               'أدخل قيمة التعديل والسبب.'

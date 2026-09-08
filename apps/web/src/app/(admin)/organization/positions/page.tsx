@@ -91,7 +91,11 @@ export default function PositionsPage() {
       key: 'employees_count',
       header: 'عدد الموظفين',
       align: 'center',
-      cell: (position) => <span className="num">{position.employees_count ?? 0}</span>,
+      cell: (position) => (
+        <span className="num" dir="ltr">
+          {position.employees_count ?? 0}
+        </span>
+      ),
     },
     {
       key: 'is_active',

@@ -121,9 +121,14 @@
   }
 
   .num {
+    /* Isolates a numeric run from the surrounding RTL bidi context so
+       "8h 4m" doesn't get reshuffled into "m4h8" when it lives inside an
+       Arabic paragraph. `isolate` keeps the element's bidi contents in
+       their own algorithm run without forcing `display: inline-block`
+       — which would collapse a <td> to inline-block layout and drop the
+       cell out of the table row. */
     font-variant-numeric: tabular-nums;
     direction: ltr;
-    unicode-bidi: embed;
-    display: inline-block;
+    unicode-bidi: isolate;
   }
 }

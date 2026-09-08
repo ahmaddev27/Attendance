@@ -40,7 +40,7 @@ function FieldRow({ label, value, type }: { label: string; value: unknown; type?
   return (
     <div className="flex flex-col gap-1 px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
       <span className="shrink-0 text-xs font-medium text-muted">{label}</span>
-      <span className="text-sm text-ink sm:text-left">
+      <span className="text-sm text-ink sm:text-end">
         <FieldValue value={value} type={type} />
       </span>
     </div>
@@ -54,9 +54,17 @@ function FieldValue({ value, type }: { value: unknown; type?: FormField['type'] 
     case 'checkbox':
       return <span>{value ? 'نعم' : 'لا'}</span>;
     case 'date':
-      return <span className="num">{formatDate(String(value))}</span>;
+      return (
+        <span className="num" dir="ltr">
+          {formatDate(String(value))}
+        </span>
+      );
     case 'number':
-      return <span className="num">{String(value)}</span>;
+      return (
+        <span className="num" dir="ltr">
+          {String(value)}
+        </span>
+      );
     case 'file':
       return (
         <span className="inline-flex items-center gap-1.5">

@@ -167,7 +167,7 @@ export default function HolidaysPage() {
           <p className="text-xs text-muted">إدارة النظام</p>
           <h1 className="mt-1 text-2xl font-bold text-ink">العطل الرسمية</h1>
         </div>
-        <Button type="button" onClick={openCreate} className="bg-brand text-white hover:bg-brand-hover">
+        <Button type="button" onClick={openCreate} className="gap-2 bg-brand text-white hover:bg-brand-hover">
           <Plus className="h-4 w-4" />
           إضافة عطلة
         </Button>
@@ -181,7 +181,9 @@ export default function HolidaysPage() {
           <SelectContent>
             {YEAR_OPTIONS.map((y) => (
               <SelectItem key={y} value={String(y)}>
-                <span className="num">{y}</span>
+                <span className="num" dir="ltr">
+                  {y}
+                </span>
               </SelectItem>
             ))}
           </SelectContent>
@@ -203,11 +205,11 @@ export default function HolidaysPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="text-right">التاريخ</TableHead>
-              <TableHead className="text-right">الاسم</TableHead>
-              <TableHead className="text-right">النوع</TableHead>
-              <TableHead className="text-right">متكررة</TableHead>
-              <TableHead className="text-right">إجراءات</TableHead>
+              <TableHead className="text-start">التاريخ</TableHead>
+              <TableHead className="text-start">الاسم</TableHead>
+              <TableHead className="text-start">النوع</TableHead>
+              <TableHead className="text-start">متكررة</TableHead>
+              <TableHead className="text-start">إجراءات</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -233,8 +235,10 @@ export default function HolidaysPage() {
             {holidays?.map((holiday) => (
               <TableRow key={holiday.id}>
                 <TableCell>
-                  <span className="num font-medium text-ink">{holiday.date}</span>
-                  <span className="mr-2 text-xs text-muted">{formatWeekday(holiday.date)}</span>
+                  <span className="num font-medium text-ink" dir="ltr">
+                    {holiday.date}
+                  </span>
+                  <span className="ms-2 text-xs text-muted">{formatWeekday(holiday.date)}</span>
                 </TableCell>
                 <TableCell className="font-medium text-ink">{holiday.name}</TableCell>
                 <TableCell>
@@ -334,7 +338,7 @@ export default function HolidaysPage() {
             </div>
 
             <DialogFooter>
-              <Button type="submit" disabled={saveMutation.isPending} className="bg-brand text-white hover:bg-brand-hover">
+              <Button type="submit" disabled={saveMutation.isPending} className="gap-2 bg-brand text-white hover:bg-brand-hover">
                 {saveMutation.isPending && <Spinner />}
                 حفظ
               </Button>

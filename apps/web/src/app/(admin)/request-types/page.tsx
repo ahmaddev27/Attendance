@@ -58,7 +58,11 @@ export default function RequestTypesPage() {
       key: 'sort_order',
       header: 'الترتيب',
       align: 'center',
-      cell: (requestType) => <span className="num">{requestType.sort_order}</span>,
+      cell: (requestType) => (
+        <span className="num" dir="ltr">
+          {requestType.sort_order}
+        </span>
+      ),
     },
     {
       key: 'is_active',

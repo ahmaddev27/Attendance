@@ -14,11 +14,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Laravel\Scout\Searchable;
 
 class Employee extends Model
 {
     /** @use HasFactory<EmployeeFactory> */
-    use HasFactory, SoftDeletes;
+    use HasFactory, Searchable, SoftDeletes;
 
     /**
      * `employee_number` is fillable here because it must be mass-assignable
@@ -171,5 +172,23 @@ class Employee extends Model
     public function getFullNameAttribute(): string
     {
         return trim("{$this->first_name} {$this->last_name}");
+    }
+
+    /**
+     * Flat payload pushed to Meilisearch. `id` is stringified because
+     * Meilisearch treats the primary key as a string internally; keeping
+     * `employee_number` numeric preserves range/sort semantics.
+     *
+     * @return array<string, mixed>
+     */
+    public function toSearchableArray(): array
+    {
+        return [
+            'id' => (string) $this->id,
+            'employee_number' => (int) $this->employee_number,
+            'full_name' => $this->full_name,
+            'email' => (string) $this->email,
+            'phone' => (string) $this->phone,
+        ];
     }
 }

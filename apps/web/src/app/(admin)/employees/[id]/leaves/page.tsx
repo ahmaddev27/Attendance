@@ -104,7 +104,9 @@ export default function EmployeeLeavesPage() {
               <SelectContent>
                 {YEAR_OPTIONS.map((y) => (
                   <SelectItem key={y} value={String(y)}>
-                    <span className="num">{y}</span>
+                    <span className="num" dir="ltr">
+                      {y}
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -125,7 +127,7 @@ export default function EmployeeLeavesPage() {
                 type="button"
                 variant="outline"
                 size="sm"
-                className="absolute left-4 top-4 gap-1.5"
+                className="absolute end-4 top-4 gap-1.5"
                 onClick={() => setAdjustingBalance(balance)}
               >
                 <SlidersHorizontal className="h-3.5 w-3.5" />
@@ -136,23 +138,31 @@ export default function EmployeeLeavesPage() {
 
         {!balancesLoading && (balances?.length ?? 0) === 0 && (
           <p className="col-span-full py-6 text-center text-sm text-muted">
-            لا توجد أرصدة إجازات مسجلة لهذا الموظف في سنة {year}
+            لا توجد أرصدة إجازات مسجلة لهذا الموظف في سنة{' '}
+            <span className="num" dir="ltr">
+              {year}
+            </span>
           </p>
         )}
       </div>
 
       <div className="mt-6 rounded-xl border border-hairline bg-surface">
         <div className="border-b border-hairline p-4">
-          <p className="text-sm font-semibold text-ink">سجل الإجازات — {year}</p>
+          <p className="text-sm font-semibold text-ink">
+            سجل الإجازات —{' '}
+            <span className="num" dir="ltr">
+              {year}
+            </span>
+          </p>
         </div>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="text-right">التواريخ</TableHead>
-              <TableHead className="text-right">النوع</TableHead>
-              <TableHead className="text-right">الأيام</TableHead>
-              <TableHead className="text-right">الحالة</TableHead>
-              <TableHead className="text-right">السبب</TableHead>
+              <TableHead className="text-start">التواريخ</TableHead>
+              <TableHead className="text-start">النوع</TableHead>
+              <TableHead className="text-start">الأيام</TableHead>
+              <TableHead className="text-start">الحالة</TableHead>
+              <TableHead className="text-start">السبب</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -170,20 +180,29 @@ export default function EmployeeLeavesPage() {
             {!leavesLoading && (leaves?.length ?? 0) === 0 && (
               <TableRow>
                 <TableCell colSpan={5} className="py-10 text-center text-sm text-muted">
-                  لا توجد طلبات إجازة مسجلة في سنة {year}
+                  لا توجد طلبات إجازة مسجلة في سنة{' '}
+                  <span className="num" dir="ltr">
+                    {year}
+                  </span>
                 </TableCell>
               </TableRow>
             )}
 
             {leaves?.map((leave) => (
               <TableRow key={leave.id}>
-                <TableCell className="num whitespace-nowrap">
-                  {formatDate(leave.start_date)} — {formatDate(leave.end_date)}
+                <TableCell className="whitespace-nowrap">
+                  <span className="num" dir="ltr">
+                    {formatDate(leave.start_date)} — {formatDate(leave.end_date)}
+                  </span>
                 </TableCell>
                 <TableCell>
                   <LeaveTypeBadge leaveType={leave.leave_type} />
                 </TableCell>
-                <TableCell className="num">{leave.days}</TableCell>
+                <TableCell>
+                  <span className="num" dir="ltr">
+                    {leave.days}
+                  </span>
+                </TableCell>
                 <TableCell>
                   <LeaveStatusBadge status={leave.status} />
                 </TableCell>

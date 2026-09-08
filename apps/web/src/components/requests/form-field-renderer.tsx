@@ -34,7 +34,7 @@ export function FormFieldRenderer({ field, value, onChange, error, employeeValue
     <div>
       <Label className="text-sm font-medium text-ink">
         {field.label}
-        {field.required && <span className="mr-1 text-danger">*</span>}
+        {field.required && <span className="ms-1 text-danger">*</span>}
       </Label>
       <div className="mt-1.5">
         <FieldInput field={field} value={value} onChange={onChange} employeeValue={employeeValue} onEmployeeChange={onEmployeeChange} />
