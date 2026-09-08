@@ -164,7 +164,7 @@ export function DataTable<T>({
         </TableBody>
       </Table>
 
-      {pagination && !isLoading && data.length > 0 && (
+      {pagination?.meta && !isLoading && data.length > 0 && (
         <DataTablePagination meta={pagination.meta} onPageChange={pagination.onPageChange} />
       )}
     </div>
@@ -178,6 +178,11 @@ function DataTablePagination({
   meta: PaginatedResponse<unknown>['meta'];
   onPageChange: (page: number) => void;
 }) {
+  // Extra guard on the render boundary — a hot-swapped API response shape
+  // (backend paginator switched off, a route that returns a plain array)
+  // used to bubble a `Cannot destructure property 'current_page' of 't'`
+  // crash all the way up to the admin sidebar. Bail cleanly instead.
+  if (!meta) return null;
   const { current_page, last_page, per_page, total } = meta;
   const from = total === 0 ? 0 : (current_page - 1) * per_page + 1;
   const to = Math.min(current_page * per_page, total);
