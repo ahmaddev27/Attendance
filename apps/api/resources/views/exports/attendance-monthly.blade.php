@@ -23,14 +23,23 @@
     <meta charset="UTF-8">
     <title>تقرير الحضور الشهري - {{ $view->monthLabel() }} {{ $view->year }}</title>
     <style>
-        /* Amiri (Google Fonts) as an aesthetic upgrade; DejaVu Sans is
-           the DomPDF fallback so the report always renders, even offline. */
+        {{--
+            Amiri (Google Fonts) as an aesthetic upgrade — dompdf downloads
+            the .ttf on first use and caches a .ufm+.cpg pair under
+            storage/fonts/. The download is skipped in the `testing` env so
+            phpunit runs don't try to reach fonts.gstatic.com from CI
+            (which sandboxes external egress) and never fail on a missing
+            font-cache write. DejaVu Sans is the DomPDF bundled fallback
+            so the report always renders, with or without Amiri.
+        --}}
+        @if (app()->environment() !== 'testing')
         @font-face {
             font-family: 'Amiri';
             font-style: normal;
             font-weight: 400;
             src: url('https://fonts.gstatic.com/s/amiri/v27/J7aRnpd8CGxBHqUpvrIw74NL.ttf') format('truetype');
         }
+        @endif
 
         * { box-sizing: border-box; }
 
