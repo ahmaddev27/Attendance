@@ -12,9 +12,11 @@ import {
   Check,
   ClipboardCheck,
   Clock,
+  BarChart3,
   FileCog,
   FileText,
   GitBranch,
+  History,
   Home,
   Inbox,
   LogOut,
@@ -52,6 +54,8 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/request-types', label: 'أنواع الطلبات', icon: FileCog },
   { href: '/tasks', label: 'المهام', icon: ClipboardCheck },
   { href: '/tasks-config/statuses', label: 'إعدادات المهام', icon: Settings2 },
+  { href: '/reports/attendance', label: 'تقارير الحضور', icon: BarChart3 },
+  { href: '/audit', label: 'سجل النشاط', icon: History },
   { href: '/notifications', label: 'الإشعارات', icon: Bell },
 ];
 

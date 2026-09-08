@@ -16,6 +16,8 @@ use App\Modules\Organization\Controllers\PositionController;
 use App\Modules\Organization\Controllers\TeamController;
 use App\Modules\Notifications\Controllers\MyNotificationsController;
 use App\Modules\Reports\Controllers\AdminDashboardController;
+use App\Modules\Reports\Controllers\AttendanceReportController;
+use App\Modules\Reports\Controllers\AuditLogController;
 use App\Modules\Requests\Controllers\ApprovalInboxController;
 use App\Modules\Requests\Controllers\MyRequestsController;
 use App\Modules\Requests\Controllers\RequestController;
@@ -180,6 +182,13 @@ Route::middleware('auth:sanctum')->group(function () {
     // sidebars and the endpoint returns aggregate counts, not per-employee
     // detail, so the current guard is sufficient.
     Route::get('/admin/dashboard/kpis', [AdminDashboardController::class, 'kpis']);
+
+    // Admin reports (M8). Aggregated views + CSV exports for month-end
+    // payroll and HR review. Kept under /admin/reports so the RBAC layer
+    // that eventually gates the sidebar can gate the endpoints at the
+    // same prefix.
+    Route::get('/admin/reports/attendance/monthly', [AttendanceReportController::class, 'monthly']);
+    Route::get('/admin/audit-log', [AuditLogController::class, 'index']);
 
     // Notifications (M7). Every user sees only their own inbox — the
     // controller uses $request->user()->notifications, not a global list.
