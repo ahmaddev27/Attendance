@@ -41,11 +41,10 @@ Route::get('/health', function () {
     ]);
 });
 
-// Reverb / Echo channel-auth endpoint (POST /api/broadcasting/auth).
-// Sanctum-guarded because our frontend already sends a Bearer token; the
-// auth callback in routes/channels.php only needs to check "is this user
-// the channel owner", not re-verify session cookies.
-Broadcast::routes(['prefix' => 'api', 'middleware' => ['auth:sanctum']]);
+// Reverb / Echo channel-auth endpoint. api.php already prefixes '/api',
+// so we DON'T re-add it here — otherwise the route ends up at
+// /api/api/broadcasting/auth and Echo's default authEndpoint 404s.
+Broadcast::routes(['middleware' => ['auth:sanctum']]);
 
 Route::prefix('auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);

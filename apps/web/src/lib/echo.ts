@@ -72,6 +72,10 @@ export function getEcho(): Echo<'reverb'> | null {
     },
   });
 
+  // Expose on window for quick devtools inspection — safe: the instance
+  // itself lives in module scope and is the source of truth.
+  window.Echo = echoInstance;
+
   return echoInstance;
 }
 
