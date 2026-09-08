@@ -18,6 +18,15 @@ return Application::configure(basePath: dirname(__DIR__))
         // the SPA lives on the same origin as the API, so Sanctum would
         // upgrade every request to a session-based (CSRF-required) request.
         // Bearer tokens in Authorization headers work correctly without it.
+
+        // spatie/laravel-permission ships three middleware but doesn't
+        // auto-register them in Laravel 11's slim bootstrap — we do it here
+        // so `->middleware('permission:manage-users')` works on any route.
+        $middleware->alias([
+            'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
+            'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
+            'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

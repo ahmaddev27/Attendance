@@ -46,12 +46,24 @@ function makeEmployeeWithSchedule(?WorkSchedule $schedule = null): Employee
 }
 
 /**
- * Authenticates the current test as a fresh admin-ish user via the
- * sanctum guard, for hitting the auth:sanctum-protected Attendance routes.
+ * Authenticates the current test as a fresh super-admin user via the
+ * sanctum guard. Ensures the 'super-admin' role and its permissions
+ * exist first, so any route protected by spatie/laravel-permission
+ * middleware (permission: manage-users, view-reports, etc.) passes.
  */
 function actingAsAdmin(): User
 {
+    // Make sure the permission catalog exists in test DBs — RolePermissionSeeder
+    // isn't in the RefreshDatabase pipeline, so we create only what we need.
+    foreach (['view-reports', 'view-audit-logs', 'manage-users', 'manage-workflows', 'approve-leaves'] as $p) {
+        \Spatie\Permission\Models\Permission::findOrCreate($p);
+    }
+    $role = \Spatie\Permission\Models\Role::findOrCreate('super-admin');
+    $role->syncPermissions(\Spatie\Permission\Models\Permission::all());
+
     $user = User::factory()->create();
+    $user->assignRole('super-admin');
+
     test()->actingAs($user, 'sanctum');
 
     return $user;

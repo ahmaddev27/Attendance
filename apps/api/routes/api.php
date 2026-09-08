@@ -183,18 +183,24 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/{request}/cancel', [MyRequestsController::class, 'cancel']);
     });
 
-    // Admin dashboard KPIs (M8). Auth-only for now — RBAC lands with the
-    // rest of the admin routes; the UI already hides this from non-admin
-    // sidebars and the endpoint returns aggregate counts, not per-employee
-    // detail, so the current guard is sufficient.
-    Route::get('/admin/dashboard/kpis', [AdminDashboardController::class, 'kpis']);
+    // Admin-only endpoints — protected by spatie/laravel-permission.
+    // super-admin has every permission via RolePermissionSeeder;
+    // department-manager and above should be granted per-permission when
+    // finer role modelling lands.
+    Route::prefix('admin')->group(function () {
+        // Dashboard summary — safe aggregate counts, but still admin-only.
+        Route::middleware('permission:view-reports')
+            ->get('/dashboard/kpis', [AdminDashboardController::class, 'kpis']);
 
-    // Admin reports (M8). Aggregated views + CSV exports for month-end
-    // payroll and HR review. Kept under /admin/reports so the RBAC layer
-    // that eventually gates the sidebar can gate the endpoints at the
-    // same prefix.
-    Route::get('/admin/reports/attendance/monthly', [AttendanceReportController::class, 'monthly']);
-    Route::get('/admin/audit-log', [AuditLogController::class, 'index']);
+        // Reports (attendance monthly, ...)
+        Route::middleware('permission:view-reports')->group(function () {
+            Route::get('/reports/attendance/monthly', [AttendanceReportController::class, 'monthly']);
+        });
+
+        // Audit log viewer
+        Route::middleware('permission:view-audit-logs')
+            ->get('/audit-log', [AuditLogController::class, 'index']);
+    });
 
     // Notifications (M7). Every user sees only their own inbox — the
     // controller uses $request->user()->notifications, not a global list.

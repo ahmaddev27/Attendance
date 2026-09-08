@@ -21,7 +21,7 @@ test('kpis endpoint requires authentication', function () {
 });
 
 test('kpis returns the expected top-level shape', function () {
-    $this->actingAs(User::factory()->create(), 'sanctum');
+    actingAsAdmin();
 
     $this->getJson('/api/admin/dashboard/kpis')
         ->assertOk()
@@ -36,7 +36,7 @@ test('kpis returns the expected top-level shape', function () {
 });
 
 test('employee counts split active vs inactive', function () {
-    $this->actingAs(User::factory()->create(), 'sanctum');
+    actingAsAdmin();
     Employee::factory()->count(3)->create(['status' => EmployeeStatus::Active]);
     Employee::factory()->count(2)->create(['status' => EmployeeStatus::Inactive]);
     Employee::factory()->create(['status' => EmployeeStatus::OnLeave]);
@@ -49,7 +49,7 @@ test('employee counts split active vs inactive', function () {
 });
 
 test('today attendance groups late+early_leave and folds remote/mission into present', function () {
-    $this->actingAs(User::factory()->create(), 'sanctum');
+    actingAsAdmin();
     $today = now()->toDateString();
     $employees = Employee::factory()->count(6)->create();
 
@@ -68,7 +68,7 @@ test('today attendance groups late+early_leave and folds remote/mission into pre
 });
 
 test('pending totals sum pending leaves and pending requests', function () {
-    $this->actingAs(User::factory()->create(), 'sanctum');
+    actingAsAdmin();
     LeaveRequest::factory()->count(2)->create(['status' => LeaveStatus::Pending]);
     LeaveRequest::factory()->create(['status' => LeaveStatus::Approved]);
 
@@ -85,7 +85,7 @@ test('pending totals sum pending leaves and pending requests', function () {
 });
 
 test('task counts respect status flags and overdue date', function () {
-    $this->actingAs(User::factory()->create(), 'sanctum');
+    actingAsAdmin();
     $openStatus = TaskStatus::factory()->create(['is_done_state' => false, 'is_cancelled_state' => false]);
     $doneStatus = TaskStatus::factory()->doneState()->create();
 
