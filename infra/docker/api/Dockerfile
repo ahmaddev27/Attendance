@@ -38,28 +38,16 @@ RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-in
                           --with-all-dependencies --ignore-platform-reqs)
 
 COPY . .
-# The prior `COPY . .` just replaced the container's composer.lock (which
-# the fallback above may have regenerated) with the possibly-out-of-sync
-# host copy. Restore whichever lock the vendor tree was actually installed
-# from so the classmap-only dump below stays consistent — using host's
-# stale lock here would make composer scan a vendor tree it doesn't
-# recognise. In practice the fresh copy of app/ is all we need for the
-# classmap; packages themselves are already installed.
-#
-# Then seed .env + a real APP_KEY (Laravel 11's Encrypter binds itself
-# eagerly and blows up with "A facade root has not been set" when the
-# key is empty). Both are build-time placeholders that never leave this
-# stage: the runtime container gets its real .env via env_file in
-# docker-compose.
-RUN [ -f .env ] || cp .env.example .env \
-    && KEY="base64:$(head -c 32 /dev/urandom | base64)" \
-    && sed -i "s|^APP_KEY=.*|APP_KEY=$KEY|" .env
-# Regenerate the optimized autoloader against the full app/ tree — we
-# deliberately skip `composer install` here so a re-COPY of an
-# out-of-sync host composer.lock can't undo the fallback that just
-# succeeded above. `dump-autoload -o` doesn't touch packages, only
-# rebuilds vendor/composer/autoload_*.php with the classmap.
-RUN composer dump-autoload --optimize --no-dev --classmap-authoritative
+# Regenerate the optimized autoloader against the full app/ tree.
+# `--no-scripts` matters: composer.json's post-autoload-dump hook runs
+# `php artisan package:discover`, which needs a fully-migrated DB and a
+# ready Redis/config to boot; neither is present at image-build time.
+# Discovery happens at container start instead (see entrypoint below),
+# where env_file has landed and the network is live. Skipping install
+# here (dump-autoload only) also means an out-of-sync host composer.lock
+# that just got re-COPY'd on top of the container's fixed one can't
+# undo the fallback resolve that succeeded a few layers up.
+RUN composer dump-autoload --optimize --no-dev --classmap-authoritative --no-scripts
 
 ############################################
 # Stage 2 — runtime: PHP 8.4 FPM Alpine
@@ -171,6 +159,25 @@ else
     # mtimes so edits are picked up without restarting the container.
     echo "opcache.validate_timestamps=1" > /usr/local/etc/php/conf.d/99-opcache-env.ini
 fi
+
+# Populate bootstrap/cache/packages.php + services.php the first time we
+# see this container — the image ships without them because Composer's
+# post-autoload-dump hook (which calls `php artisan package:discover`)
+# needs a bootable app (real APP_KEY, reachable services) that only
+# exists once env_file lands here at runtime. Non-fatal so a queue
+# worker or scheduler starting a millisecond before the api container
+# has warmed the caches doesn't die: the sibling php-fpm run will
+# populate them and every subsequent request reads from the on-disk
+# cache. Only the main `php-fpm` command runs this — other CMDs
+# (queue:work, schedule:work, reverb:start) skip it to avoid a
+# thundering-herd discover on every container start.
+case "$1" in
+    php-fpm|php-fpm7*|php-fpm8*)
+        cd /var/www/html
+        php artisan package:discover --ansi || \
+            echo "WARN: package:discover failed — continuing (cache will populate on first request)"
+        ;;
+esac
 
 exec "$@"
 EOF

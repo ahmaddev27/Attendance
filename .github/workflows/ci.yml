@@ -106,15 +106,15 @@ jobs:
             || composer update --no-progress --prefer-dist --no-interaction \
                               --with-all-dependencies --ignore-platform-reqs --no-scripts
 
-      - name: Discover packages
-        # APP_KEY is already set in .env from the previous step, so artisan
-        # can boot cleanly. This is the same command Composer's
-        # post-autoload-dump hook would run — calling it directly here
-        # surfaces provider errors with Laravel's own message instead of
-        # composer's generic "run-script failed" wrapper.
-        run: php artisan package:discover --ansi
-
       - name: Run tests
+        # No explicit `php artisan package:discover` here — Laravel's
+        # PackageManifest::getManifest() calls ->build() lazily on first
+        # bootstrap when bootstrap/cache/packages.php is missing, and it
+        # does so from an already-booted container (facades set), which
+        # was the failure mode we kept hitting when we invoked
+        # package:discover manually as our first artisan call.
+        # `php artisan test` boots the app once, triggers the lazy
+        # discover, then runs pest — the whole thing in one process.
         run: php artisan test
         env:
           DB_CONNECTION: mysql
