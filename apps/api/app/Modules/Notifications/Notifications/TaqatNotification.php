@@ -31,6 +31,12 @@ class TaqatNotification extends Notification
     /**
      * @param  array<string, mixed>  $meta  Optional structured payload
      *                                       (leave_request_id, task_id, ...)
+     * @param  bool  $suppressBroadcast  Set by NotificationService when the
+     *                                    same event was already broadcast to
+     *                                    the same recipient within the dedup
+     *                                    window — the DB row is still written
+     *                                    (durable inbox) but Reverb is skipped
+     *                                    to avoid toast/counter double-fires.
      */
     public function __construct(
         public readonly string $title,
@@ -38,6 +44,7 @@ class TaqatNotification extends Notification
         public readonly ?string $url = null,
         public readonly ?string $icon = null,
         public readonly array $meta = [],
+        public readonly bool $suppressBroadcast = false,
     ) {}
 
     /**
@@ -45,13 +52,13 @@ class TaqatNotification extends Notification
      */
     public function via(mixed $notifiable): array
     {
-        // 'broadcast' only fires when BROADCAST_CONNECTION is set to
-        // something concrete ('reverb'); when it's 'null' (dev without
-        // Reverb, or a misconfigured VPS) Laravel silently drops the
-        // broadcast path and the database record is still written.
-        return config('broadcasting.default') === 'null'
-            ? ['database']
-            : ['database', 'broadcast'];
+        // Database is always written — it's the durable inbox.
+        // Broadcast is added when Reverb is configured AND the caller
+        // didn't ask us to suppress it (see $suppressBroadcast).
+        if ($this->suppressBroadcast || config('broadcasting.default') === 'null') {
+            return ['database'];
+        }
+        return ['database', 'broadcast'];
     }
 
     /**

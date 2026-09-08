@@ -10,6 +10,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Modules\Notifications\Notifications\TaqatNotification;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Notification;
 
 /**
@@ -22,9 +23,21 @@ use Illuminate\Support\Facades\Notification;
  * Silently no-ops when the resolved recipient can't be found (e.g. a
  * leave belongs to a soft-deleted employee whose linked user is gone) —
  * we don't want a notification error to break the underlying action.
+ *
+ * Dedup: when the same event key fires for the same recipient within
+ * DEDUP_WINDOW seconds, the DB row is still written (durable inbox) but
+ * the Reverb broadcast is suppressed so the frontend bell/toast doesn't
+ * double-fire. See dispatch().
  */
 class NotificationService
 {
+    /**
+     * Suppress-broadcast window in seconds. Long enough to absorb a
+     * double-click or a rapid re-approve, short enough that a deliberate
+     * second event ~a minute later still reaches the toast.
+     */
+    private const DEDUP_WINDOW = 30;
+
     public function leaveDecided(LeaveRequest $leave): void
     {
         $recipient = $leave->employee?->user;
@@ -34,7 +47,7 @@ class NotificationService
 
         $approved = $leave->status->value === 'approved';
 
-        Notification::send($recipient, new TaqatNotification(
+        $this->dispatch($recipient, "leave-decided:{$leave->id}", new TaqatNotification(
             title: $approved
                 ? 'تمت الموافقة على طلب إجازتك'
                 : 'تم رفض طلب إجازتك',
@@ -65,7 +78,7 @@ class NotificationService
             default => "تحديث على طلبك ({$status})",
         };
 
-        Notification::send($recipient, new TaqatNotification(
+        $this->dispatch($recipient, "request-decided:{$request->id}:{$status}", new TaqatNotification(
             title: $title,
             body: sprintf(
                 '%s — %s',
@@ -90,18 +103,22 @@ class NotificationService
             return;
         }
 
-        Notification::send($approvers, new TaqatNotification(
-            title: 'طلب جديد بانتظار موافقتك',
-            body: sprintf(
-                '%s — %s من %s',
-                $request->requestType?->name ?? 'طلب',
-                $request->request_number,
-                $request->employee?->full_name ?? 'موظف',
-            ),
-            url: '/approvals',
-            icon: 'inbox',
-            meta: ['request_id' => $request->id],
-        ));
+        // Each approver gets their own dedup key so the loop still catches
+        // "same request re-forwarded to me twice in 30s" per-approver.
+        foreach ($approvers as $approver) {
+            $this->dispatch($approver, "request-pending:{$request->id}", new TaqatNotification(
+                title: 'طلب جديد بانتظار موافقتك',
+                body: sprintf(
+                    '%s — %s من %s',
+                    $request->requestType?->name ?? 'طلب',
+                    $request->request_number,
+                    $request->employee?->full_name ?? 'موظف',
+                ),
+                url: '/approvals',
+                icon: 'inbox',
+                meta: ['request_id' => $request->id],
+            ));
+        }
     }
 
     public function taskAssigned(Task $task): void
@@ -111,12 +128,42 @@ class NotificationService
             return;
         }
 
-        Notification::send($recipient, new TaqatNotification(
+        $this->dispatch($recipient, "task-assigned:{$task->id}", new TaqatNotification(
             title: 'تم إسناد مهمة إليك',
             body: $task->title,
             url: '/my-tasks',
             icon: 'clipboard-check',
             meta: ['task_id' => $task->id],
         ));
+    }
+
+    /**
+     * Send a notification with per-recipient dedup on the broadcast channel.
+     *
+     * Every path in this service goes through here. If the same $eventKey
+     * fired for the same user in the last DEDUP_WINDOW seconds, we clone
+     * the notification with suppressBroadcast=true — the durable DB row
+     * still lands (so the bell counter and history page catch up on the
+     * next poll/open), but Reverb doesn't fan out a second toast/counter
+     * update.
+     */
+    private function dispatch(User $recipient, string $eventKey, TaqatNotification $notification): void
+    {
+        $cacheKey = "notif-dedup:{$recipient->id}:{$eventKey}";
+
+        $isDuplicate = ! Cache::add($cacheKey, 1, self::DEDUP_WINDOW);
+
+        if ($isDuplicate) {
+            $notification = new TaqatNotification(
+                title: $notification->title,
+                body: $notification->body,
+                url: $notification->url,
+                icon: $notification->icon,
+                meta: $notification->meta,
+                suppressBroadcast: true,
+            );
+        }
+
+        Notification::send($recipient, $notification);
     }
 }

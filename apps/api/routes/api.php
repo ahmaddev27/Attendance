@@ -14,10 +14,12 @@ use App\Modules\Leaves\Controllers\LeaveTypeController;
 use App\Modules\Organization\Controllers\DepartmentController;
 use App\Modules\Organization\Controllers\PositionController;
 use App\Modules\Organization\Controllers\TeamController;
+use App\Modules\AI\Controllers\MotivationController;
 use App\Modules\Notifications\Controllers\MyNotificationsController;
 use App\Modules\Reports\Controllers\AdminDashboardController;
 use App\Modules\Reports\Controllers\AttendanceReportController;
 use App\Modules\Reports\Controllers\AuditLogController;
+use App\Modules\Reports\Controllers\EmployeeDashboardController;
 use App\Modules\Requests\Controllers\ApprovalInboxController;
 use App\Modules\Requests\Controllers\MyRequestsController;
 use App\Modules\Requests\Controllers\RequestController;
@@ -202,6 +204,10 @@ Route::middleware('auth:sanctum')->group(function () {
             ->get('/audit-log', [AuditLogController::class, 'index']);
     });
 
+    // Employee's personal dashboard (M7). Scoped to $request->user()
+    // at the service layer — no permission gate needed.
+    Route::get('/me/dashboard/kpis', [EmployeeDashboardController::class, 'kpis']);
+
     // Notifications (M7). Every user sees only their own inbox — the
     // controller uses $request->user()->notifications, not a global list.
     Route::prefix('me/notifications')->group(function () {
@@ -210,4 +216,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/read-all', [MyNotificationsController::class, 'markAllRead']);
         Route::post('/{id}/read', [MyNotificationsController::class, 'markRead']);
     });
+
+    // AI Motivation (M8) — one Claude-backed line per user per day,
+    // cached in redis and served with a canned fallback if the API
+    // path fails, so the dashboard never 500s over an LLM outage.
+    Route::get('/me/motivation', [MotivationController::class, 'show']);
 });

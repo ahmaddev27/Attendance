@@ -28,35 +28,41 @@ import {
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { useAuthStore } from '@/lib/stores/auth-store';
+import { hasAnyPermission, useAuthStore } from '@/lib/stores/auth-store';
 
 type NavItem = {
   href: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
+  /**
+   * Permissions gating this item — any-of semantics. Empty array = visible
+   * to every authenticated admin (like the dashboard summary + notifications
+   * inbox everyone should see).
+   */
+  permissions: string[];
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { href: '/dashboard', label: 'الرئيسية', icon: Home },
-  { href: '/employees', label: 'الموظفون', icon: Users },
-  { href: '/organization/departments', label: 'الأقسام', icon: Building },
-  { href: '/organization/teams', label: 'الفرق', icon: UsersRound },
-  { href: '/organization/positions', label: 'المسميات الوظيفية', icon: Briefcase },
-  { href: '/attendance', label: 'الحضور', icon: Calendar },
-  { href: '/organization/schedules', label: 'الجداول', icon: Clock },
-  { href: '/organization/holidays', label: 'العطل', icon: CalendarOff },
-  { href: '/organization/devices', label: 'أجهزة QR', icon: QrCode },
-  { href: '/organization/leave-types', label: 'أنواع الإجازات', icon: Palette },
-  { href: '/leaves', label: 'الإجازات', icon: Check },
-  { href: '/requests', label: 'الطلبات', icon: FileText },
-  { href: '/approvals', label: 'صندوق الموافقات', icon: Inbox },
-  { href: '/workflows', label: 'مسارات العمل', icon: GitBranch },
-  { href: '/request-types', label: 'أنواع الطلبات', icon: FileCog },
-  { href: '/tasks', label: 'المهام', icon: ClipboardCheck },
-  { href: '/tasks-config/statuses', label: 'إعدادات المهام', icon: Settings2 },
-  { href: '/reports/attendance', label: 'تقارير الحضور', icon: BarChart3 },
-  { href: '/audit', label: 'سجل النشاط', icon: History },
-  { href: '/notifications', label: 'الإشعارات', icon: Bell },
+  { href: '/dashboard', label: 'الرئيسية', icon: Home, permissions: [] },
+  { href: '/employees', label: 'الموظفون', icon: Users, permissions: ['manage-users'] },
+  { href: '/organization/departments', label: 'الأقسام', icon: Building, permissions: ['manage-departments'] },
+  { href: '/organization/teams', label: 'الفرق', icon: UsersRound, permissions: ['manage-departments'] },
+  { href: '/organization/positions', label: 'المسميات الوظيفية', icon: Briefcase, permissions: ['manage-departments'] },
+  { href: '/attendance', label: 'الحضور', icon: Calendar, permissions: ['view-all-attendance'] },
+  { href: '/organization/schedules', label: 'الجداول', icon: Clock, permissions: ['manage-departments'] },
+  { href: '/organization/holidays', label: 'العطل', icon: CalendarOff, permissions: ['manage-departments'] },
+  { href: '/organization/devices', label: 'أجهزة QR', icon: QrCode, permissions: ['manage-departments'] },
+  { href: '/organization/leave-types', label: 'أنواع الإجازات', icon: Palette, permissions: ['approve-leaves'] },
+  { href: '/leaves', label: 'الإجازات', icon: Check, permissions: ['approve-leaves'] },
+  { href: '/requests', label: 'الطلبات', icon: FileText, permissions: ['manage-workflows'] },
+  { href: '/approvals', label: 'صندوق الموافقات', icon: Inbox, permissions: [] },
+  { href: '/workflows', label: 'مسارات العمل', icon: GitBranch, permissions: ['manage-workflows'] },
+  { href: '/request-types', label: 'أنواع الطلبات', icon: FileCog, permissions: ['manage-workflows'] },
+  { href: '/tasks', label: 'المهام', icon: ClipboardCheck, permissions: ['create-tasks'] },
+  { href: '/tasks-config/statuses', label: 'إعدادات المهام', icon: Settings2, permissions: ['manage-workflows'] },
+  { href: '/reports/attendance', label: 'تقارير الحضور', icon: BarChart3, permissions: ['view-reports'] },
+  { href: '/audit', label: 'سجل النشاط', icon: History, permissions: ['view-audit-logs'] },
+  { href: '/notifications', label: 'الإشعارات', icon: Bell, permissions: [] },
 ];
 
 function isActivePath(pathname: string | null, href: string) {
@@ -66,10 +72,15 @@ function isActivePath(pathname: string | null, href: string) {
 
 export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const user = useAuthStore((s) => s.user);
+
+  // Filter items by the current user's permissions — items with an empty
+  // permissions array (dashboard, notifications) are visible to everyone.
+  const visibleItems = NAV_ITEMS.filter((item) => hasAnyPermission(user, item.permissions));
 
   return (
     <nav className="flex flex-1 flex-col gap-1 overflow-y-auto">
-      {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+      {visibleItems.map(({ href, label, icon: Icon }) => {
         const active = isActivePath(pathname, href);
         return (
           <Link
