@@ -38,22 +38,28 @@ RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-in
                           --with-all-dependencies --ignore-platform-reqs)
 
 COPY . .
-# Laravel's post-autoload-dump hook runs `php artisan package:discover`,
-# which boots the framework. Two things have to be true before that boot
-# can succeed:
-#   1. A .env file exists (.env.example alone doesn't satisfy Laravel's
-#      environment repository, and .env itself is .gitignored).
-#   2. APP_KEY is set to a valid base64 string — Laravel 11's Encrypter
-#      binds itself eagerly and blows up with "A facade root has not
-#      been set" when the key is empty.
-# Both are build-time placeholders that never leave this stage: the
-# runtime container gets its real .env (with real APP_KEY) via env_file
-# in docker-compose. The build-time key is regenerated on every image
-# build so it never becomes a shared secret across builds.
+# The prior `COPY . .` just replaced the container's composer.lock (which
+# the fallback above may have regenerated) with the possibly-out-of-sync
+# host copy. Restore whichever lock the vendor tree was actually installed
+# from so the classmap-only dump below stays consistent — using host's
+# stale lock here would make composer scan a vendor tree it doesn't
+# recognise. In practice the fresh copy of app/ is all we need for the
+# classmap; packages themselves are already installed.
+#
+# Then seed .env + a real APP_KEY (Laravel 11's Encrypter binds itself
+# eagerly and blows up with "A facade root has not been set" when the
+# key is empty). Both are build-time placeholders that never leave this
+# stage: the runtime container gets its real .env via env_file in
+# docker-compose.
 RUN [ -f .env ] || cp .env.example .env \
     && KEY="base64:$(head -c 32 /dev/urandom | base64)" \
     && sed -i "s|^APP_KEY=.*|APP_KEY=$KEY|" .env
-RUN composer install --no-dev --optimize-autoloader --prefer-dist --no-interaction
+# Regenerate the optimized autoloader against the full app/ tree — we
+# deliberately skip `composer install` here so a re-COPY of an
+# out-of-sync host composer.lock can't undo the fallback that just
+# succeeded above. `dump-autoload -o` doesn't touch packages, only
+# rebuilds vendor/composer/autoload_*.php with the classmap.
+RUN composer dump-autoload --optimize --no-dev --classmap-authoritative
 
 ############################################
 # Stage 2 — runtime: PHP 8.4 FPM Alpine
