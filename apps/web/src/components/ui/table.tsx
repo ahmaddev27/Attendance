@@ -58,10 +58,12 @@ const TableRow = React.forwardRef<
   <tr
     ref={ref}
     className={cn(
-      // TAQAT: `muted` is a dark ink tone (see tailwind.config.ts) — using it
-      // as a hover background gives the aggressive dark grey stripe the user
-      // reported. Swap to `surface-2` (light neutral) + a subtle brand tint.
-      "border-b border-hairline transition-colors hover:bg-brand-soft/40 data-[state=selected]:bg-brand-soft/60",
+      // Hover: neutral ground tone, no brand tint. The previous brand-soft/40
+      // read as a full-row blue wash on hover that competed with the pill
+      // badges inside the row (status, department, etc.) — users flagged it
+      // as noisy. `ground` is the same off-white the app body sits on, so
+      // the row visibly lifts against the surface without borrowing hue.
+      "border-b border-hairline transition-colors hover:bg-ground data-[state=selected]:bg-brand-soft/50",
       className
     )}
     {...props}
@@ -76,7 +78,10 @@ const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={cn(
-      "h-10 px-2 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+      // `text-start` (not `text-left`) so headers naturally right-align
+      // under `dir="rtl"`; `px-3` + `h-11` give the header a bit more
+      // breathing room to sit above the padded cells below.
+      "h-11 px-3 text-start align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
       className
     )}
     {...props}
@@ -91,7 +96,9 @@ const TableCell = React.forwardRef<
   <td
     ref={ref}
     className={cn(
-      "p-2 align-middle [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+      // `text-start` mirrors TableHead; `px-3 py-3` gives cells a taller
+      // rhythm so avatar + two lines of text (name + email) don't crowd.
+      "px-3 py-3 align-middle text-start [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
       className
     )}
     {...props}

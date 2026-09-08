@@ -37,6 +37,15 @@ RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-in
                           --with-all-dependencies --ignore-platform-reqs --no-audit)
 
 COPY . .
+# Laravel's post-autoload-dump hook runs `php artisan package:discover`,
+# which boots the framework and dies with "A facade root has not been set"
+# if there is no readable .env at all — .env.example alone doesn't satisfy
+# Laravel's environment repository. `.env` is .gitignored (real values are
+# supplied via env_file at runtime), so seed a build-time placeholder that
+# never leaves this stage and never becomes the runtime .env. The two
+# stateful env vars that must be present (APP_KEY and any early-boot
+# services) come from `.env.example`; we just make sure the file exists.
+RUN [ -f .env ] || cp .env.example .env
 RUN composer install --no-dev --optimize-autoloader --prefer-dist --no-interaction
 
 ############################################

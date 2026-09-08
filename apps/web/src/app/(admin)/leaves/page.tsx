@@ -82,14 +82,14 @@ export default function LeavesPage() {
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <Button onClick={() => setCreateOpen(true)} className="gap-2 bg-brand text-white hover:bg-brand-hover">
-          <Plus className="h-4 w-4" />
-          طلب جديد
-        </Button>
         <div>
           <p className="text-xs font-medium text-muted">الإجازات</p>
           <h1 className="mt-1 text-2xl font-bold text-ink">طلبات الإجازة</h1>
         </div>
+        <Button onClick={() => setCreateOpen(true)} className="gap-2 bg-brand text-white hover:bg-brand-hover">
+          <Plus className="h-4 w-4" />
+          طلب جديد
+        </Button>
       </div>
 
       <div className="mb-4 grid grid-cols-1 gap-3 rounded-xl border border-hairline bg-surface p-4 sm:grid-cols-2 lg:grid-cols-5">

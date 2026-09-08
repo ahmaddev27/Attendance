@@ -77,14 +77,14 @@ export default function WorkflowsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <Button onClick={openCreate} className="gap-2 bg-brand text-white hover:bg-brand-hover">
-          <Plus className="h-4 w-4" />
-          مسار عمل جديد
-        </Button>
         <div>
           <p className="text-xs font-medium text-muted">مسارات العمل</p>
           <h1 className="mt-1 text-2xl font-bold text-ink">إدارة مسارات العمل</h1>
         </div>
+        <Button onClick={openCreate} className="gap-2 bg-brand text-white hover:bg-brand-hover">
+          <Plus className="h-4 w-4" />
+          مسار عمل جديد
+        </Button>
       </div>
 
       <DataTable

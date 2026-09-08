@@ -43,14 +43,14 @@ export default function TaskTagsPage() {
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <Button onClick={openCreate} className="gap-2 bg-brand text-white hover:bg-brand-hover">
-          <Plus className="h-4 w-4" />
-          وسم جديد
-        </Button>
         <div>
           <p className="text-xs font-medium text-muted">إعدادات المهام</p>
           <h1 className="mt-1 text-2xl font-bold text-ink">وسوم المهام</h1>
         </div>
+        <Button onClick={openCreate} className="gap-2 bg-brand text-white hover:bg-brand-hover">
+          <Plus className="h-4 w-4" />
+          وسم جديد
+        </Button>
       </div>
 
       <div className="rounded-xl border border-hairline bg-surface">

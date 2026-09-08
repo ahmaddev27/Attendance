@@ -7,54 +7,53 @@ import { Menu } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { SidebarNav, UserFooter } from '@/components/layout/admin-sidebar';
 import { NotificationBell } from '@/components/notifications/notification-bell';
-import { cn } from '@/lib/utils';
 
 /**
  * Header bar visible on every admin page.
  *
- * Below md: shows a menu button + logo (mobile-only strip), and the same
- *   bell — the sidebar itself is hidden and reachable through the menu.
- * At md+: shows only the bell aligned to the left edge of the content
- *   area (the sidebar owns the right side under RTL), so admin actions
- *   have a consistent spot to live regardless of viewport.
+ * Below md: menu button + logo pack to the reading start (right in RTL),
+ *   bell sits at the reading end (left in RTL) — sidebar is hidden and
+ *   opens from the menu button.
+ * At md+: menu + logo are hidden (the sidebar carries the brand), and
+ *   the bell stays anchored at the reading end (left in RTL) — same spot
+ *   at every breakpoint so muscle memory holds.
+ *
+ * `me-auto` on the leading group is what enforces the split: it pushes
+ * the group toward the reading start and lets the bell claim the end,
+ * with no reliance on `justify-*` (which broke on desktop when the
+ * leading items were `md:hidden` and only the bell was left).
  */
 export function AdminHeader() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header
-      className={cn(
-        'sticky top-0 z-20 flex items-center justify-between border-b border-hairline bg-surface px-4 py-3',
-        // Keep the bar compact on desktop — only the bell needs to fit.
-        'md:justify-start md:px-6'
-      )}
-    >
-      {/* Mobile: menu button (left in RTL flow) */}
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label="فتح القائمة"
-        className={cn(
-          'grid h-9 w-9 place-items-center rounded-md text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink md:hidden'
-        )}
-      >
-        <Menu className="h-5 w-5" />
-      </button>
-
-      {/* Mobile: logo (right in RTL flow) */}
-      <Image
-        src="/img/logo.png"
-        alt="TAQAT"
-        width={80}
-        height={28}
-        className="object-contain md:hidden"
-        priority
-      />
-
-      {/* Bell — always visible; on desktop it's the only thing in the bar. */}
-      <div className="md:ms-auto">
-        <NotificationBell />
+    <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-hairline bg-surface px-4 py-3 md:px-6">
+      {/* Leading group — menu button + logo, mobile-only.
+          `me-auto` on the wrapper eats the remaining space so the bell
+          lands at the reading end (left in RTL) at every viewport. When
+          the group is empty (desktop, both children md:hidden), the
+          empty div still carries `me-auto` so the anchor point holds. */}
+      <div className="flex items-center gap-3 me-auto">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label="فتح القائمة"
+          className="grid h-9 w-9 place-items-center rounded-md text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink md:hidden"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <Image
+          src="/img/logo.png"
+          alt="TAQAT"
+          width={80}
+          height={28}
+          className="object-contain md:hidden"
+          priority
+        />
       </div>
+
+      {/* Bell — reading-end anchor at every breakpoint. */}
+      <NotificationBell />
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="flex max-h-[80vh] flex-col gap-4 p-4">

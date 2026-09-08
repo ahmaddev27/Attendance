@@ -177,14 +177,14 @@ export default function TasksPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <Button onClick={openCreateDialog} className="gap-2 bg-brand text-white hover:bg-brand-hover">
-          <Plus className="h-4 w-4" />
-          مهمة جديدة
-        </Button>
         <div>
           <p className="text-xs font-medium text-muted">إدارة العمل</p>
           <h1 className="mt-1 text-2xl font-bold text-ink">المهام</h1>
         </div>
+        <Button onClick={openCreateDialog} className="gap-2 bg-brand text-white hover:bg-brand-hover">
+          <Plus className="h-4 w-4" />
+          مهمة جديدة
+        </Button>
       </div>
 
       <Tabs value={view} onValueChange={(v) => setView(v as 'kanban' | 'list')}>

@@ -62,6 +62,17 @@ jobs:
           key: composer-${{ hashFiles('apps/api/composer.lock') }}
           restore-keys: composer-
 
+      # `composer install` runs Laravel's post-autoload-dump hook, which calls
+      # `php artisan package:discover`. That command bootstraps the framework
+      # and needs a readable `.env` — without one the container-registered
+      # facades never resolve and the whole install fails with
+      # "A facade root has not been set." So .env has to exist first, and we
+      # pass `--no-scripts` on install so the hook only runs after we've
+      # generated a real APP_KEY below.
+      - name: Prepare .env for post-install scripts
+        run: |
+          [ -f .env ] || cp .env.example .env
+
       - name: Install PHP dependencies
         # Three failure modes we've seen in practice:
         #   1. composer.lock genuinely up-to-date → `composer install` succeeds
@@ -73,17 +84,20 @@ jobs:
         #      locked laravel/framework version has security advisories → we
         #      disable the block for the CI run only (never persisted).
         # `--ignore-platform-reqs` covers CI images missing niche extensions;
-        # `--no-audit` skips the extra network call on every install.
+        # `--no-audit` skips the extra network call on every install;
+        # `--no-scripts` defers package:discover to the next step so the
+        # command runs against a fully-prepared env instead of aborting on
+        # a missing APP_KEY.
         run: |
           composer config policy.advisories.block false
-          composer install --no-progress --prefer-dist --no-interaction --no-audit \
+          composer install --no-progress --prefer-dist --no-interaction --no-audit --no-scripts \
             || composer update --no-progress --prefer-dist --no-interaction \
-                              --with-all-dependencies --ignore-platform-reqs --no-audit
+                              --with-all-dependencies --ignore-platform-reqs --no-audit --no-scripts
 
-      - name: Prepare application key
+      - name: Generate app key + run deferred composer scripts
         run: |
-          [ -f .env ] || cp .env.example .env
           php artisan key:generate --force
+          composer run-script post-autoload-dump --no-interaction
 
       - name: Run tests
         run: php artisan test

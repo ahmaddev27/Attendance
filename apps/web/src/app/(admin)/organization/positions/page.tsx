@@ -116,14 +116,14 @@ export default function PositionsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <Button onClick={openCreateDialog} className="gap-2 bg-brand text-white hover:bg-brand-hover">
-          <Plus className="h-4 w-4" />
-          مسمى وظيفي جديد
-        </Button>
         <div>
           <p className="text-xs font-medium text-muted">المسميات الوظيفية</p>
           <h1 className="mt-1 text-2xl font-bold text-ink">إدارة المسميات الوظيفية</h1>
         </div>
+        <Button onClick={openCreateDialog} className="gap-2 bg-brand text-white hover:bg-brand-hover">
+          <Plus className="h-4 w-4" />
+          مسمى وظيفي جديد
+        </Button>
       </div>
 
       <FilterBar searchValue={search} onSearchChange={setSearch} searchPlaceholder="بحث بالمسمى الوظيفي...">
