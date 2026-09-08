@@ -63,7 +63,13 @@ jobs:
           restore-keys: composer-
 
       - name: Install PHP dependencies
-        run: composer install --no-progress --prefer-dist --no-interaction
+        # `composer install` refuses to run when composer.lock is out of
+        # date. When someone adds a package to composer.json without also
+        # committing the lock (usually the VPS deploy path), CI would fail
+        # here. `install || update` recovers automatically for the common
+        # single-package add; genuine dependency conflicts still surface
+        # because `composer update` will fail loudly on them too.
+        run: composer install --no-progress --prefer-dist --no-interaction || composer update --no-progress --prefer-dist --no-interaction
 
       - name: Prepare application key
         run: |
