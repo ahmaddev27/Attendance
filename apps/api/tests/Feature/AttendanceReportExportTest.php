@@ -5,6 +5,34 @@ declare(strict_types=1);
 use App\Models\Attendance;
 use App\Models\Employee;
 use App\Shared\Enums\AttendanceStatus;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+
+/**
+ * maatwebsite/excel's `Excel::download()` returns a BinaryFileResponse and
+ * DomPDF's `stream()` returns a StreamedResponse — the test client's
+ * `streamedContent()` only handles the latter. This helper reads either
+ * shape (plus the plain Response fallback) so the assertions below work
+ * for every export format we ship without a per-test branch.
+ */
+function attendanceExportBody($response): string
+{
+    $base = $response->baseResponse ?? $response;
+
+    if ($base instanceof BinaryFileResponse) {
+        return (string) file_get_contents($base->getFile()->getPathname());
+    }
+
+    if ($base instanceof StreamedResponse) {
+        // sendContent() writes to the output buffer; capture it so we
+        // don't taint phpunit's own stdout.
+        ob_start();
+        $base->sendContent();
+        return (string) ob_get_clean();
+    }
+
+    return (string) $response->getContent();
+}
 
 /**
  * Regression coverage for the XLSX + PDF admin monthly attendance
@@ -53,9 +81,9 @@ test('xlsx export returns a spreadsheetml attachment', function () {
 
     // Not just headers — the body must contain the ZIP-based XLSX
     // signature so we know a real workbook streamed through.
-    $body = $response->streamedContent() ?: $response->getContent();
-    expect(strlen((string) $body))->toBeGreaterThan(0);
-    expect(substr((string) $body, 0, 2))->toBe('PK');
+    $body = attendanceExportBody($response);
+    expect(strlen($body))->toBeGreaterThan(0);
+    expect(substr($body, 0, 2))->toBe('PK');
 });
 
 test('pdf export returns a real PDF payload', function () {
@@ -69,8 +97,8 @@ test('pdf export returns a real PDF payload', function () {
     $response->assertOk();
     expect($response->headers->get('content-type'))->toContain('application/pdf');
 
-    $body = $response->streamedContent() ?: $response->getContent();
-    expect(substr((string) $body, 0, 4))->toBe('%PDF');
+    $body = attendanceExportBody($response);
+    expect(substr($body, 0, 4))->toBe('%PDF');
 });
 
 test('unsupported format is rejected with validation error', function () {
