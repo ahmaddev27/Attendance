@@ -17,6 +17,7 @@ use App\Modules\Organization\Controllers\TeamController;
 use App\Modules\AI\Controllers\MotivationController;
 use App\Modules\Analytics\Controllers\AnalyticsController;
 use App\Modules\Notifications\Controllers\MyNotificationsController;
+use App\Modules\Push\Controllers\PushTokenController;
 use App\Modules\Reports\Controllers\AdminDashboardController;
 use App\Modules\Reports\Controllers\AttendanceReportController;
 use App\Modules\Reports\Controllers\AuditLogController;
@@ -240,6 +241,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/unread-count', [MyNotificationsController::class, 'unreadCount']);
         Route::post('/read-all', [MyNotificationsController::class, 'markAllRead']);
         Route::post('/{id}/read', [MyNotificationsController::class, 'markRead']);
+    });
+
+    // Mobile push tokens. The RN app registers on login/launch and
+    // revokes on logout — one row per (user, device_id) so a fresh
+    // Expo token overwrites in place instead of piling up.
+    Route::prefix('me/push-tokens')->group(function () {
+        Route::post('/', [PushTokenController::class, 'register']);
+        Route::delete('/', [PushTokenController::class, 'revokeAll']);
+        Route::delete('/{deviceId}', [PushTokenController::class, 'revokeDevice']);
     });
 
     // AI Motivation (M8) — one Claude-backed line per user per day,

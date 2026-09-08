@@ -50,6 +50,10 @@ class SettingsController extends Controller
             ['key' => 'anthropic_api_key', 'label' => 'مفتاح Anthropic Claude', 'encrypted' => true, 'type' => 'password'],
             ['key' => 'anthropic_model', 'label' => 'موديل Claude', 'type' => 'text'],
         ],
+        'push' => [
+            ['key' => 'expo_access_token', 'label' => 'Expo Access Token (اختياري)', 'encrypted' => true, 'type' => 'password'],
+            ['key' => 'fake', 'label' => 'وضع الاختبار', 'type' => 'boolean'],
+        ],
     ];
 
     public function __construct(

@@ -8,10 +8,14 @@ use App\Modules\Settings\Services\SettingsService;
 use App\Modules\Sms\Contracts\SmsGateway;
 use App\Modules\Sms\Gateways\FakeSmsGateway;
 use App\Modules\Sms\Gateways\MtcSmsGateway;
+use App\Modules\Push\Contracts\PushGateway;
+use App\Modules\Push\Gateways\ExpoPushGateway;
+use App\Modules\Push\Gateways\FakePushGateway;
 use App\Modules\Whatsapp\Contracts\WhatsappGateway;
 use App\Modules\Whatsapp\Gateways\FakeWhatsappGateway;
 use App\Modules\Whatsapp\Gateways\MetaCloudGateway;
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\ServiceProvider;
 use Throwable;
@@ -26,6 +30,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(SettingsService::class);
         $this->registerSmsGateway();
         $this->registerWhatsappGateway();
+        $this->registerPushGateway();
     }
 
     /**
@@ -99,6 +104,34 @@ class AppServiceProvider extends ServiceProvider
                 endpoint: $this->safe(fn () => $settings->get('whatsapp.endpoint', 'services.whatsapp.endpoint')),
                 timeout: (int) config('services.whatsapp.timeout', 10),
             );
+        });
+    }
+
+    /**
+     * Bind the PushGateway contract. Same fake-vs-real switch pattern as
+     * SMS and WhatsApp: fake in the `testing` environment, fake when the
+     * `push.fake` setting is truthy (local dev + staging), Expo otherwise.
+     * Access token is optional — Expo accepts anonymous /send calls for
+     * the public ExponentPushToken scheme, but production installs that
+     * opt into "Enhanced Security" pass a real token from Settings.
+     */
+    private function registerPushGateway(): void
+    {
+        $this->app->bind(PushGateway::class, function (Application $app): PushGateway {
+            /** @var SettingsService $settings */
+            $settings = $app->make(SettingsService::class);
+
+            $fakeFlag = $this->safe(fn () => $settings->get('push.fake', 'services.push.fake', '0'));
+            $useFake = $app->environment('testing')
+                || filter_var($fakeFlag, FILTER_VALIDATE_BOOLEAN);
+
+            if ($useFake) {
+                return new FakePushGateway();
+            }
+
+            $accessToken = $this->safe(fn () => $settings->get('push.expo_access_token', 'services.push.access_token'));
+
+            return new ExpoPushGateway($app->make(HttpFactory::class), $accessToken);
         });
     }
 

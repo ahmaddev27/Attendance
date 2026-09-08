@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Notifications\Notifications;
 
+use App\Modules\Push\Notifications\Channels\PushChannel;
 use App\Modules\Sms\Notifications\Channels\SmsChannel;
 use App\Modules\Whatsapp\Notifications\Channels\WhatsappChannel;
 use Illuminate\Bus\Queueable;
@@ -72,6 +73,11 @@ class TaqatNotification extends Notification
      *                               credentials are configured (or the fake
      *                               driver is on) AND the recipient's employee
      *                               has a phone.
+     * @param  bool  $sendPush  Opt-IN to also send this notification as a
+     *                           mobile push via Expo. Defaults false; only
+     *                           fires when the recipient has at least one
+     *                           registered push_tokens row (the mobile app
+     *                           writes one on login and clears it on logout).
      */
     public function __construct(
         public readonly string $title,
@@ -83,6 +89,7 @@ class TaqatNotification extends Notification
         public readonly bool $suppressMail = false,
         public readonly bool $sendSms = false,
         public readonly bool $sendWhatsapp = false,
+        public readonly bool $sendPush = false,
     ) {}
 
     /**
@@ -119,6 +126,15 @@ class TaqatNotification extends Notification
         // phone we can dial.
         if ($this->sendWhatsapp && $this->whatsappIsSendable($notifiable)) {
             $channels[] = WhatsappChannel::class;
+        }
+
+        // Mobile push is opt-in per notification. Unlike SMS/WhatsApp we
+        // don't need credentials to be present (Expo's public scheme
+        // requires none) — only that the recipient has at least one
+        // registered push_tokens row. If they don't, the channel is a
+        // no-op anyway; we skip it here to avoid an empty DB query.
+        if ($this->sendPush && ($notifiable->pushTokens?->isNotEmpty() ?? false)) {
+            $channels[] = PushChannel::class;
         }
 
         return $channels;
@@ -233,6 +249,28 @@ class TaqatNotification extends Notification
             : $this->title;
 
         return Str::limit($composed, 157, '...');
+    }
+
+    /**
+     * Payload delivered over the PushChannel (Expo). `data` carries the
+     * same structured meta as the DB row so the mobile app can deep-link
+     * into the right screen when the recipient taps the notification —
+     * we deliberately keep `data` a plain scalar map so Expo's JSON
+     * round-trip doesn't drop anything.
+     *
+     * @return array{title: string, body: ?string, data: array<string, mixed>}
+     */
+    public function toPush(mixed $notifiable): array
+    {
+        return [
+            'title' => $this->title,
+            'body' => $this->body,
+            'data' => array_filter([
+                'url' => $this->url,
+                'icon' => $this->icon,
+                'meta' => $this->meta,
+            ], static fn ($v) => $v !== null),
+        ];
     }
 
     /**

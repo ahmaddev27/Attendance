@@ -69,4 +69,18 @@ return [
         'fake' => (bool) env('WHATSAPP_FAKE', false),
     ],
 
+    /*
+    | Expo Push Notifications.
+    | Anonymous sends work without any config — Expo accepts the public
+    | ExponentPushToken scheme with no auth. Set `access_token` only if
+    | you opt into Expo's "Enhanced Security" mode (recommended for
+    | production so third parties can't spoof pushes). `fake` routes
+    | every send to the FakePushGateway instead of Expo — the default
+    | for local dev + CI so tests never call an external service.
+    */
+    'push' => [
+        'access_token' => env('EXPO_ACCESS_TOKEN'),
+        'fake' => (bool) env('PUSH_FAKE', false),
+    ],
+
 ];
