@@ -9,17 +9,21 @@ export function EmployeeAvatar({
   size = 32,
   className,
 }: {
-  employee: Pick<EmployeeSummary, 'full_name' | 'avatar_url'>;
+  // Nullable — attendance rows can survive an employee deletion (or arrive
+  // from an eager-load that missed the join), and this component is
+  // rendered inside a list where a per-row null shouldn't take down the
+  // whole page. Accept null and render a neutral placeholder instead.
+  employee: Pick<EmployeeSummary, 'full_name' | 'avatar_url'> | null | undefined;
   size?: number;
   className?: string;
 }) {
-  const initial = employee.full_name?.trim()?.charAt(0)?.toUpperCase() || '؟';
+  const initial = employee?.full_name?.trim()?.charAt(0)?.toUpperCase() || '؟';
 
-  if (employee.avatar_url) {
+  if (employee?.avatar_url) {
     return (
       <Image
         src={employee.avatar_url}
-        alt={employee.full_name}
+        alt={employee.full_name ?? ''}
         width={size}
         height={size}
         unoptimized
