@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { BarChart3, Download } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -108,23 +109,25 @@ export default function AttendancePage() {
       <div className="mb-4 grid grid-cols-1 gap-3 rounded-xl border border-hairline bg-surface p-4 sm:grid-cols-2 lg:grid-cols-5">
         <div>
           <Label className="text-xs font-semibold text-ink-2">من تاريخ</Label>
-          <Input
-            type="date"
-            value={from}
-            onChange={(e) => resetPageAnd(setFrom)(e.target.value)}
-            className="mt-1.5"
-            dir="ltr"
-          />
+          <div className="mt-1.5">
+            <DatePicker
+              value={from}
+              onChange={resetPageAnd(setFrom)}
+              placeholder="اختر تاريخاً"
+              max={to || undefined}
+            />
+          </div>
         </div>
         <div>
           <Label className="text-xs font-semibold text-ink-2">إلى تاريخ</Label>
-          <Input
-            type="date"
-            value={to}
-            onChange={(e) => resetPageAnd(setTo)(e.target.value)}
-            className="mt-1.5"
-            dir="ltr"
-          />
+          <div className="mt-1.5">
+            <DatePicker
+              value={to}
+              onChange={resetPageAnd(setTo)}
+              placeholder="اختر تاريخاً"
+              min={from || undefined}
+            />
+          </div>
         </div>
         <div>
           <Label className="text-xs font-semibold text-ink-2">الموظف</Label>

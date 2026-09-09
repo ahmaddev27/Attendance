@@ -5,6 +5,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -264,11 +265,15 @@ export default function TasksPage() {
             </div>
             <div>
               <Label className="text-xs font-semibold text-ink-2">الاستحقاق من</Label>
-              <Input type="date" dir="ltr" value={dueFrom} onChange={(e) => setDueFrom(e.target.value)} className="mt-1.5" />
+              <div className="mt-1.5">
+                <DatePicker value={dueFrom} onChange={setDueFrom} placeholder="اختر تاريخاً" max={dueTo || undefined} />
+              </div>
             </div>
             <div>
               <Label className="text-xs font-semibold text-ink-2">الاستحقاق إلى</Label>
-              <Input type="date" dir="ltr" value={dueTo} onChange={(e) => setDueTo(e.target.value)} className="mt-1.5" />
+              <div className="mt-1.5">
+                <DatePicker value={dueTo} onChange={setDueTo} placeholder="اختر تاريخاً" min={dueFrom || undefined} />
+              </div>
             </div>
           </div>
 

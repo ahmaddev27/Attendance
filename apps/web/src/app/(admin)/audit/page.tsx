@@ -6,6 +6,7 @@ import { History, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Skeleton } from '@/components/ui/skeleton';
 import { auditLogApi, type AuditActivity } from '@/lib/api/endpoints/audit-log';
 
@@ -65,22 +66,20 @@ export default function AuditLogPage() {
           </label>
           <label className="text-xs">
             <span className="mb-1 block font-semibold text-ink-2">من</span>
-            <input
-              type="date"
+            <DatePicker
               value={filters.from ?? ''}
-              onChange={(e) => setFilter('from', e.target.value || undefined)}
-              className="w-full rounded-lg border border-hairline bg-surface px-3 py-2 text-sm"
-              dir="ltr"
+              onChange={(v) => setFilter('from', v || undefined)}
+              placeholder="اختر تاريخاً"
+              max={filters.to || undefined}
             />
           </label>
           <label className="text-xs">
             <span className="mb-1 block font-semibold text-ink-2">إلى</span>
-            <input
-              type="date"
+            <DatePicker
               value={filters.to ?? ''}
-              onChange={(e) => setFilter('to', e.target.value || undefined)}
-              className="w-full rounded-lg border border-hairline bg-surface px-3 py-2 text-sm"
-              dir="ltr"
+              onChange={(v) => setFilter('to', v || undefined)}
+              placeholder="اختر تاريخاً"
+              min={filters.from || undefined}
             />
           </label>
           {hasFilters && (

@@ -4,6 +4,7 @@ import * as React from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Eye } from 'lucide-react';
 
+import { DatePicker } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { DataTable, type DataTableColumn } from '@/components/data-table/data-table';
@@ -148,14 +149,14 @@ export default function RequestsPage() {
           <EmployeeSearchSelect value={employee} onChange={setEmployee} placeholder="كل الموظفين" />
         </div>
         <div className="flex items-center gap-2">
-          <div>
+          <div className="w-44">
             <Label className="sr-only">من تاريخ</Label>
-            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} dir="ltr" className="w-40" />
+            <DatePicker value={from} onChange={setFrom} placeholder="من تاريخ" max={to || undefined} />
           </div>
           <span className="text-xs text-muted">إلى</span>
-          <div>
+          <div className="w-44">
             <Label className="sr-only">إلى تاريخ</Label>
-            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} dir="ltr" className="w-40" />
+            <DatePicker value={to} onChange={setTo} placeholder="إلى تاريخ" min={from || undefined} />
           </div>
         </div>
       </FilterBar>

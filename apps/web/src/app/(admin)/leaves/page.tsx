@@ -6,6 +6,7 @@ import { CheckCircle2, Eye, Plus, XCircle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -135,11 +136,15 @@ export default function LeavesPage() {
         </div>
         <div>
           <Label className="text-xs font-semibold text-ink-2">من تاريخ</Label>
-          <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="mt-1.5" dir="ltr" />
+          <div className="mt-1.5">
+            <DatePicker value={from} onChange={setFrom} placeholder="اختر تاريخاً" max={to || undefined} />
+          </div>
         </div>
         <div>
           <Label className="text-xs font-semibold text-ink-2">إلى تاريخ</Label>
-          <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="mt-1.5" dir="ltr" />
+          <div className="mt-1.5">
+            <DatePicker value={to} onChange={setTo} placeholder="اختر تاريخاً" min={from || undefined} />
+          </div>
         </div>
       </div>
 
