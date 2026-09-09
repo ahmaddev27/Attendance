@@ -55,9 +55,12 @@ class WipeDemoData extends Command
         $dryRun = (bool) $this->option('dry-run');
         $force = (bool) $this->option('force');
 
-        if ($isProd && ! $force) {
+        // Production safety only applies to WRITE runs. A dry-run just
+        // counts rows and is safe to invoke without --force anywhere.
+        if ($isProd && ! $force && ! $dryRun) {
             $this->error('APP_ENV is production. Refusing to run without --force.');
             $this->line('Add --force to confirm you really want to wipe production data.');
+            $this->line('(--dry-run works without --force — it only reports counts.)');
             return self::FAILURE;
         }
 
