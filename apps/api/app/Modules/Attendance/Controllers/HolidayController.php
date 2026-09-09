@@ -11,6 +11,7 @@ use App\Modules\Attendance\Requests\UpdateHolidayRequest;
 use App\Modules\Attendance\Resources\HolidayResource;
 use App\Modules\Attendance\Services\HolidayService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 /**
@@ -25,9 +26,20 @@ class HolidayController extends Controller
         private readonly HolidayService $holidays,
     ) {}
 
-    public function index(): AnonymousResourceCollection
+    public function index(Request $request): AnonymousResourceCollection
     {
-        return HolidayResource::collection($this->holidays->paginate());
+        $filters = $request->only(['year', 'type']);
+
+        // Default path: return every matching holiday as a flat list —
+        // the admin holidays screen reads `data.data` as an array and
+        // filters client-side. Opt in to pagination with `per_page`.
+        if ($request->filled('per_page')) {
+            $perPage = max(1, (int) $request->query('per_page'));
+
+            return HolidayResource::collection($this->holidays->paginate($filters, $perPage));
+        }
+
+        return HolidayResource::collection($this->holidays->list($filters));
     }
 
     public function store(StoreHolidayRequest $request): JsonResponse

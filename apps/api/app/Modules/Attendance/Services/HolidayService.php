@@ -7,6 +7,7 @@ namespace App\Modules\Attendance\Services;
 use App\Models\Holiday;
 use App\Modules\Attendance\Repositories\HolidayRepository;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 
 /**
  * Thin CRUD wrapper — kept as a service (rather than calling the
@@ -19,9 +20,21 @@ class HolidayService
         private readonly HolidayRepository $repository,
     ) {}
 
-    public function paginate(int $perPage = 15): LengthAwarePaginator
+    /**
+     * @param  array<string, mixed>  $filters
+     */
+    public function paginate(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        return $this->repository->paginate($perPage);
+        return $this->repository->paginate($filters, $perPage);
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return Collection<int, Holiday>
+     */
+    public function list(array $filters = []): Collection
+    {
+        return $this->repository->list($filters);
     }
 
     /**

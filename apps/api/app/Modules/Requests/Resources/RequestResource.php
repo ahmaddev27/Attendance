@@ -43,11 +43,17 @@ class RequestResource extends JsonResource
                 'id' => $this->currentStep->id,
                 'name' => $this->currentStep->name,
                 'step_order' => $this->currentStep->step_order,
+                'can_reject' => (bool) $this->currentStep->can_reject,
+                'can_return' => (bool) $this->currentStep->can_return,
+                'can_forward' => (bool) $this->currentStep->can_forward,
+                'approver_type' => $this->currentStep->approver_type?->value,
+                'approver_ref' => $this->currentStep->approver_ref,
             ]),
             'latest_approval' => $this->whenLoaded(
                 'latestApproval',
                 fn () => $this->latestApproval === null ? null : new ApprovalResource($this->latestApproval)
             ),
+            'approvals' => ApprovalResource::collection($this->whenLoaded('approvals')),
             'submitted_at' => $this->submitted_at?->toIso8601String(),
             'completed_at' => $this->completed_at?->toIso8601String(),
             'created_at' => $this->created_at,

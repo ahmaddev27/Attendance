@@ -17,7 +17,16 @@ class RequestRepository
      *
      * @var list<string>
      */
-    private const WITH = ['employee', 'requestType', 'currentStep', 'latestApproval.approver', 'latestApproval.forwardedTo'];
+    private const WITH = [
+        'employee',
+        'requestType',
+        'currentStep',
+        'latestApproval.approver',
+        'latestApproval.forwardedTo',
+        'approvals.approver',
+        'approvals.forwardedTo',
+        'approvals.workflowStep',
+    ];
 
     /**
      * @param  array<string, mixed>  $filters

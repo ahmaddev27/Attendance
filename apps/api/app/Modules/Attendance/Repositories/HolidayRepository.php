@@ -12,9 +12,48 @@ use Illuminate\Support\Collection;
 
 class HolidayRepository
 {
-    public function paginate(int $perPage = 15): LengthAwarePaginator
+    /**
+     * @param  array<string, mixed>  $filters
+     */
+    public function paginate(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        return Holiday::query()->orderBy('date')->paginate($perPage);
+        $query = Holiday::query()->orderBy('date');
+
+        $this->applyFilters($query, $filters);
+
+        return $query->paginate($perPage);
+    }
+
+    /**
+     * Non-paginated listing — the admin holidays page reads `data.data`
+     * as a flat array and filters client-side by year/type, so pagination
+     * would silently truncate its list.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return Collection<int, Holiday>
+     */
+    public function list(array $filters = []): Collection
+    {
+        $query = Holiday::query()->orderBy('date');
+
+        $this->applyFilters($query, $filters);
+
+        return $query->get();
+    }
+
+    /**
+     * @param  Builder<Holiday>  $query
+     * @param  array<string, mixed>  $filters
+     */
+    private function applyFilters(Builder $query, array $filters): void
+    {
+        if (! empty($filters['year'])) {
+            $query->whereYear('date', (int) $filters['year']);
+        }
+
+        if (! empty($filters['type'])) {
+            $query->where('type', $filters['type']);
+        }
     }
 
     public function find(int $id): ?Holiday

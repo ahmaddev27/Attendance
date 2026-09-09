@@ -24,7 +24,8 @@ class AttendanceResource extends JsonResource
             'employee' => $this->whenLoaded('employee', fn () => [
                 'id' => $this->employee->id,
                 'employee_number' => $this->employee->employee_number,
-                'name' => trim("{$this->employee->first_name} {$this->employee->last_name}"),
+                'full_name' => $this->employee->full_name,
+                'avatar_url' => $this->employee->avatar_url,
             ]),
             'date' => $this->date?->toDateString(),
             'check_in_at' => $this->check_in_at?->toIso8601String(),
