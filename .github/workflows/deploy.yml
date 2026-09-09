@@ -120,12 +120,7 @@ jobs:
   # ---------------------------------------------------------------------------
   deploy:
     name: Deploy to VPS
-    # Disabled 2026-09-09: SSH-key management via GitHub Secrets kept
-    # breaking (paste-format issues, key rotation friction). Deploy is
-    # now driven manually by `ssh root@<VPS_HOST> /root/deploy-taqat.sh`
-    # from the operator's own machine — one command, no CI blocker on
-    # SSH auth. To re-enable this job, remove the `false &&` guard.
-    if: false && (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     # Deliberately does NOT depend on build-api/build-web — VPS builds locally,
     # so ghcr push failures shouldn't block the deploy.
     runs-on: ubuntu-latest
@@ -133,20 +128,77 @@ jobs:
       group: vps-deploy
       cancel-in-progress: false
     steps:
-      - name: SSH → git pull → rebuild → migrate
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_SSH_PORT }}
-          command_timeout: 30m
-          # `set -euo pipefail` inside the script gives us fail-fast; the
-          # v1 action removed `script_stop` so we don't need it here.
-          script: |
+      - name: Prepare SSH key
+        # We accept EITHER a raw private key OR a base64-encoded one via
+        # VPS_SSH_KEY. Base64 is the recommended path because copy-paste
+        # into GitHub Secrets UI mangles line endings surprisingly often —
+        # "ssh.ParsePrivateKey: no key found" is always that. Base64 is
+        # a single line so nothing can go wrong.
+        #
+        # To use base64: on the VPS run
+        #   `base64 -w 0 ~/.ssh/gha_deploy`
+        # copy the single-line output, paste as VPS_SSH_KEY.
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          RAW="${{ secrets.VPS_SSH_KEY }}"
+
+          # Try base64 first; if it decodes to something that looks like a
+          # private key, use that. Otherwise fall back to the raw value.
+          if echo "$RAW" | base64 -d 2>/dev/null | grep -q "PRIVATE KEY"; then
+            echo "→ Detected base64-encoded key"
+            echo "$RAW" | base64 -d > ~/.ssh/id_deploy
+          else
+            echo "→ Using raw key"
+            printf '%s\n' "$RAW" > ~/.ssh/id_deploy
+          fi
+
+          # Trailing newline is required for OpenSSH — the printf above
+          # adds one, base64-decode preserves the original's.
+          chmod 600 ~/.ssh/id_deploy
+
+          # Sanity: can openssh parse it?
+          if ! ssh-keygen -y -f ~/.ssh/id_deploy > /tmp/pubkey 2>/dev/null; then
+            echo "✗ FATAL: VPS_SSH_KEY is not a parseable OpenSSH private key"
+            echo "  Fix by setting the secret to the base64-encoded key:"
+            echo "  On the VPS: base64 -w 0 ~/.ssh/gha_deploy"
+            echo "  Copy that single line into GitHub → Settings → Secrets → VPS_SSH_KEY"
+            exit 1
+          fi
+          echo "→ Key parsed OK. Public key derives to:"
+          cat /tmp/pubkey
+
+          # Pin the host key so a MITM'd deploy can't happen and so the
+          # first-connect prompt doesn't hang the SSH.
+          ssh-keyscan -p "${{ secrets.VPS_SSH_PORT }}" -H "${{ secrets.VPS_HOST }}" \
+            >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy to VPS
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
+          VPS_APP_PATH: ${{ secrets.VPS_APP_PATH }}
+          NO_CACHE: ${{ inputs.no_cache }}
+        run: |
+          set -euo pipefail
+
+          # Ship the deploy script inline over SSH. -T disables pty
+          # allocation (cleaner logs), StrictHostKeyChecking=yes because
+          # we just pinned the host key.
+          ssh -T \
+            -o StrictHostKeyChecking=yes \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=5 \
+            -i ~/.ssh/id_deploy \
+            -p "$VPS_SSH_PORT" \
+            "$VPS_USER@$VPS_HOST" \
+            "APP_PATH='$VPS_APP_PATH' NO_CACHE='$NO_CACHE' bash -s" << 'REMOTE_SCRIPT'
             set -euo pipefail
 
-            APP_PATH="${{ secrets.VPS_APP_PATH }}"
+            APP_PATH="${APP_PATH:?APP_PATH missing}"
             COMPOSE_FILE="docker-compose.simple.yml"
 
             cd "$APP_PATH"
@@ -276,7 +328,7 @@ jobs:
             # left cached layers that keep referencing files that were
             # never actually downloaded (symfony/polyfill-mbstring was
             # the recurring symptom).
-            if [ "${{ inputs.no_cache }}" = "true" ]; then
+            if [ "${NO_CACHE:-false}" = "true" ]; then
               echo "   ⚠ --no-cache requested — pruning buildx cache first"
               docker builder prune -af || true
               $DC build --pull --no-cache api web
@@ -373,6 +425,7 @@ jobs:
             echo "════════════════════════════════════════"
             echo "✓ Deploy complete: $AFTER"
             echo "════════════════════════════════════════"
+          REMOTE_SCRIPT
 
       - name: Post-deploy health check
         run: |

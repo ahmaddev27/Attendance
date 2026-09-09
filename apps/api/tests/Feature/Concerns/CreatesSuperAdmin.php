@@ -33,6 +33,12 @@ trait CreatesSuperAdmin
         // seeder, add it here too, or every test route that references
         // it starts throwing PermissionDoesNotExist inside
         // hasPermissionTo/checkPermissionTo.
+        // Guard MUST be 'web' — the User model resolves its permission
+        // guard to 'web' by default (Sanctum tokens route through it),
+        // so the permission has to exist under that specific guard.
+        // Without the explicit arg, Spatie writes them under
+        // sanctum/api and the runtime check throws "no permission named
+        // X for guard web".
         foreach ([
             'manage-users',
             'manage-departments',
@@ -43,11 +49,11 @@ trait CreatesSuperAdmin
             'view-reports',
             'view-audit-logs',
         ] as $permissionName) {
-            Permission::findOrCreate($permissionName);
+            Permission::findOrCreate($permissionName, 'web');
         }
 
-        $role = Role::findOrCreate('super-admin');
-        $role->syncPermissions(Permission::all());
+        $role = Role::findOrCreate('super-admin', 'web');
+        $role->syncPermissions(Permission::where('guard_name', 'web')->get());
 
         $user = User::factory()->create();
         $user->assignRole('super-admin');

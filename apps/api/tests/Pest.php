@@ -59,6 +59,11 @@ function actingAsAdmin(): User
     // PermissionDoesNotExist. Hard-coding a subset here caused CI to red
     // out every time a route referenced a permission not in the list —
     // e.g. `manage-workflows`, `create-tasks`, `view-all-attendance`.
+    // Guard MUST be 'web' — the User model resolves its permission guard to
+    // 'web' by default (Sanctum tokens still route through it), so the
+    // permission has to be bound to that guard. Without the explicit arg,
+    // Spatie creates it under sanctum/api and the runtime check throws
+    // "no permission named X for guard web".
     foreach ([
         'manage-users',
         'manage-departments',
@@ -69,10 +74,12 @@ function actingAsAdmin(): User
         'view-reports',
         'view-audit-logs',
     ] as $p) {
-        \Spatie\Permission\Models\Permission::findOrCreate($p);
+        \Spatie\Permission\Models\Permission::findOrCreate($p, 'web');
     }
-    $role = \Spatie\Permission\Models\Role::findOrCreate('super-admin');
-    $role->syncPermissions(\Spatie\Permission\Models\Permission::all());
+    $role = \Spatie\Permission\Models\Role::findOrCreate('super-admin', 'web');
+    $role->syncPermissions(
+        \Spatie\Permission\Models\Permission::where('guard_name', 'web')->get()
+    );
 
     $user = User::factory()->create();
     $user->assignRole('super-admin');
