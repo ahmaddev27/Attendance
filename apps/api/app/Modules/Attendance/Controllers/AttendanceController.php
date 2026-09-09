@@ -38,6 +38,17 @@ class AttendanceController extends Controller
 
     public function monthlySummary(Employee $employee, int $year, int $month): JsonResponse
     {
+        // Employees without an assigned work schedule can't have their
+        // monthly attendance calculated (no expected hours, no workdays).
+        // Return a friendly 422 with a clear reason so the UI can display
+        // "assign a schedule first" instead of a generic 500.
+        if ($employee->work_schedule_id === null) {
+            return response()->json([
+                'message' => 'الموظف غير مرتبط بجدول دوام. عيّن له جدولاً من صفحة الموظف ثم أعد المحاولة.',
+                'error_code' => 'missing_work_schedule',
+            ], 422);
+        }
+
         $summary = $this->calculator->monthlySummary($employee, $year, $month);
 
         // Wrap in `data` to match every other resource-shaped endpoint in
