@@ -181,10 +181,43 @@ export function EmployeeFormDialog({ open, onOpenChange, employee }: EmployeeFor
       };
       return isEdit ? employeesApi.update(employee.id, payload) : employeesApi.create(payload);
     },
-    onSuccess: () => {
-      toast.success(isEdit ? 'تم تحديث بيانات الموظف بنجاح' : 'تمت إضافة الموظف بنجاح');
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       onOpenChange(false);
+
+      if (isEdit) {
+        toast.success('تم تحديث بيانات الموظف بنجاح');
+        return;
+      }
+
+      // The API returns `generated_password` on create — the plaintext
+      // password we minted for the new employee. It was also enqueued as
+      // a welcome SMS, but we surface it here as a manual fallback: if
+      // the employee has no phone (SMS was skipped) or the carrier
+      // silently drops it, the admin has one chance to copy it.
+      const created = (res as { data?: { data?: { generated_password?: string; phone?: string | null } } })
+        ?.data?.data;
+      const password = created?.generated_password;
+      const hasPhone = !!(created?.phone && created.phone.trim());
+
+      if (password) {
+        toast.success('تمت إضافة الموظف — كلمة السر أدناه', {
+          duration: 20000,
+          description: hasPhone
+            ? `تم إرسال بيانات الدخول عبر SMS. كلمة السر: ${password}`
+            : `الموظف بدون رقم جوّال، سلّمه كلمة السر يدوياً: ${password}`,
+          action: {
+            label: 'نسخ',
+            onClick: () => {
+              navigator.clipboard.writeText(password).catch(() => {
+                /* copy blocked (older Safari, HTTP context) — the string is visible in the toast anyway */
+              });
+            },
+          },
+        });
+      } else {
+        toast.success('تمت إضافة الموظف بنجاح');
+      }
     },
     onError: (err: unknown) => {
       const message =

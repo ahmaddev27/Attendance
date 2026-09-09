@@ -55,6 +55,15 @@ class EmployeeResource extends JsonResource
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
             'deleted_at' => $this->deleted_at,
+            // Only present on the create response — EmployeeService::create
+            // sets `generated_password` in memory (never persisted) so the
+            // admin can hand it to the user out-of-band if the SMS didn't
+            // land (no phone / carrier down). $this->when() drops the key
+            // entirely on every other response.
+            'generated_password' => $this->when(
+                isset($this->generated_password),
+                fn () => $this->generated_password,
+            ),
         ];
     }
 }

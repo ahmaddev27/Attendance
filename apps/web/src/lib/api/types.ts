@@ -228,6 +228,11 @@ export type Employee = {
   department: Department | null;
   team: Team | null;
   direct_manager: EmployeeSummary | null;
+  // Only ever set on the create response — the plaintext password the
+  // server just minted for the new user. It's also enqueued as a welcome
+  // SMS (see EmployeeService::sendWelcomeSms on the API), so this is a
+  // fallback for out-of-band delivery when there's no phone on file.
+  generated_password?: string;
 };
 
 export type EmployeeInput = {
