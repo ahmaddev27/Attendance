@@ -24,6 +24,10 @@ class TaskAttachmentController extends Controller
 
     public function index(Task $task): AnonymousResourceCollection
     {
+        /** @var User|null $user */
+        $user = request()->user();
+        $this->assertCanAccessTask($task, $user);
+
         return TaskAttachmentResource::collection($task->getMedia('attachments'));
     }
 
@@ -31,6 +35,7 @@ class TaskAttachmentController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
+        $this->assertCanAccessTask($task, $user);
 
         $media = $this->attachments->upload($task, $request->file('file'), $user);
 
@@ -61,17 +66,38 @@ class TaskAttachmentController extends Controller
         $task = $media->model()->first();
         abort_unless($task !== null, 404);
 
+        /** @var User|null $user */
         $user = request()->user();
-        $employeeId = $user?->employee?->id;
-        $canManage = $user && (
-            $user->hasPermissionTo('manage-workflows')
-            || $task->created_by === $employeeId
-            || $task->assigned_to === $employeeId
-        );
-        abort_unless($canManage, 403);
+        $this->assertCanAccessTask($task, $user);
 
         $this->attachments->delete($media);
 
         return response()->json(null, 204);
+    }
+
+    /**
+     * Common attachment-list gate: admins (manage-workflows) get through
+     * for every task; everyone else only for tasks they created or were
+     * assigned to. Before this check, `/tasks/{task}/attachments` was an
+     * IDOR — any employee could enumerate every task's files.
+     */
+    private function assertCanAccessTask(Task $task, ?User $user): void
+    {
+        abort_unless($user !== null, 401);
+
+        if ($user->hasPermissionTo('manage-workflows')) {
+            return;
+        }
+
+        $employeeId = $user->employee_id;
+
+        if ($employeeId !== null
+            && ((int) $task->created_by === (int) $employeeId
+                || (int) $task->assigned_to === (int) $employeeId)
+        ) {
+            return;
+        }
+
+        abort(403, 'You do not have permission to access this task.');
     }
 }

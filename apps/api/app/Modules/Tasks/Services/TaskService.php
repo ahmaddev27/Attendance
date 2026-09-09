@@ -45,9 +45,13 @@ class TaskService
     /**
      * @param  array<string, mixed>  $filters
      */
-    public function paginate(array $filters, int $perPage = 25): LengthAwarePaginator
+    public function paginate(array $filters, int $perPage = 25, ?User $actor = null): LengthAwarePaginator
     {
-        return $this->tasks->paginate($filters, $perPage);
+        return $this->tasks->paginate(
+            $filters,
+            $perPage,
+            ownedByEmployeeId: $this->authorizedScopeFor($actor),
+        );
     }
 
     /**
@@ -88,12 +92,27 @@ class TaskService
      */
     public function create(array $data, User $actor): Task
     {
-        $createdBy = $data['created_by'] ?? $actor->employee_id;
+        // Server-owned fields. `created_by` is ALWAYS the acting employee —
+        // any client-supplied value is deliberately ignored so a compromised
+        // token can't attribute a task to another employee. Same for
+        // `assigned_to` when the caller isn't a workflow admin: only admins
+        // may assign tasks to someone else, non-admins get pinned to
+        // themselves.
+        $createdBy = $actor->employee_id;
 
         if (empty($createdBy)) {
             throw ValidationException::withMessages([
-                'created_by' => 'created_by is required — the acting user has no linked employee profile.',
+                'created_by' => 'The acting user has no linked employee profile — cannot create a task.',
             ]);
+        }
+
+        $data['created_by'] = $createdBy;
+
+        if (! $this->actorHasManageWorkflows($actor)) {
+            // Non-admins can only assign to themselves (or leave unassigned).
+            if (array_key_exists('assigned_to', $data) && $data['assigned_to'] !== null) {
+                $data['assigned_to'] = $createdBy;
+            }
         }
 
         $statusId = $data['status_id'] ?? $this->statuses->firstBySortOrder()?->id;
@@ -142,6 +161,20 @@ class TaskService
      */
     public function update(Task $task, array $data, User $actor): Task
     {
+        $this->assertCanActOnTask($task, $actor);
+
+        // A non-admin editing their own task must not be able to hand it off
+        // to another employee (would immediately lose access to it after the
+        // reassignment, and the point of the IDOR fix is that non-admins
+        // don't get to touch other people's tasks in either direction).
+        if (! $this->actorHasManageWorkflows($actor)
+            && array_key_exists('assigned_to', $data)
+            && $data['assigned_to'] !== null
+            && (int) $data['assigned_to'] !== (int) $actor->employee_id
+        ) {
+            unset($data['assigned_to']);
+        }
+
         $tags = $data['tags'] ?? null;
         unset($data['tags']);
 
@@ -193,6 +226,8 @@ class TaskService
      */
     public function complete(Task $task, User $actor): Task
     {
+        $this->assertCanActOnTask($task, $actor);
+
         $doneStatus = $this->statuses->firstDoneState();
 
         if ($doneStatus === null) {
@@ -230,6 +265,8 @@ class TaskService
 
     public function delete(Task $task, User $actor): void
     {
+        $this->assertCanActOnTask($task, $actor);
+
         DB::transaction(function () use ($task, $actor) {
             $this->tasks->delete($task);
             $this->history->log($task, $actor, TaskAction::Deleted);
@@ -282,5 +319,53 @@ class TaskService
             'assigned_to' => $newValue === null ? TaskAction::Unassigned : TaskAction::Assigned,
             default => TaskAction::Updated,
         };
+    }
+
+    /**
+     * Guard the state-changing task actions (update, delete, complete)
+     * against cross-employee tampering. The acting user is authorized only
+     * if they hold `manage-workflows` OR the task is their own (creator or
+     * assignee). Everyone else 403s — before the audit fix any authenticated
+     * user could PUT/DELETE any task in the org by id.
+     */
+    private function assertCanActOnTask(Task $task, User $actor): void
+    {
+        if ($this->actorHasManageWorkflows($actor)) {
+            return;
+        }
+
+        $employeeId = $actor->employee_id;
+
+        if ($employeeId !== null
+            && ((int) $task->created_by === (int) $employeeId
+                || (int) $task->assigned_to === (int) $employeeId)
+        ) {
+            return;
+        }
+
+        abort(403, 'You do not have permission to act on this task.');
+    }
+
+    /**
+     * Employee-id scope for list/kanban visibility. Admins with
+     * manage-workflows see everything (null = no scope); everyone else is
+     * pinned to tasks they created or were assigned. Returns null when the
+     * acting user has no linked employee profile either — the caller
+     * should treat that as "no visible tasks" (see repository::paginate).
+     */
+    private function authorizedScopeFor(?User $actor): ?int
+    {
+        if ($actor === null || $this->actorHasManageWorkflows($actor)) {
+            return null;
+        }
+
+        return $actor->employee_id;
+    }
+
+    private function actorHasManageWorkflows(?User $actor): bool
+    {
+        return $actor !== null
+            && method_exists($actor, 'hasPermissionTo')
+            && $actor->hasPermissionTo('manage-workflows');
     }
 }

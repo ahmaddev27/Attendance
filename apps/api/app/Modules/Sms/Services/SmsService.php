@@ -8,6 +8,7 @@ use App\Models\SmsLog;
 use App\Modules\Sms\Contracts\SmsGateway;
 use App\Modules\Sms\Contracts\SmsResult;
 use App\Modules\Sms\Jobs\SendSmsJob;
+use App\Shared\Support\RedactsSensitiveText;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -30,6 +31,8 @@ use Throwable;
  */
 final class SmsService
 {
+    use RedactsSensitiveText;
+
     public function __construct(
         private readonly SmsGateway $gateway,
     ) {}
@@ -57,9 +60,11 @@ final class SmsService
         $result = $this->gateway->send($to, $body);
 
         try {
+            // Persist the redacted body only — the raw copy still hit the
+            // carrier above. See SendSmsJob::writeLog for the same rule.
             SmsLog::create([
                 'to' => $to,
-                'body' => $body,
+                'body' => $this->redactBody($body),
                 'status' => $result->success ? 'sent' : 'failed',
                 'provider_message_id' => $result->provider_message_id,
                 'error' => $result->error,

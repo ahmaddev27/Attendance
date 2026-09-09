@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Modules\Settings\Services\SettingsService;
 use App\Modules\Sms\Services\SmsService;
 use App\Modules\Whatsapp\Services\WhatsappService;
+use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -110,8 +111,20 @@ class SettingsController extends Controller
             'mail.*' => 'nullable|string|max:500',
             'sms' => 'array',
             'sms.*' => 'nullable|string|max:500',
+            // Endpoint URLs are admin-editable but attacker-tempting: an
+            // internal metadata IP (169.254.169.254, localhost, *.local)
+            // in `sms.mtc_endpoint` would turn `POST /settings/test/sms`
+            // into an SSRF probe of internal infrastructure. Refuse any
+            // host outside the fixed provider allow-list.
+            'sms.mtc_endpoint' => ['nullable', 'string', 'url:http,https', 'max:500', $this->endpointHostRule()],
             'whatsapp' => 'array',
             'whatsapp.*' => 'nullable|string|max:500',
+            // The WhatsApp endpoint isn't in the UI schema today but the
+            // container reads `whatsapp.endpoint` from the settings table
+            // (see AppServiceProvider::registerWhatsappGateway) — apply
+            // the same allow-list so a hidden write via the API can't
+            // hijack the Graph URL either.
+            'whatsapp.endpoint' => ['nullable', 'string', 'url:http,https', 'max:500', $this->endpointHostRule()],
             'ai' => 'array',
             'ai.*' => 'nullable|string|max:500',
             // Push group was rendered by the UI and included in self::GROUPS
@@ -206,22 +219,35 @@ class SettingsController extends Controller
             );
 
             if (! $result->success) {
+                // Log the raw provider response server-side only. Echoing
+                // it back to the admin lets an attacker who tricked us
+                // into POSTing to an internal URL read the response body
+                // — SSRF response oracle. Keep the payload minimal.
+                Log::warning('[settings:test-sms] provider rejected', [
+                    'error' => $result->error,
+                    'to' => $data['to'],
+                    'raw_response' => $result->raw_response,
+                ]);
                 return response()->json([
                     'data' => [
                         'ok' => false,
                         'error' => $result->error,
                         'provider_message_id' => $result->provider_message_id,
-                        'raw_response' => $result->raw_response,
                     ],
                     'message' => $result->error ?: 'تعذر إرسال الرسالة. تحقق من إعدادات MTC.',
                 ], 422);
             }
 
+            Log::info('[settings:test-sms] sent', [
+                'to' => $data['to'],
+                'provider_message_id' => $result->provider_message_id,
+                'raw_response' => $result->raw_response,
+            ]);
+
             return response()->json(['data' => [
                 'ok' => true,
                 'message' => "تم إرسال رسالة الاختبار إلى {$data['to']}",
                 'provider_message_id' => $result->provider_message_id,
-                'raw_response' => $result->raw_response,
             ]]);
         } catch (Throwable $e) {
             Log::warning('[settings:test-sms] failed', ['error' => $e->getMessage(), 'to' => $data['to']]);
@@ -255,22 +281,33 @@ class SettingsController extends Controller
             );
 
             if (! $result->success) {
+                // Same SSRF-oracle rationale as testSms above: don't echo
+                // the raw provider response back to the admin.
+                Log::warning('[settings:test-whatsapp] provider rejected', [
+                    'error' => $result->error,
+                    'to' => $data['to'],
+                    'raw_response' => $result->raw_response,
+                ]);
                 return response()->json([
                     'data' => [
                         'ok' => false,
                         'error' => $result->error,
                         'provider_message_id' => $result->provider_message_id,
-                        'raw_response' => $result->raw_response,
                     ],
                     'message' => $result->error ?: 'تعذر إرسال الرسالة. تحقق من إعدادات واتساب.',
                 ], 422);
             }
 
+            Log::info('[settings:test-whatsapp] sent', [
+                'to' => $data['to'],
+                'provider_message_id' => $result->provider_message_id,
+                'raw_response' => $result->raw_response,
+            ]);
+
             return response()->json(['data' => [
                 'ok' => true,
                 'message' => "تم إرسال رسالة واتساب اختبارية إلى {$data['to']}",
                 'provider_message_id' => $result->provider_message_id,
-                'raw_response' => $result->raw_response,
             ]]);
         } catch (Throwable $e) {
             Log::warning('[settings:test-whatsapp] failed', ['error' => $e->getMessage(), 'to' => $data['to']]);
@@ -279,5 +316,64 @@ class SettingsController extends Controller
                 'message' => 'تعذر إرسال الرسالة. تحقق من إعدادات واتساب.',
             ], 422);
         }
+    }
+
+    /**
+     * Provider endpoints that a super-admin may legitimately point our
+     * SMS / WhatsApp integrations at. Everything else — internal IPs,
+     * cloud metadata endpoints, arbitrary attacker-controlled hosts — is
+     * refused by `endpointHostRule()` so `POST /settings/test/*` can
+     * never be turned into an SSRF probe of internal infrastructure.
+     *
+     * Kept as a class constant (not env) so a compromised admin session
+     * cannot widen the list without a code deploy.
+     */
+    private const ALLOWED_ENDPOINT_HOSTS = [
+        'sms.mtcegypt.com.eg',
+        'int.mtcsms.com',
+        'graph.facebook.com',
+    ];
+
+    /**
+     * Custom validator closure enforcing ALLOWED_ENDPOINT_HOSTS. Also
+     * hard-blocks the well-known internal-metadata / loopback / link-
+     * local hosts even in the (currently impossible) case a matching
+     * host is ever added to the allow-list by mistake.
+     */
+    private function endpointHostRule(): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail): void {
+            if ($value === null || $value === '') {
+                return;
+            }
+
+            $host = mb_strtolower((string) parse_url((string) $value, PHP_URL_HOST));
+
+            if ($host === '') {
+                $fail("The {$attribute} must be an absolute URL with a host.");
+
+                return;
+            }
+
+            // Belt-and-braces deny list — never allow these regardless of
+            // what the allow-list says.
+            $denyExact = ['localhost', 'metadata.google.internal', 'metadata.goog', 'metadata'];
+            if (in_array($host, $denyExact, true)
+                || str_starts_with($host, '127.')
+                || str_starts_with($host, '169.254.')
+                || str_starts_with($host, '10.')
+                || str_starts_with($host, '192.168.')
+                || str_ends_with($host, '.local')
+                || str_ends_with($host, '.internal')
+            ) {
+                $fail("The {$attribute} host is not permitted.");
+
+                return;
+            }
+
+            if (! in_array($host, self::ALLOWED_ENDPOINT_HOSTS, true)) {
+                $fail("The {$attribute} host is not in the provider allow-list.");
+            }
+        };
     }
 }

@@ -78,23 +78,22 @@ class EmployeeController extends Controller
     /**
      * `POST /employees/{employee}/reset-password`
      *
-     * Admin-facing "give this employee a new password" endpoint. Accepts an
-     * optional plaintext `password` (min 8) OR auto-generates a readable
-     * 12-char password server-side when none is provided. The plaintext is
-     * returned ONCE in the response AND enqueued as a welcome SMS to the
-     * employee's phone — the response is the admin's fallback if the SMS
-     * didn't land.
+     * Admin-facing "give this employee a new password" endpoint. The new
+     * password is ALWAYS server-generated (readable 12-char string) — the
+     * client can no longer supply a `password` field, so a compromised
+     * admin token can't install a known password silently. The generated
+     * plaintext is returned ONCE in the response AND enqueued as a
+     * welcome SMS to the employee's phone.
      */
     public function resetPassword(Request $request, Employee $employee): JsonResponse
     {
         $validated = $request->validate([
-            'password' => ['nullable', 'string', 'min:8', 'max:72'],
             'role' => ['nullable', 'string'],
         ]);
 
         $result = $this->employeeService->resetPassword(
             employee: $employee,
-            password: $validated['password'] ?? null,
+            password: null, // always server-generated — never accept client input
             role: $validated['role'] ?? null,
         );
 

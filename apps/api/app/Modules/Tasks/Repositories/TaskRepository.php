@@ -37,10 +37,25 @@ class TaskRepository
 
     /**
      * @param  array<string, mixed>  $filters
+     * @param  int|null              $ownedByEmployeeId  When non-null, force-scopes
+     *                                                    the query to tasks that
+     *                                                    the given employee created
+     *                                                    OR is assigned to. Callers
+     *                                                    without `manage-workflows`
+     *                                                    pass their own employee id
+     *                                                    to block cross-employee
+     *                                                    reads (Tasks IDOR fix).
      */
-    public function paginate(array $filters, int $perPage): LengthAwarePaginator
+    public function paginate(array $filters, int $perPage, ?int $ownedByEmployeeId = null): LengthAwarePaginator
     {
         $query = $this->baseQuery($filters);
+
+        if ($ownedByEmployeeId !== null) {
+            $query->where(function (Builder $q) use ($ownedByEmployeeId): void {
+                $q->where('created_by', $ownedByEmployeeId)
+                    ->orWhere('assigned_to', $ownedByEmployeeId);
+            });
+        }
 
         return $this->applySort($query, $filters)->paginate($perPage);
     }

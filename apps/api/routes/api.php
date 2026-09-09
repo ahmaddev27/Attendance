@@ -83,7 +83,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/employees/{employee}/restore', [EmployeeController::class, 'restore']);
         // Admin-only: hand the employee a new password + create a User for
         // them if one doesn't already exist. Returns the plaintext once.
-        Route::post('/employees/{employee}/reset-password', [EmployeeController::class, 'resetPassword']);
+        //
+        // Throttled by the 'reset-password' limiter (30/hour/admin, see
+        // RateLimiterServiceProvider) so a compromised admin token can't
+        // enumerate passwords or grind through every employee row.
+        Route::post('/employees/{employee}/reset-password', [EmployeeController::class, 'resetPassword'])
+            ->middleware('throttle:reset-password');
     });
 });
 
@@ -122,11 +127,17 @@ Route::middleware('auth:sanctum')->group(function () {
 
 // M4 — Leaves: types + balances + requests.
 Route::middleware('auth:sanctum')->group(function () {
+    // Leave-type catalog is READABLE by any authenticated employee (they
+    // need it to populate the "type" dropdown on the submit form via
+    // mobile/web). Write verbs stay behind approve-leaves so only HR can
+    // add/edit/remove leave types.
+    Route::apiResource('leave-types', LeaveTypeController::class)->only(['index', 'show']);
+
     // Admin — approve-leaves gate. Without this, an employee could POST
     // /leave-requests/{their-own-id}/approve and self-approve their leave
     // (security audit finding, 2026-09-09).
     Route::middleware('permission:approve-leaves')->group(function () {
-        Route::apiResource('leave-types', LeaveTypeController::class);
+        Route::apiResource('leave-types', LeaveTypeController::class)->except(['index', 'show']);
         Route::apiResource('leave-requests', LeaveRequestController::class)->except(['update']);
         Route::post('/leave-requests/{leave_request}/approve', [LeaveRequestController::class, 'approve']);
         Route::post('/leave-requests/{leave_request}/reject', [LeaveRequestController::class, 'reject']);
@@ -192,6 +203,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
 // M5 — Generic Workflow Engine + Request Builder.
 Route::middleware('auth:sanctum')->group(function () {
+    // Request-type catalog is READABLE by any authenticated employee (they
+    // need it to populate the "which kind of request" list before opening
+    // the submit form). Write verbs stay behind manage-workflows so only
+    // HR admins can add/edit/remove types + their form schemas.
+    Route::apiResource('request-types', RequestTypeController::class)->only(['index', 'show']);
+
     // Admin: workflow management — gated so an employee can't rewire
     // approval trees or delete workflow steps.
     Route::middleware('permission:manage-workflows')->group(function () {
@@ -200,7 +217,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::apiResource('steps', WorkflowStepController::class);
             Route::post('/steps/reorder', [WorkflowStepController::class, 'reorder']);
         });
-        Route::apiResource('request-types', RequestTypeController::class);
+        Route::apiResource('request-types', RequestTypeController::class)->except(['index', 'show']);
     });
 
     // Admin oversight: see every request in the org. Own-request read +
@@ -303,9 +320,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Mobile push tokens. The RN app registers on login/launch and
     // revokes on logout — one row per (user, device_id) so a fresh
-    // Expo token overwrites in place instead of piling up.
+    // Expo token overwrites in place instead of piling up. The register
+    // endpoint is rate-limited (20/hour/user) via the 'push-tokens'
+    // named limiter so a misbehaving or compromised app can't balloon
+    // the push_tokens table.
     Route::prefix('me/push-tokens')->group(function () {
-        Route::post('/', [PushTokenController::class, 'register']);
+        Route::post('/', [PushTokenController::class, 'register'])
+            ->middleware('throttle:push-tokens');
         Route::delete('/', [PushTokenController::class, 'revokeAll']);
         Route::delete('/{deviceId}', [PushTokenController::class, 'revokeDevice']);
     });

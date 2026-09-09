@@ -28,6 +28,10 @@ class TaskCommentController extends Controller
      */
     public function index(Task $task): AnonymousResourceCollection
     {
+        /** @var User|null $user */
+        $user = request()->user();
+        $this->assertCanAccessTask($task, $user);
+
         return TaskCommentResource::collection($this->comments->threadForTask($task));
     }
 
@@ -35,6 +39,7 @@ class TaskCommentController extends Controller
     {
         /** @var User $user */
         $user = $request->user();
+        $this->assertCanAccessTask($task, $user);
 
         $comment = $this->comments->create(
             $task,
@@ -70,5 +75,31 @@ class TaskCommentController extends Controller
         $this->comments->delete($comment, $user);
 
         return response()->json(null, 204);
+    }
+
+    /**
+     * Common comment-thread gate: admins (manage-workflows) get through
+     * for every task; everyone else only for tasks they created or were
+     * assigned to. Before this check, `/tasks/{task}/comments` was an
+     * IDOR — any employee could read/write every task's discussion thread.
+     */
+    private function assertCanAccessTask(Task $task, ?User $user): void
+    {
+        abort_unless($user !== null, 401);
+
+        if ($user->hasPermissionTo('manage-workflows')) {
+            return;
+        }
+
+        $employeeId = $user->employee_id;
+
+        if ($employeeId !== null
+            && ((int) $task->created_by === (int) $employeeId
+                || (int) $task->assigned_to === (int) $employeeId)
+        ) {
+            return;
+        }
+
+        abort(403, 'You do not have permission to access this task.');
     }
 }

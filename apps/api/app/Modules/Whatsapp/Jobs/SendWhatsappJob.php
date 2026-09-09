@@ -7,6 +7,7 @@ namespace App\Modules\Whatsapp\Jobs;
 use App\Models\WhatsappLog;
 use App\Modules\Whatsapp\Contracts\WhatsappGateway;
 use App\Modules\Whatsapp\Contracts\WhatsappResult;
+use App\Shared\Support\RedactsSensitiveText;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -36,7 +37,7 @@ use Throwable;
  */
 final class SendWhatsappJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, InteractsWithQueue, Queueable, RedactsSensitiveText, SerializesModels;
 
     /**
      * Total attempts (initial + retries). Kept small because WhatsApp
@@ -83,9 +84,11 @@ final class SendWhatsappJob implements ShouldQueue
     private function writeLog(WhatsappResult $result): void
     {
         try {
+            // Persist the redacted body only — the raw copy still hit Meta
+            // via handle() above. See SendSmsJob::writeLog for the rule.
             WhatsappLog::create([
                 'to' => $this->to,
-                'body' => $this->body,
+                'body' => $this->redactBody($this->body),
                 'status' => $result->success ? 'sent' : 'failed',
                 'provider_message_id' => $result->provider_message_id,
                 'error' => $result->error,

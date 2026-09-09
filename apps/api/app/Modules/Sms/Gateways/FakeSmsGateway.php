@@ -6,6 +6,7 @@ namespace App\Modules\Sms\Gateways;
 
 use App\Modules\Sms\Contracts\SmsGateway;
 use App\Modules\Sms\Contracts\SmsResult;
+use App\Shared\Support\RedactsSensitiveText;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -21,20 +22,26 @@ use Illuminate\Support\Str;
  */
 final class FakeSmsGateway implements SmsGateway
 {
+    use RedactsSensitiveText;
+
     public function send(string $to, string $body): SmsResult
     {
         $fakeId = 'fake-'.Str::uuid()->toString();
+        $safeBody = $this->redactBody($body);
 
         Log::info('[FakeSmsGateway] SMS delivered (no carrier hit)', [
             'to' => $to,
-            'body' => $body,
+            // Log the redacted body — a fake gateway is what dev/test
+            // environments use, and the application log is not a place
+            // for plaintext welcome-SMS passwords.
+            'body' => $safeBody,
             'provider_message_id' => $fakeId,
         ]);
 
         return SmsResult::success($fakeId, [
             'driver' => 'fake',
             'to' => $to,
-            'body' => $body,
+            'body' => $safeBody,
         ]);
     }
 }

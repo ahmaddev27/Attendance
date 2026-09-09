@@ -8,6 +8,7 @@ use App\Models\WhatsappLog;
 use App\Modules\Whatsapp\Contracts\WhatsappGateway;
 use App\Modules\Whatsapp\Contracts\WhatsappResult;
 use App\Modules\Whatsapp\Jobs\SendWhatsappJob;
+use App\Shared\Support\RedactsSensitiveText;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -30,6 +31,8 @@ use Throwable;
  */
 final class WhatsappService
 {
+    use RedactsSensitiveText;
+
     public function __construct(
         private readonly WhatsappGateway $gateway,
     ) {}
@@ -56,9 +59,11 @@ final class WhatsappService
         $result = $this->gateway->send($to, $body);
 
         try {
+            // Persist the redacted body only — the raw copy still hit Meta
+            // above. See SendSmsJob::writeLog for the same rule.
             WhatsappLog::create([
                 'to' => $to,
-                'body' => $body,
+                'body' => $this->redactBody($body),
                 'status' => $result->success ? 'sent' : 'failed',
                 'provider_message_id' => $result->provider_message_id,
                 'error' => $result->error,

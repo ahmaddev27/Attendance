@@ -6,6 +6,7 @@ namespace App\Modules\Whatsapp\Gateways;
 
 use App\Modules\Whatsapp\Contracts\WhatsappGateway;
 use App\Modules\Whatsapp\Contracts\WhatsappResult;
+use App\Shared\Support\RedactsSensitiveText;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -23,20 +24,26 @@ use Illuminate\Support\Str;
  */
 final class FakeWhatsappGateway implements WhatsappGateway
 {
+    use RedactsSensitiveText;
+
     public function send(string $to, string $body): WhatsappResult
     {
         $fakeId = 'fake-wa-'.Str::uuid()->toString();
+        $safeBody = $this->redactBody($body);
 
         Log::info('[FakeWhatsappGateway] WhatsApp delivered (no provider hit)', [
             'to' => $to,
-            'body' => $body,
+            // Log the redacted body — a fake gateway is what dev/test
+            // environments use, and the application log is not a place
+            // for plaintext welcome-message passwords.
+            'body' => $safeBody,
             'provider_message_id' => $fakeId,
         ]);
 
         return WhatsappResult::success($fakeId, [
             'driver' => 'fake',
             'to' => $to,
-            'body' => $body,
+            'body' => $safeBody,
         ]);
     }
 }

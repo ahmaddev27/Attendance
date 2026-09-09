@@ -35,7 +35,10 @@ class TaskController extends Controller
 
         $perPage = (int) $request->integer('per_page', self::DEFAULT_PER_PAGE);
 
-        return TaskResource::collection($this->taskService->paginate($filters, $perPage));
+        /** @var User $actor */
+        $actor = $request->user();
+
+        return TaskResource::collection($this->taskService->paginate($filters, $perPage, $actor));
     }
 
     /**

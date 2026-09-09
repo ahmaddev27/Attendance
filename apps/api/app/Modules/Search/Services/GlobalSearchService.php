@@ -8,6 +8,8 @@ use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\Request as RequestModel;
 use App\Models\Task;
+use App\Models\User;
+use Illuminate\Support\Facades\Auth;
 
 /**
  * Cross-index search over the four indexed models. Fans a single search
@@ -91,7 +93,23 @@ class GlobalSearchService
      */
     private function searchRequests(string $term, int $limit): array
     {
-        return RequestModel::search($term)
+        $query = RequestModel::search($term);
+
+        // Non-privileged callers see ONLY their own requests. Before this
+        // scoping, `/api/search?q=...` leaked request_numbers (and, via
+        // the leaves branch, leave reasons) belonging to any employee to
+        // any authenticated user.
+        //
+        // ->query() is used (instead of ->where()) so the scoping runs on
+        // the SQL hydration query rather than as a Meilisearch filter —
+        // this keeps the fix independent of whether `employee_id` is
+        // configured as a filterable attribute in the search index.
+        $ownEmployeeId = $this->ownEmployeeIdIfScoped();
+        if ($ownEmployeeId !== null) {
+            $query->query(fn ($q) => $q->where('employee_id', $ownEmployeeId));
+        }
+
+        return $query
             ->take($limit)
             ->get()
             ->load('requestType')
@@ -111,19 +129,66 @@ class GlobalSearchService
      */
     private function searchLeaves(string $term, int $limit): array
     {
-        return LeaveRequest::search($term)
+        $query = LeaveRequest::search($term);
+
+        // Same rationale as searchRequests: scope via ->query() so this
+        // works regardless of the Meilisearch index's filterable-attribute
+        // configuration.
+        $ownEmployeeId = $this->ownEmployeeIdIfScoped();
+        if ($ownEmployeeId !== null) {
+            $query->query(fn ($q) => $q->where('employee_id', $ownEmployeeId));
+        }
+
+        return $query
             ->take($limit)
             ->get()
             ->load('employee')
-            ->map(fn (LeaveRequest $leave) => [
-                'type' => 'leave',
-                'id' => $leave->id,
-                'title' => $leave->employee?->full_name ?? 'طلب إجازة',
-                'subtitle' => $this->truncate((string) $leave->reason, 80),
-                'url' => "/leaves/{$leave->id}",
-            ])
+            ->map(function (LeaveRequest $leave) use ($ownEmployeeId): array {
+                // Leave `reason` is free-form text (medical, personal, …)
+                // and must never leak across employees. Only show it when
+                // the row belongs to the caller themself; cross-employee
+                // rows are still visible to privileged readers but with
+                // the reason blanked out.
+                $showReason = $ownEmployeeId !== null
+                    ? (int) $leave->employee_id === $ownEmployeeId
+                    : ((int) $leave->employee_id === (int) (Auth::user()?->employee_id ?? 0));
+
+                return [
+                    'type' => 'leave',
+                    'id' => $leave->id,
+                    'title' => $leave->employee?->full_name ?? 'طلب إجازة',
+                    'subtitle' => $showReason ? $this->truncate((string) $leave->reason, 80) : '',
+                    'url' => "/leaves/{$leave->id}",
+                ];
+            })
             ->values()
             ->all();
+    }
+
+    /**
+     * Own-scope helper: when the caller has neither `view-reports` nor
+     * `manage-workflows`, requests + leaves search must be pinned to
+     * their own `employee_id`. Returns the id to scope by, or null when
+     * the caller is privileged (no scoping — see everything).
+     */
+    private function ownEmployeeIdIfScoped(): ?int
+    {
+        /** @var User|null $user */
+        $user = Auth::user();
+
+        if ($user === null) {
+            // Unauthenticated shouldn't reach the search endpoint, but
+            // if it ever does, return an id that matches nothing so the
+            // fan-out returns an empty set.
+            return 0;
+        }
+
+        if ($user->can('view-reports') || $user->can('manage-workflows')) {
+            return null;
+        }
+
+        // No linked employee => scope to a sentinel that matches nothing.
+        return (int) ($user->employee_id ?? 0);
     }
 
     private function truncate(string $value, int $length): string

@@ -7,6 +7,7 @@ namespace App\Modules\Sms\Jobs;
 use App\Models\SmsLog;
 use App\Modules\Sms\Contracts\SmsGateway;
 use App\Modules\Sms\Contracts\SmsResult;
+use App\Shared\Support\RedactsSensitiveText;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -36,7 +37,7 @@ use Throwable;
  */
 final class SendSmsJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, InteractsWithQueue, Queueable, RedactsSensitiveText, SerializesModels;
 
     /**
      * Total attempts (initial + retries). Kept small because SMS is
@@ -84,9 +85,12 @@ final class SendSmsJob implements ShouldQueue
     private function writeLog(SmsResult $result): void
     {
         try {
+            // Persist the redacted body only — the raw copy still hit the
+            // carrier via handle() above, but a DB dump / audit log must
+            // never leak the plaintext password from a welcome SMS.
             SmsLog::create([
                 'to' => $this->to,
-                'body' => $this->body,
+                'body' => $this->redactBody($this->body),
                 'status' => $result->success ? 'sent' : 'failed',
                 'provider_message_id' => $result->provider_message_id,
                 'error' => $result->error,
