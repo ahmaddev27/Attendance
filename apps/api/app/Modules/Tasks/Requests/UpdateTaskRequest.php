@@ -35,4 +35,15 @@ class UpdateTaskRequest extends FormRequest
             'tags.*' => ['integer', 'exists:task_tags,id'],
         ];
     }
+
+    /**
+     * See StoreTaskRequest — the FE historically ships `tag_ids` on the
+     * update dialog too.
+     */
+    protected function prepareForValidation(): void
+    {
+        if (! $this->has('tags') && $this->has('tag_ids')) {
+            $this->merge(['tags' => $this->input('tag_ids')]);
+        }
+    }
 }

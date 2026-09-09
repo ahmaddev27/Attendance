@@ -28,7 +28,7 @@ class MyTasksController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         $employee = $this->resolveEmployee($request);
-        $filters = [...$request->only(['status_id', 'priority_id', 'search']), 'assigned_to' => $employee->id];
+        $filters = [...$request->only(['status_id', 'priority_id', 'search', 'due_date_from', 'due_date_to', 'tag_id']), 'assigned_to' => $employee->id];
         $perPage = (int) $request->integer('per_page', self::DEFAULT_PER_PAGE);
 
         return TaskResource::collection($this->taskService->paginate($filters, $perPage));
@@ -37,7 +37,7 @@ class MyTasksController extends Controller
     public function created(Request $request): AnonymousResourceCollection
     {
         $employee = $this->resolveEmployee($request);
-        $filters = [...$request->only(['status_id', 'priority_id', 'search']), 'created_by' => $employee->id];
+        $filters = [...$request->only(['status_id', 'priority_id', 'search', 'due_date_from', 'due_date_to', 'tag_id']), 'created_by' => $employee->id];
         $perPage = (int) $request->integer('per_page', self::DEFAULT_PER_PAGE);
 
         return TaskResource::collection($this->taskService->paginate($filters, $perPage));

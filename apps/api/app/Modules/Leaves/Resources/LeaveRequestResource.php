@@ -7,6 +7,7 @@ namespace App\Modules\Leaves\Resources;
 use App\Models\LeaveRequest;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * @mixin LeaveRequest
@@ -32,12 +33,18 @@ class LeaveRequestResource extends JsonResource
                 'name' => $this->leaveType->name,
                 'code' => $this->leaveType->code,
                 'color' => $this->leaveType->color,
+                'requires_attachment' => $this->leaveType->requires_attachment,
             ]),
             'start_date' => $this->start_date?->toDateString(),
             'end_date' => $this->end_date?->toDateString(),
             'days' => (float) $this->days,
             'reason' => $this->reason,
-            'attachment_path' => $this->attachment_path,
+            // FE reads `attachment_url` on the leave-details dialog; the
+            // storage path was leaking as an internal-only key. Resolved
+            // to a public URL so the review flow can actually download.
+            'attachment_url' => $this->attachment_path
+                ? Storage::disk('public')->url($this->attachment_path)
+                : null,
             'status' => $this->status?->value,
             'reviewed_by' => $this->reviewed_by,
             'reviewer' => $this->whenLoaded('reviewer', fn () => $this->reviewer === null ? null : [

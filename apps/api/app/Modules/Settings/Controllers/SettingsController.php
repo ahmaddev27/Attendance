@@ -114,6 +114,12 @@ class SettingsController extends Controller
             'whatsapp.*' => 'nullable|string|max:500',
             'ai' => 'array',
             'ai.*' => 'nullable|string|max:500',
+            // Push group was rendered by the UI and included in self::GROUPS
+            // but missing from validation — every save silently dropped the
+            // whole group. Admin would type an Expo token, see the success
+            // toast, reload — value gone.
+            'push' => 'array',
+            'push.*' => 'nullable|string|max:500',
         ]);
 
         foreach (self::GROUPS as $group => $fields) {

@@ -14,6 +14,19 @@ class StoreTaskRequest extends FormRequest
     }
 
     /**
+     * Accept `tag_ids` as an alias for `tags` — the frontend historically
+     * ships either shape. Normalizing here (before validation runs) means
+     * the rules list only mentions `tags` and TaskService always reads
+     * from a single key.
+     */
+    protected function prepareForValidation(): void
+    {
+        if (! $this->has('tags') && $this->has('tag_ids')) {
+            $this->merge(['tags' => $this->input('tag_ids')]);
+        }
+    }
+
+    /**
      * @return array<string, array<int, mixed>>
      */
     public function rules(): array
@@ -40,6 +53,11 @@ class StoreTaskRequest extends FormRequest
             'start_date' => ['nullable', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:start_date'],
 
+            // Accept `tags` (canonical) OR `tag_ids` (alias the frontend
+            // historically sent). Both funnel to the same
+            // TaskService::sync path via prepareForValidation below. Kept
+            // as an alias rather than renamed one-sided because two
+            // dialogs on the FE ship `tag_ids` today.
             'tags' => ['sometimes', 'array'],
             'tags.*' => ['integer', 'exists:task_tags,id'],
         ];

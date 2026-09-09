@@ -34,7 +34,15 @@ class AnalyticsFiltersRequest extends FormRequest
     {
         return [
             'from' => ['nullable', 'date_format:Y-m-d'],
-            'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
+            // Only enforce the order when `from` is actually present.
+            // Laravel's `after_or_equal:from` reads the field literally
+            // and 422s when the referenced field is empty — a user
+            // picking only "إلى تاريخ" would break the whole page.
+            'to' => array_filter([
+                'nullable',
+                'date_format:Y-m-d',
+                $this->filled('from') ? 'after_or_equal:from' : null,
+            ]),
             'department_id' => ['nullable', 'integer', 'exists:departments,id'],
             'team_id' => ['nullable', 'integer', 'exists:teams,id'],
             'employee_id' => ['nullable', 'integer', 'exists:employees,id'],
