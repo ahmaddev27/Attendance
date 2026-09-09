@@ -92,28 +92,27 @@ class TaskService
      */
     public function create(array $data, User $actor): Task
     {
-        // Server-owned fields. `created_by` is ALWAYS the acting employee —
-        // any client-supplied value is deliberately ignored so a compromised
-        // token can't attribute a task to another employee. Same for
-        // `assigned_to` when the caller isn't a workflow admin: only admins
-        // may assign tasks to someone else, non-admins get pinned to
-        // themselves.
-        $createdBy = $actor->employee_id;
+        // Server-owned attribution. Admins (manage-workflows) may create a
+        // task on behalf of another employee by supplying `created_by`
+        // explicitly — the ops/manager creation flow relies on it. For
+        // everyone else, `created_by` is forced to the acting employee so
+        // a compromised token can't spoof authorship.
+        $isAdmin = $this->actorHasManageWorkflows($actor);
 
-        if (empty($createdBy)) {
-            throw ValidationException::withMessages([
-                'created_by' => 'The acting user has no linked employee profile — cannot create a task.',
-            ]);
-        }
-
-        $data['created_by'] = $createdBy;
-
-        if (! $this->actorHasManageWorkflows($actor)) {
-            // Non-admins can only assign to themselves (or leave unassigned).
-            if (array_key_exists('assigned_to', $data) && $data['assigned_to'] !== null) {
-                $data['assigned_to'] = $createdBy;
+        if (! $isAdmin || empty($data['created_by'])) {
+            if (empty($actor->employee_id)) {
+                throw ValidationException::withMessages([
+                    'created_by' => 'The acting user has no linked employee profile — cannot create a task.',
+                ]);
             }
+            $data['created_by'] = $actor->employee_id;
         }
+        $createdBy = (int) $data['created_by'];
+
+        // `assigned_to` stays as-given: assigning a task to a teammate is a
+        // normal collaborative action, not a privilege escalation. Employee
+        // + admin both pass through here. The FormRequest already validates
+        // the target exists.
 
         $statusId = $data['status_id'] ?? $this->statuses->firstBySortOrder()?->id;
 
@@ -163,17 +162,12 @@ class TaskService
     {
         $this->assertCanActOnTask($task, $actor);
 
-        // A non-admin editing their own task must not be able to hand it off
-        // to another employee (would immediately lose access to it after the
-        // reassignment, and the point of the IDOR fix is that non-admins
-        // don't get to touch other people's tasks in either direction).
-        if (! $this->actorHasManageWorkflows($actor)
-            && array_key_exists('assigned_to', $data)
-            && $data['assigned_to'] !== null
-            && (int) $data['assigned_to'] !== (int) $actor->employee_id
-        ) {
-            unset($data['assigned_to']);
-        }
+        // Reassignment is a normal collaborative action (matches the create
+        // path — see comment there). We previously blocked non-admins from
+        // reassigning away from themselves to prevent losing access, but
+        // that broke task-delegation flows and there's no security angle:
+        // assertCanActOnTask above already confirms the actor may edit
+        // this task, and a legitimate delegation happens all the time.
 
         $tags = $data['tags'] ?? null;
         unset($data['tags']);
