@@ -61,8 +61,8 @@ export function KanbanBoard({ onTaskClick }: KanbanBoardProps) {
 
   const findTask = React.useCallback(
     (taskId: number): Task | undefined => {
-      for (const tasks of Object.values(board ?? {})) {
-        const found = tasks.find((t) => t.id === taskId);
+      for (const entry of Object.values(board ?? {})) {
+        const found = entry.tasks?.find((t) => t.id === taskId);
         if (found) return found;
       }
       return undefined;
@@ -79,19 +79,28 @@ export function KanbanBoard({ onTaskClick }: KanbanBoardProps) {
       const targetStatus = sortedStatuses.find((s) => s.id === statusId);
 
       if (previousBoard && targetStatus) {
+        // The board is now `Record<code, { status, tasks }>` — flatten
+        // by pulling each entry's `.tasks` array, then find the row.
         const movedTask = Object.values(previousBoard)
-          .flat()
+          .flatMap((entry) => entry.tasks ?? [])
           .find((t) => t.id === taskId);
 
         if (movedTask) {
           const nextBoard: KanbanBoardData = {};
-          for (const [code, tasks] of Object.entries(previousBoard)) {
-            nextBoard[code] = tasks.filter((t) => t.id !== taskId);
+          for (const [code, entry] of Object.entries(previousBoard)) {
+            nextBoard[code] = {
+              status: entry.status,
+              tasks: (entry.tasks ?? []).filter((t) => t.id !== taskId),
+            };
           }
-          nextBoard[targetStatus.code] = [
-            { ...movedTask, status: targetStatus },
-            ...(nextBoard[targetStatus.code] ?? []),
-          ];
+          const targetEntry = nextBoard[targetStatus.code];
+          nextBoard[targetStatus.code] = {
+            status: targetStatus,
+            tasks: [
+              { ...movedTask, status: targetStatus },
+              ...((targetEntry?.tasks) ?? []),
+            ],
+          };
           queryClient.setQueryData(KANBAN_QUERY_KEY, nextBoard);
         }
       }
@@ -148,7 +157,12 @@ export function KanbanBoard({ onTaskClick }: KanbanBoardProps) {
     >
       <div className="flex gap-4 overflow-x-auto pb-2">
         {sortedStatuses.map((status) => (
-          <KanbanColumn key={status.id} status={status} tasks={board?.[status.code] ?? []} onTaskClick={onTaskClick} />
+          <KanbanColumn
+            key={status.id}
+            status={status}
+            tasks={board?.[status.code]?.tasks ?? []}
+            onTaskClick={onTaskClick}
+          />
         ))}
       </div>
       <DragOverlay>{activeTask && <TaskCard task={activeTask} dragOverlay />}</DragOverlay>

@@ -553,7 +553,15 @@ export type TaskListParams = {
   search?: string;
 };
 
-export type KanbanBoard = Record<string, Task[]>; // keyed by status.code
+/**
+ * `/tasks/kanban` shape — keyed by status.code, each entry carries the
+ * TaskStatus object AND the tasks in that column. The backend
+ * (TaskService::kanban) returns this so the frontend has a single
+ * source of truth for column ordering + color, without a second
+ * `/task-statuses` round-trip on the kanban render path.
+ */
+export type KanbanBoardEntry = { status: TaskStatus; tasks: Task[] };
+export type KanbanBoard = Record<string, KanbanBoardEntry>; // keyed by status.code
 
 // ---------------------------------------------------------------------------
 // Workflow engine + request builder (M5)
