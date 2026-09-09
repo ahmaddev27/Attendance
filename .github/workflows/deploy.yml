@@ -120,7 +120,12 @@ jobs:
   # ---------------------------------------------------------------------------
   deploy:
     name: Deploy to VPS
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    # Disabled 2026-09-09: SSH-key management via GitHub Secrets kept
+    # breaking (paste-format issues, key rotation friction). Deploy is
+    # now driven manually by `ssh root@<VPS_HOST> /root/deploy-taqat.sh`
+    # from the operator's own machine — one command, no CI blocker on
+    # SSH auth. To re-enable this job, remove the `false &&` guard.
+    if: false && (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
     # Deliberately does NOT depend on build-api/build-web — VPS builds locally,
     # so ghcr push failures shouldn't block the deploy.
     runs-on: ubuntu-latest
