@@ -51,12 +51,17 @@ class TaqatNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
-    // Route this notification's channel sends onto the queue worker so
-    // the request thread doesn't block on Mail/Broadcast/SMS/WhatsApp/Push
-    // HTTP calls (each up to 10s). Scale audit (2026-09-09) traced a
-    // 5-worker php-fpm cap starving at ~200 concurrent users because
-    // every mutation was firing sync notification I/O inside the request.
-    public $afterCommit = true;
+    // NB: don't redeclare `public $afterCommit = true;` at class level —
+    // Illuminate\Bus\Queueable declares `public $afterCommit;` (untyped,
+    // no default) and PHP 8.4 rejects the mismatched default as an
+    // incompatible property composition (fatal at boot). We flip the flag
+    // in the constructor instead, which is what `->afterCommit()` does
+    // internally on the trait.
+    //
+    // Why enqueue at all: scale audit (2026-09-09) traced a 5-worker
+    // php-fpm cap starving at ~200 concurrent users because every
+    // mutation was firing sync notification I/O (Mail / Broadcast / SMS
+    // / WhatsApp / Push HTTP calls, each up to 10s) inside the request.
 
     /**
      * @param  array<string, mixed>  $meta  Optional structured payload
@@ -98,7 +103,12 @@ class TaqatNotification extends Notification implements ShouldQueue
         public readonly bool $sendSms = false,
         public readonly bool $sendWhatsapp = false,
         public readonly bool $sendPush = false,
-    ) {}
+    ) {
+        // Route the channel dispatches after the enclosing DB transaction
+        // commits — otherwise the queue worker can pick up the job before
+        // the notifiable row (or its parent request/task) is visible.
+        $this->afterCommit();
+    }
 
     /**
      * @return array<int, string>
