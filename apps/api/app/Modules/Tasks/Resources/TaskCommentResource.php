@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Modules\Tasks\Resources;
 
 use App\Models\TaskComment;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Spatie\Permission\Exceptions\PermissionDoesNotExist;
 
 /**
  * @mixin TaskComment
@@ -44,10 +46,28 @@ class TaskCommentResource extends JsonResource
             'edited_at' => $this->edited_at,
             'can_edit' => $isAuthor && $withinEditWindow,
             'can_delete' => $isAuthor
-                || ($authUser?->hasPermissionTo('manage-workflows') ?? false),
+                || $this->safeHasPermission($authUser, 'manage-workflows'),
             'replies' => self::collection($this->whenLoaded('replies')),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];
+    }
+
+    /**
+     * Spatie throws PermissionDoesNotExist when the row isn't seeded
+     * (fresh install, some tests) — a resource being serialised must
+     * never break the response for that. Semantically: missing
+     * permission == user does not have it.
+     */
+    private function safeHasPermission(?User $user, string $permission): bool
+    {
+        if ($user === null) {
+            return false;
+        }
+        try {
+            return $user->hasPermissionTo($permission);
+        } catch (PermissionDoesNotExist) {
+            return false;
+        }
     }
 }

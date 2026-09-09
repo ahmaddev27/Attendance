@@ -87,8 +87,15 @@ class TaskCommentController extends Controller
     {
         abort_unless($user !== null, 401);
 
-        if ($user->hasPermissionTo('manage-workflows')) {
-            return;
+        // Wrap in try/catch: Spatie throws PermissionDoesNotExist when
+        // the permission isn't seeded (bare install, some tests).
+        // Missing permission == user does not have it.
+        try {
+            if ($user->hasPermissionTo('manage-workflows')) {
+                return;
+            }
+        } catch (\Spatie\Permission\Exceptions\PermissionDoesNotExist) {
+            // fall through to ownership check
         }
 
         $employeeId = $user->employee_id;

@@ -362,10 +362,25 @@ class TaskService
         return $actor->employee_id;
     }
 
+    /**
+     * Spatie throws PermissionDoesNotExist when the permission row is
+     * missing from the DB (typical in tests that don't run the seeder,
+     * and in fresh installs before RolePermissionSeeder has run). A
+     * missing permission is semantically equivalent to "user does not
+     * have it", so swallow the exception and return false — throwing
+     * on a routine capability check would 500 every request from a
+     * regular employee on any not-yet-seeded install.
+     */
     private function actorHasManageWorkflows(?User $actor): bool
     {
-        return $actor !== null
-            && method_exists($actor, 'hasPermissionTo')
-            && $actor->hasPermissionTo('manage-workflows');
+        if ($actor === null || ! method_exists($actor, 'hasPermissionTo')) {
+            return false;
+        }
+
+        try {
+            return $actor->hasPermissionTo('manage-workflows');
+        } catch (\Spatie\Permission\Exceptions\PermissionDoesNotExist) {
+            return false;
+        }
     }
 }
