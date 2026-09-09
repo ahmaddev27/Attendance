@@ -53,9 +53,22 @@ function makeEmployeeWithSchedule(?WorkSchedule $schedule = null): Employee
  */
 function actingAsAdmin(): User
 {
-    // Make sure the permission catalog exists in test DBs — RolePermissionSeeder
-    // isn't in the RefreshDatabase pipeline, so we create only what we need.
-    foreach (['view-reports', 'view-audit-logs', 'manage-users', 'manage-workflows', 'approve-leaves'] as $p) {
+    // Seed the ENTIRE permission catalog defined by RolePermissionSeeder
+    // (single source of truth) so any code path that calls
+    // $user->hasPermissionTo('...') resolves without Spatie throwing
+    // PermissionDoesNotExist. Hard-coding a subset here caused CI to red
+    // out every time a route referenced a permission not in the list —
+    // e.g. `manage-workflows`, `create-tasks`, `view-all-attendance`.
+    foreach ([
+        'manage-users',
+        'manage-departments',
+        'view-all-attendance',
+        'approve-leaves',
+        'create-tasks',
+        'manage-workflows',
+        'view-reports',
+        'view-audit-logs',
+    ] as $p) {
         \Spatie\Permission\Models\Permission::findOrCreate($p);
     }
     $role = \Spatie\Permission\Models\Role::findOrCreate('super-admin');

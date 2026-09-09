@@ -28,10 +28,18 @@ trait CreatesSuperAdmin
 {
     protected function actingAsSuperAdmin(): User
     {
+        // Full permission catalog — kept in lock-step with
+        // RolePermissionSeeder. When you add a new permission to the
+        // seeder, add it here too, or every test route that references
+        // it starts throwing PermissionDoesNotExist inside
+        // hasPermissionTo/checkPermissionTo.
         foreach ([
             'manage-users',
-            'manage-workflows',
+            'manage-departments',
+            'view-all-attendance',
             'approve-leaves',
+            'create-tasks',
+            'manage-workflows',
             'view-reports',
             'view-audit-logs',
         ] as $permissionName) {

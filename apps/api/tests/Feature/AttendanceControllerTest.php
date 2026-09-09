@@ -45,12 +45,18 @@ test('monthly summary endpoint returns the expected structure', function () {
 
     $response = $this->getJson("/api/attendance/employee/{$employee->id}/monthly/2026/1");
 
+    // Response is now wrapped in a `data:{}` envelope (matches every
+    // other resource-shaped endpoint) with an embedded `employee` block
+    // for the frontend header.
     $response->assertOk()->assertJsonStructure([
-        'year', 'month', 'total_working_days', 'present_days', 'absent_days',
-        'leave_days', 'holiday_days', 'weekend_days', 'total_minutes',
-        'total_hours', 'expected_minutes', 'difference_minutes',
-        'overtime_minutes', 'late_minutes', 'early_leave_minutes',
-        'attendance_percentage',
+        'data' => [
+            'employee' => ['id', 'employee_number', 'full_name'],
+            'year', 'month', 'total_working_days', 'present_days', 'absent_days',
+            'leave_days', 'holiday_days', 'weekend_days', 'total_minutes',
+            'total_hours', 'expected_minutes', 'difference_minutes',
+            'overtime_minutes', 'late_minutes', 'early_leave_minutes',
+            'attendance_percentage',
+        ],
     ]);
 });
 
