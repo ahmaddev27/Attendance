@@ -9,9 +9,9 @@
 [![Last commit](https://img.shields.io/github/last-commit/ahmaddev27/Attendance?style=for-the-badge&logo=git)](https://github.com/ahmaddev27/Attendance/commits/main)
 
 [![Phase 1](https://img.shields.io/badge/Phase%201-100%25-brightgreen?style=for-the-badge)](docs/v2/03-phase-1-plan.md)
-[![Phase 2](https://img.shields.io/badge/Phase%202-85%25-blue?style=for-the-badge)](docs/v2/03-phase-1-plan.md)
-[![Phase 3](https://img.shields.io/badge/Phase%203-35%25-yellow?style=for-the-badge)](docs/v2/03-phase-1-plan.md)
-[![Phase 4](https://img.shields.io/badge/Phase%204-40%25-orange?style=for-the-badge)](docs/v2/03-phase-1-plan.md)
+[![Phase 2](https://img.shields.io/badge/Phase%202-100%25-brightgreen?style=for-the-badge)](docs/v2/03-phase-1-plan.md)
+[![Phase 3](https://img.shields.io/badge/Phase%203-100%25-brightgreen?style=for-the-badge)](docs/v2/03-phase-1-plan.md)
+[![Phase 4](https://img.shields.io/badge/Phase%204-Planning-lightgrey?style=for-the-badge)](docs/v2/03-phase-1-plan.md)
 
 [![Laravel](https://img.shields.io/badge/Laravel-11-red?style=flat-square&logo=laravel)](https://laravel.com)
 [![Next.js](https://img.shields.io/badge/Next.js-15-black?style=flat-square&logo=nextdotjs)](https://nextjs.org)
@@ -108,6 +108,16 @@
 - PDF: Arabic font (Amiri) + brand-blue table
 - Audit log via [spatie/laravel-activitylog](https://spatie.be/docs/laravel-activitylog)
 
+### 📈 Analytics Dashboard (Phase 3)
+- Dedicated `/analytics` page with **5 parallel useQueries**
+- **Attendance KPIs**: rate %, avg check-in/out clock, working days
+- **Attendance heatmap**: 7×24 grid (day-of-week × hour) with 5-step intensity buckets
+- **Leave patterns**: monthly trend + by-type + by-department (Recharts line/pie)
+- **Task performance**: totals + avg completion hours + top 5 assignees
+- **Employee summary**: headcount by dept + team + recent hires (bar chart)
+- Filters: preset ranges (7d/30d/this-month/custom) + dept/team/employee
+- SQL-raw queries in `AnalyticsService`, wrapped in `Cache::remember` (5 min TTL)
+
 ### 🔍 Global Search (Meilisearch)
 - Cmd/Ctrl+K palette
 - Cross-index search: employees, tasks, requests, leaves
@@ -125,8 +135,19 @@
 
 ### 📱 Applications
 - **Web Admin Panel** (Next.js 15) — fully RTL, shadcn/ui + TAQAT tokens
-- **Mobile App** (React Native + Expo) — Login, Tasks, Leaves, QR Scanner, Push notifications
-- **PWA** — Serwist service worker + offline shell for `/scan` + install prompt
+- **Mobile App** (React Native + Expo) — Login, Home KPIs, Tasks + detail, Leaves + create, Requests, Notifications inbox, QR Scanner, Profile
+- **PWA** — Serwist service worker (NetworkFirst for HTML + `/_next/*`, StaleWhileRevalidate elsewhere) + offline shell for `/scan` + install prompt
+
+### 📲 Push Notifications (Expo)
+- `POST /me/push-tokens` — mobile app registers on every launch; upsert on (user_id, device_id) so a rotated Expo token overwrites in place
+- `PushChannel` custom Laravel notification channel, opt-in per `TaqatNotification` via `$sendPush=true`
+- Bulk-send in 100-message chunks (Expo API cap), receipt polling prunes `DeviceNotRegistered` tokens automatically
+- Same fake/real gateway split as SMS + WhatsApp — `FakePushGateway` in `testing` env logs to laravel.log
+
+### 🧰 Operator Commands
+- `php artisan taqat:backfill-users` — create login accounts for existing employees (idempotent, `--random` for per-user passwords)
+- `php artisan taqat:wipe-demo` — nuke transactional data + non-admin users, KEEP org tree (dept/team/position/leave-type/schedule/holiday/task-config) and super-admins
+- Both commands have `--dry-run` for safe preview and refuse to run destructive paths in production without `--force`
 
 ---
 
@@ -196,14 +217,14 @@ docker-compose.simple.yml
 
 ## 📈 Phase Progress
 
-| Phase | Original scope | Status | Notes |
-|-------|---------------|--------|-------|
-| **Phase 1** (MVP — M1-M8) | 12 weeks | ✅ **100%** | All milestones + Realtime + PWA |
-| **Phase 2** (Projects + Scrum + Polish) | 8 weeks | ✅ **~85%** | Excel/PDF ✅ · WhatsApp ✅ · Meilisearch ✅ · Kanban ✅ · Mail ✅ · Projects/Sprints ⏸ |
-| **Phase 3** (AI + Executive) | 6 weeks | ✅ **~35%** | AI Motivation ✅ · Manager Assistant + Executive Dashboard ⏸ |
-| **Phase 4** (Scale + Mobile) | 4+ weeks | ✅ **~40%** | Mobile RN scaffold ✅ · 2FA/SSO/SAML ⏸ |
+| Phase | Scope | Status | Highlights |
+|-------|-------|--------|------------|
+| **Phase 1** (Foundation — M1-M8) | 12 wk | ✅ **100%** | Auth · Employees · Attendance (QR) · Leaves · Tasks · Requests + Workflow · Notifications · Reports · Audit · RBAC |
+| **Phase 2** (Enterprise Extensions) | 8 wk  | ✅ **100%** | Mail (Resend) · SMS (MTC) · WhatsApp (Meta) · AI (Claude) · Excel + PDF · Meilisearch · PWA · Admin Settings UI |
+| **Phase 3** (Analytics + Mobile) | 6 wk  | ✅ **100%** | Analytics dashboard (Recharts + heatmap) · Push Notifications (Expo) · React Native app (Auth · Home · Tasks · Leaves · Requests · Notifications · Profile · QR scan) |
+| **Phase 4** (Scale + Security) | TBD   | 🕒 **Planning** | 2FA · session management · deeper audit · BI drill-downs · EAS mobile release |
 
-**We are ~3-4 months ahead of the original schedule.**
+**Delivered ~3 months ahead of the original 30-week roadmap.**
 
 ---
 
@@ -450,21 +471,27 @@ taqat/
 
 Features from the extended SRS deferred to a later phase:
 
-### Phase 2 remaining
-- **Projects + Sprints + Scrum ceremonies** (Kanban exists but without Projects grouping)
-- **Row-level scoping for permissions** — department-manager should only see their department's attendance/leaves (currently `view-all-attendance` is boolean-granted; adding a query scope layer would close the ⚠️ items in the RBAC matrix above)
+### Phase 4 (planned)
+- **Two-Factor Authentication** — TOTP + SMS fallback
+- **Session management UI** — see-my-devices + revoke
+- **Deeper audit trail** — IP/UA on every sensitive op, cohort view
+- **Rate limiting** on auth + reset-password endpoints
+- **BI drill-downs** — cohort analysis, custom report builder
+- **Row-level permission scoping** — department-manager sees only their department's attendance/leaves (currently `view-*` permissions are boolean-granted; a query-scope layer would close the ⚠️ items in the RBAC matrix)
 
-### Phase 3 remaining
-- **Manager AI Assistant** (Motivation only is built)
-- **Executive Dashboard** (C-level KPIs)
+### Extended-SRS deferred
+- **Projects + Sprints + Scrum ceremonies** (Kanban is per-status; project grouping is not modelled)
+- **Manager AI Assistant** (only the daily-motivation AI is live)
+- **Executive Dashboard** (C-level KPI wall)
 - **Performance Reviews + KPI system**
+- **Multi-tenancy (SaaS)** — postponed by product owner
+- **WhatsApp templates** for cold outreach outside the 24h customer-service window
+- **Mobile app store submission** — needs an EAS/Expo project id + certs (framework fully wired)
 
-### Phase 4 remaining
-- **2FA / SSO / SAML**
-- **Multi-company (SaaS)**
-- **WhatsApp templates** for cold outreach outside 24h session window
-- **Firebase Push notifications** on mobile (framework ready, needs FCM config)
-- **App Store submission** for mobile
+### Known operational debt
+- **Reverb WebSocket** — realtime notifications need `mod_proxy_http >= 2.4.47` OR `mod_proxy_wstunnel` on Apache; the `infra/apache/proxy.conf` in this repo is deploy-ready but must be copied to the VPS + `httpd` restarted the first time.
+- **Deploy `.git` ownership** — auto-recovers when the SSH deploy user has passwordless sudo for `chown`; otherwise a manual `sudo chown -R <user>:<group> /path/to/app/.git` is needed once whenever `root` runs a git op on the box.
+- **PDF Amiri font cache** — dompdf downloads the Amiri TTF into `storage/fonts/` on first render. In `testing` env we skip the `@font-face` so tests never hit fonts.gstatic.com.
 
 ---
 
