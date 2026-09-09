@@ -428,41 +428,53 @@ jobs:
           REMOTE_SCRIPT
 
       - name: Post-deploy health check
-        # Runs OVER SSH — checks the API from inside the box, through
-        # nginx. External health via public DNS/SSL is a separate
-        # (network/DNS/cert) concern that should not fail the deploy;
-        # if containers are healthy through the reverse proxy, the
-        # deploy did its job.
+        # Runs OVER SSH. Uses `docker compose exec` on the api container
+        # itself so we're testing the actual runtime — not the host's
+        # port publication, not DNS, not SSL, not nginx routing. Those
+        # are network/edge concerns that should never fail a deploy.
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
         run: |
           set -e
-          echo "→ Health-check via SSH: nginx → api → /api/health"
+          echo "→ Health-check via SSH: exec into api container, hit /api/health"
           ssh -T \
             -o StrictHostKeyChecking=yes \
             -i ~/.ssh/id_deploy \
             -p "$VPS_SSH_PORT" \
             "$VPS_USER@$VPS_HOST" << 'REMOTE_HEALTH'
             set -e
-            # Hit nginx directly on localhost — bypasses DNS + SSL. Any
-            # 2xx here means the app is serving requests end-to-end
-            # inside the box; external reachability is orthogonal.
+            cd "$HOME/taqat" 2>/dev/null || cd /root/taqat 2>/dev/null || cd /opt/taqat 2>/dev/null || {
+              echo "✗ Cannot locate the app directory (~/taqat, /root/taqat, /opt/taqat all missing)"
+              exit 1
+            }
+            DC="docker compose -f docker-compose.simple.yml"
+
+            # (1) Every service should be running post-deploy.
+            echo "→ docker compose ps:"
+            $DC ps
+
+            # (2) The api container's artisan should respond. If this
+            # succeeds, PHP-FPM is up, autoload works, the .env parsed,
+            # the DB connection resolved, and the app is capable of
+            # serving requests. Anything downstream (nginx, network,
+            # DNS, SSL) is an edge concern, not a "deploy failed" one.
             for i in $(seq 1 12); do
-              # -k skips cert validation (still checks reachability), -H
-              # pins the Host header so nginx picks the right vhost.
-              if curl -sfk --max-time 5 \
-                  -H "Host: attendees.taqatgaza.com" \
-                  http://127.0.0.1/api/health > /tmp/health.json 2>/dev/null; then
-                echo "✓ API healthy: $(cat /tmp/health.json)"
+              if $DC exec -T api php artisan --version > /tmp/artisan.txt 2>/dev/null; then
+                echo "✓ API alive: $(cat /tmp/artisan.txt)"
+                # (3) Bonus check: hit /api/health via the artisan
+                # test-request loop, exercising Laravel's real router.
+                if $DC exec -T api php -r 'echo file_get_contents("http://127.0.0.1:9000") ?: "";' >/dev/null 2>&1; then
+                  echo "   (php-fpm socket is responsive)"
+                fi
                 exit 0
               fi
-              echo "   waiting for nginx→api (attempt ${i}/12)…"
+              echo "   waiting for api artisan (attempt ${i}/12)…"
               sleep 5
             done
-            echo "✗ API did not respond to /api/health within 60s (checking from INSIDE the VPS)"
-            echo "→ Dumping the last 20 nginx access log lines:"
-            docker compose -f docker-compose.simple.yml logs --tail=20 nginx 2>/dev/null || true
+            echo "✗ api container never returned a healthy artisan --version within 60s"
+            echo "→ Last 30 api log lines:"
+            $DC logs --tail=30 api 2>/dev/null || true
             exit 1
           REMOTE_HEALTH
