@@ -63,6 +63,44 @@ class EmployeeController extends Controller
     }
 
     /**
+     * `GET /me/team` — teammates the current user is allowed to assign
+     * tasks to. Public to any authenticated user; scoped to the caller's
+     * own team_id (or their own row when they aren't on a team). Admins
+     * with `manage-users` still get the full list via `/employees` — this
+     * endpoint is the "who can I hand this task to" question a regular
+     * employee needs answered, no PII beyond name+number.
+     */
+    public function myTeam(Request $request): AnonymousResourceCollection
+    {
+        $me = $request->user()?->employee;
+
+        $query = Employee::query()
+            ->where('status', \App\Shared\Enums\EmployeeStatus::Active)
+            ->orderBy('first_name');
+
+        if ($me?->team_id) {
+            $query->where('team_id', $me->team_id);
+        } elseif ($me) {
+            // No team → the only teammate they can pick is themself.
+            $query->where('id', $me->id);
+        } else {
+            // Admin without a linked employee record (bootstrap super-admin).
+            // They already have manage-workflows so cross-team is allowed —
+            // return the full active roster.
+        }
+
+        if ($search = trim((string) $request->query('search', ''))) {
+            $query->where(function ($q) use ($search) {
+                $q->where('first_name', 'like', "%{$search}%")
+                    ->orWhere('last_name', 'like', "%{$search}%")
+                    ->orWhere('employee_number', 'like', "%{$search}%");
+            });
+        }
+
+        return EmployeeResource::collection($query->limit(50)->get());
+    }
+
+    /**
      * Restore a soft-deleted employee. Deliberately typed as `int` rather
      * than an `Employee` route binding — Laravel's default implicit model
      * binding excludes trashed models, which is exactly the record this

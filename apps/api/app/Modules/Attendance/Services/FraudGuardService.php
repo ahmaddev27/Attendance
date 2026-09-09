@@ -25,6 +25,13 @@ class FraudGuardService
 
     private function assertWithinGeofence(AttendanceDevice $device, ?float $latitude, ?float $longitude): void
     {
+        // The admin toggle is the primary gate. Even if lat/lng/radius are
+        // configured, we skip the check unless enforce_geo is on — lets
+        // ops stage the location settings before turning enforcement on.
+        if (! $device->enforce_geo) {
+            return;
+        }
+
         if ($device->allowed_lat === null || $device->allowed_lng === null || ! $device->allowed_radius_meters) {
             return;
         }
@@ -47,6 +54,13 @@ class FraudGuardService
 
     private function assertIpAllowed(AttendanceDevice $device, string $ip): void
     {
+        // Same admin-toggle gate as geofence. A stored whitelist without
+        // enforce_ip=true is treated as informational — visible in the
+        // admin UI but not enforced at scan time.
+        if (! $device->enforce_ip) {
+            return;
+        }
+
         $whitelist = $device->ip_whitelist;
 
         if (empty($whitelist)) {

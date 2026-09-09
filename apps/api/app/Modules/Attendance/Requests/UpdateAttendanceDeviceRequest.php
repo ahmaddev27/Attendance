@@ -20,12 +20,14 @@ class UpdateAttendanceDeviceRequest extends FormRequest
     {
         return [
             'name' => ['sometimes', 'string', 'max:100'],
-            'qr_rotates_every_seconds' => ['sometimes', 'integer', 'min:30', 'max:3600'],
+            'qr_rotates_every_seconds' => ['sometimes', 'integer', 'min:0', 'max:3600'],
             'allowed_lat' => ['sometimes', 'nullable', 'numeric', 'between:-90,90'],
             'allowed_lng' => ['sometimes', 'nullable', 'numeric', 'between:-180,180'],
             'allowed_radius_meters' => ['sometimes', 'nullable', 'integer', 'min:1'],
             'ip_whitelist' => ['sometimes', 'nullable', 'array'],
             'ip_whitelist.*' => ['string', 'max:64'],
+            'enforce_geo' => ['sometimes', 'boolean'],
+            'enforce_ip' => ['sometimes', 'boolean'],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }

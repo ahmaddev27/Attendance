@@ -17,4 +17,12 @@ export const employeesApi = {
     apiClient.put<ApiResource<Employee>>(`/employees/${id}`, data),
   delete: (id: number) => apiClient.delete(`/employees/${id}`),
   restore: (id: number) => apiClient.post(`/employees/${id}/restore`),
+  /**
+   * Any authenticated user — returns teammates the caller is allowed
+   * to assign tasks to (same team_id, or just self if teamless).
+   * Used by TaskFormDialog for non-admin creators; admins keep hitting
+   * `list()` for the full org.
+   */
+  myTeam: (search?: string) =>
+    apiClient.get<{ data: Employee[] }>('/me/team', { params: { search } }),
 };

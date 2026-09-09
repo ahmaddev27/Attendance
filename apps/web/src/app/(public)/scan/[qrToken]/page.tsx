@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import { toast } from 'sonner';
-import { CheckCircle2, LogIn, LogOut, TriangleAlert } from 'lucide-react';
+import { CheckCircle2, LogIn, LogOut, RefreshCw, TriangleAlert } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,159 +12,193 @@ import { Spinner } from '@/components/ui/spinner';
 import { LiveClock } from '@/components/attendance/live-clock';
 import { scanApi, type ScanCheckPayload } from '@/lib/api/endpoints/attendance';
 import { formatTime } from '@/lib/attendance-format';
-import type { ScanDeviceInfo, ScanResponse } from '@/lib/api/types';
+import type { ScanDeviceInfo, ScanResponse, ScanStatus } from '@/lib/api/types';
 
-const STORAGE_KEY = 'taqat_kiosk_employee';
+// The kiosk remembers the last successful employee here so the same person
+// returning to check out doesn't have to retype their number. Cleared on
+// the "تغيير" button below.
+const STORAGE_KEY = 'taqat_kiosk_employee_number';
 
-type SavedEmployee = { employee_number: number; full_name: string };
-type ScanAction = 'check-in' | 'check-out';
-type ViewState = 'loading' | 'device-error' | 'idle' | 'entering-number' | 'locating' | 'success';
+type ViewState =
+  | 'loading-device'
+  | 'device-error'
+  | 'entering-number'
+  | 'checking-status'
+  | 'ready'
+  | 'locating'
+  | 'success'
+  | 'day-complete';
 
-function readSavedEmployee(): SavedEmployee | null {
+type ReadyPayload = {
+  status: ScanStatus;
+  // Which action the ready screen offers based on the status.state.
+  action: 'check-in' | 'check-out';
+};
+
+function readSavedNumber(): number | null {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (typeof parsed?.employee_number === 'number' && typeof parsed?.full_name === 'string') {
-      return parsed;
-    }
-    return null;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : null;
   } catch {
     return null;
   }
 }
 
-function saveEmployee(employee: SavedEmployee) {
+function saveNumber(n: number) {
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(employee));
+    window.localStorage.setItem(STORAGE_KEY, String(n));
   } catch {
-    // Private browsing / storage disabled — the kiosk still works, it just
-    // won't remember the employee for next time.
+    // Private browsing / storage disabled — kiosk still works.
   }
 }
 
-function clearSavedEmployee() {
+function clearSavedNumber() {
   try {
     window.localStorage.removeItem(STORAGE_KEY);
   } catch {
-    // ignore
+    /* ignore */
   }
 }
 
-function getCurrentPosition(): Promise<GeolocationPosition> {
-  return new Promise((resolve, reject) => {
+function getCurrentPosition(): Promise<GeolocationPosition | null> {
+  // Geolocation is best-effort: if the device doesn't have it or the user
+  // denies, we send null coordinates. The backend enforces geo ONLY when
+  // enforce_geo is on for that device, so a null-coord scan on a
+  // geo-disabled device still succeeds. On a geo-enforced device, the
+  // backend will 422 with a clear reason.
+  return new Promise((resolve) => {
     if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
-      reject(new Error('المتصفح لا يدعم تحديد الموقع'));
+      resolve(null);
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      resolve,
-      () => reject(new Error('يرجى تفعيل خدمة الموقع للمتابعة')),
-      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 0 }
+      (pos) => resolve(pos),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 0 },
     );
   });
 }
-
-const ACTION_LABEL: Record<ScanAction, string> = {
-  'check-in': 'تسجيل الحضور',
-  'check-out': 'تسجيل الانصراف',
-};
 
 export default function KioskScanPage() {
   const params = useParams<{ qrToken: string }>();
   const qrToken = params.qrToken;
 
-  const [view, setView] = useState<ViewState>('loading');
+  const [view, setView] = useState<ViewState>('loading-device');
   const [device, setDevice] = useState<ScanDeviceInfo | null>(null);
-  const [savedEmployee, setSavedEmployee] = useState<SavedEmployee | null>(null);
-  const [pendingAction, setPendingAction] = useState<ScanAction | null>(null);
   const [employeeNumberInput, setEmployeeNumberInput] = useState('');
-  const [successResult, setSuccessResult] = useState<{ action: ScanAction; response: ScanResponse } | null>(null);
+  const [ready, setReady] = useState<ReadyPayload | null>(null);
+  const [successResult, setSuccessResult] = useState<{
+    action: 'check-in' | 'check-out';
+    response: ScanResponse;
+  } | null>(null);
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadDevice = useCallback(async () => {
-    setView('loading');
+    setView('loading-device');
     try {
       const info = await scanApi.deviceInfo(qrToken);
       setDevice(info);
-      setView('idle');
+
+      // If the last employee is remembered on this browser, jump straight
+      // to the status probe. Otherwise show the number-entry screen.
+      const saved = readSavedNumber();
+      if (saved) {
+        probeStatus(saved);
+      } else {
+        setView('entering-number');
+      }
     } catch {
       setView('device-error');
     }
   }, [qrToken]);
 
   useEffect(() => {
-    setSavedEmployee(readSavedEmployee());
     loadDevice();
     return () => {
       if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadDevice]);
 
-  const backToIdle = () => {
-    setPendingAction(null);
-    setEmployeeNumberInput('');
-    setView('idle');
-  };
-
-  const startAction = (action: ScanAction) => {
-    setPendingAction(action);
-    if (savedEmployee) {
-      submitScan(action, savedEmployee.employee_number, { fromManualEntry: false });
-    } else {
+  /**
+   * Query the backend for what THIS employee should do next — the whole
+   * point of the new flow. `not_checked_in` → offer check-in;
+   * `checked_in` → offer check-out; `checked_out` → show a done screen.
+   */
+  const probeStatus = async (employeeNumber: number) => {
+    setView('checking-status');
+    try {
+      const status = await scanApi.status({ qr_token: qrToken, employee_number: employeeNumber });
+      if (status.state === 'checked_out') {
+        setReady({ status, action: 'check-out' });
+        setView('day-complete');
+        return;
+      }
+      const action = status.state === 'not_checked_in' ? 'check-in' : 'check-out';
+      setReady({ status, action });
+      setView('ready');
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+        ?? 'رقم وظيفي غير معروف أو غير مفعّل';
+      toast.error(message);
+      clearSavedNumber();
       setView('entering-number');
     }
   };
 
-  const submitScan = async (
-    action: ScanAction,
-    employeeNumber: number,
-    { fromManualEntry }: { fromManualEntry: boolean }
-  ) => {
+  const submitScan = async () => {
+    if (!ready) return;
     setView('locating');
+    const position = await getCurrentPosition();
+    const payload: ScanCheckPayload = {
+      employee_number: ready.status.employee.employee_number,
+      qr_token: qrToken,
+      latitude: position?.coords.latitude ?? undefined,
+      longitude: position?.coords.longitude ?? undefined,
+    };
     try {
-      const position = await getCurrentPosition();
-      const payload: ScanCheckPayload = {
-        employee_number: employeeNumber,
-        qr_token: qrToken,
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-      };
-      const response = action === 'check-in' ? await scanApi.checkIn(payload) : await scanApi.checkOut(payload);
-
-      const employee: SavedEmployee = {
-        employee_number: response.attendance.employee.employee_number,
-        full_name: response.attendance.employee.full_name,
-      };
-      saveEmployee(employee);
-      setSavedEmployee(employee);
-      setSuccessResult({ action, response });
+      const response =
+        ready.action === 'check-in'
+          ? await scanApi.checkIn(payload)
+          : await scanApi.checkOut(payload);
+      saveNumber(response.attendance.employee.employee_number);
+      setSuccessResult({ action: ready.action, response });
       setView('success');
-
+      // After a beat, reset back to the number-entry screen so the next
+      // person in line at the kiosk can walk up.
       resetTimerRef.current = setTimeout(() => {
         setSuccessResult(null);
-        backToIdle();
-      }, 4000);
-    } catch (err: any) {
-      const message = err?.response?.data?.message || err?.message || 'حدث خطأ، حاول مرة أخرى';
+        setReady(null);
+        setEmployeeNumberInput('');
+        setView('entering-number');
+      }, 4500);
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+        ?? 'حدث خطأ، حاول مرة أخرى';
       toast.error(message);
-      setView(fromManualEntry ? 'entering-number' : 'idle');
+      setView('ready');
     }
   };
 
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const number = Number(employeeNumberInput);
-    if (!employeeNumberInput.trim() || Number.isNaN(number)) {
+    if (!employeeNumberInput.trim() || !Number.isFinite(number) || number <= 0) {
       toast.error('أدخل رقماً وظيفياً صحيحاً');
       return;
     }
-    if (pendingAction) submitScan(pendingAction, number, { fromManualEntry: true });
+    probeStatus(number);
   };
 
-  const handleChangeEmployee = () => {
-    clearSavedEmployee();
-    setSavedEmployee(null);
+  const changeEmployee = () => {
+    clearSavedNumber();
+    setReady(null);
+    setEmployeeNumberInput('');
+    setView('entering-number');
   };
 
   return (
@@ -174,7 +208,7 @@ export default function KioskScanPage() {
       </header>
 
       <main className="flex flex-1 flex-col items-center justify-center gap-8 px-6 py-8">
-        {view === 'loading' && (
+        {view === 'loading-device' && (
           <div className="flex flex-col items-center gap-3 text-muted">
             <Spinner className="h-8 w-8" />
             <p>جارٍ تحميل بيانات الجهاز...</p>
@@ -185,75 +219,22 @@ export default function KioskScanPage() {
           <div className="flex flex-col items-center gap-4 text-center">
             <TriangleAlert className="h-14 w-14 text-danger" />
             <p className="text-lg font-semibold text-ink">الجهاز غير موجود أو غير نشط</p>
-            <p className="max-w-sm text-sm text-muted">تأكد من مسح رمز QR الصحيح أو تواصل مع إدارة الموارد البشرية</p>
+            <p className="max-w-sm text-sm text-muted">
+              تأكد من مسح رمز QR الصحيح أو تواصل مع إدارة الموارد البشرية
+            </p>
             <Button type="button" onClick={loadDevice} className="mt-2 min-h-[56px] px-8">
               إعادة المحاولة
             </Button>
           </div>
         )}
 
-        {view === 'idle' && (
-          <div className="flex w-full max-w-sm flex-col items-center gap-8">
-            <LiveClock />
-
-            {savedEmployee ? (
-              <div className="flex w-full flex-col items-center gap-4">
-                <p className="text-xl font-semibold text-ink">أنت {savedEmployee.full_name}؟</p>
-                <div className="flex w-full flex-col gap-3">
-                  <Button
-                    type="button"
-                    onClick={() => startAction('check-in')}
-                    className="min-h-[56px] w-full bg-brand text-lg font-bold text-white hover:bg-brand-hover"
-                  >
-                    <LogIn className="h-5 w-5" />
-                    تسجيل الحضور
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => startAction('check-out')}
-                    className="min-h-[56px] w-full text-lg font-bold"
-                  >
-                    <LogOut className="h-5 w-5" />
-                    تسجيل الانصراف
-                  </Button>
-                  <button
-                    type="button"
-                    onClick={handleChangeEmployee}
-                    className="mt-1 min-h-[44px] text-sm text-muted underline-offset-4 hover:text-ink hover:underline"
-                  >
-                    تغيير
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex w-full flex-col gap-3">
-                <Button
-                  type="button"
-                  onClick={() => startAction('check-in')}
-                  className="min-h-[56px] w-full bg-brand text-lg font-bold text-white hover:bg-brand-hover"
-                >
-                  <LogIn className="h-5 w-5" />
-                  تسجيل الحضور
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => startAction('check-out')}
-                  className="min-h-[56px] w-full text-lg font-bold"
-                >
-                  <LogOut className="h-5 w-5" />
-                  تسجيل الانصراف
-                </Button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {view === 'entering-number' && pendingAction && (
+        {view === 'entering-number' && (
           <form onSubmit={handleManualSubmit} className="flex w-full max-w-sm flex-col items-center gap-6">
-            <p className="text-lg font-semibold text-ink">{ACTION_LABEL[pendingAction]}</p>
-            <p className="text-sm text-muted">أدخل رقمك الوظيفي</p>
+            <LiveClock />
+            <div className="flex flex-col items-center gap-2 text-center">
+              <p className="text-lg font-semibold text-ink">أدخل رقمك الوظيفي</p>
+              <p className="text-xs text-muted">سنعرض الزر المناسب لك — حضور أو انصراف</p>
+            </div>
             <Input
               type="tel"
               inputMode="numeric"
@@ -263,18 +244,78 @@ export default function KioskScanPage() {
               className="num h-20 w-full rounded-2xl text-center text-4xl font-bold tracking-widest"
               dir="ltr"
             />
-            <div className="flex w-full flex-col gap-3">
-              <Button
-                type="submit"
-                className="min-h-[56px] w-full bg-brand text-lg font-bold text-white hover:bg-brand-hover"
-              >
-                متابعة
-              </Button>
-              <Button type="button" variant="ghost" onClick={backToIdle} className="min-h-[48px] w-full">
-                إلغاء
-              </Button>
-            </div>
+            <Button
+              type="submit"
+              className="min-h-[56px] w-full bg-brand text-lg font-bold text-white hover:bg-brand-hover"
+            >
+              متابعة
+            </Button>
           </form>
+        )}
+
+        {view === 'checking-status' && (
+          <div className="flex flex-col items-center gap-3 text-muted">
+            <Spinner className="h-8 w-8" />
+            <p>جارٍ التحقق من حالتك اليومية...</p>
+          </div>
+        )}
+
+        {view === 'ready' && ready && (
+          <div className="flex w-full max-w-sm flex-col items-center gap-6">
+            <LiveClock />
+            <p className="text-2xl font-bold text-ink">مرحباً {ready.status.employee.full_name}</p>
+            {ready.action === 'check-out' && ready.status.check_in_at && (
+              <p className="text-sm text-muted">
+                سُجّل حضورك عند{' '}
+                <span className="num font-semibold text-ink">
+                  {formatTime(ready.status.check_in_at)}
+                </span>
+              </p>
+            )}
+            <Button
+              type="button"
+              onClick={submitScan}
+              className={
+                ready.action === 'check-in'
+                  ? 'min-h-[64px] w-full bg-brand text-xl font-bold text-white hover:bg-brand-hover'
+                  : 'min-h-[64px] w-full bg-warning text-xl font-bold text-white hover:bg-warning/90'
+              }
+            >
+              {ready.action === 'check-in' ? <LogIn className="h-6 w-6" /> : <LogOut className="h-6 w-6" />}
+              {ready.action === 'check-in' ? 'تسجيل الحضور' : 'تسجيل الانصراف'}
+            </Button>
+            <button
+              type="button"
+              onClick={changeEmployee}
+              className="mt-1 flex items-center gap-2 text-sm text-muted underline-offset-4 hover:text-ink hover:underline"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              لست {ready.status.employee.full_name}؟ تغيير
+            </button>
+          </div>
+        )}
+
+        {view === 'day-complete' && ready && (
+          <div className="flex w-full max-w-sm flex-col items-center gap-4 text-center">
+            <CheckCircle2 className="h-16 w-16 text-success" />
+            <p className="text-xl font-semibold text-ink">
+              أنهيت دوامك يا {ready.status.employee.full_name}
+            </p>
+            {ready.status.check_in_at && ready.status.check_out_at && (
+              <p className="text-sm text-muted">
+                <span className="num">{formatTime(ready.status.check_in_at)}</span> →{' '}
+                <span className="num">{formatTime(ready.status.check_out_at)}</span>
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={changeEmployee}
+              className="mt-2 flex items-center gap-2 text-sm text-muted underline-offset-4 hover:text-ink hover:underline"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              موظف آخر
+            </button>
+          </div>
         )}
 
         {view === 'locating' && (
@@ -292,7 +333,7 @@ export default function KioskScanPage() {
               {formatTime(
                 successResult.action === 'check-in'
                   ? successResult.response.attendance.check_in_at
-                  : successResult.response.attendance.check_out_at
+                  : successResult.response.attendance.check_out_at,
               )}
             </p>
           </div>
@@ -300,7 +341,7 @@ export default function KioskScanPage() {
       </main>
 
       <footer className="border-t border-hairline py-4 text-center text-xs text-muted">
-        {device?.device_name ?? ' '}
+        {device?.device_name ?? ' '}
       </footer>
     </div>
   );

@@ -19,26 +19,41 @@ import {
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
-/** Searchable employee combobox for the attendance filters bar. */
+/**
+ * Searchable employee combobox.
+ *
+ * `source` selects the roster the dropdown offers:
+ * - `all` (default): admin-only `/employees` list — used on attendance
+ *   filters and admin task creation.
+ * - `my-team`: `/me/team` — the current user's teammates only. Use this
+ *   whenever a regular employee is picking an assignee; the backend
+ *   enforces the same scope so a bypass on the FE still 422s server-side.
+ */
 export function EmployeeSearchSelect({
   value,
   onChange,
   placeholder = 'كل الموظفين',
+  source = 'all',
 }: {
   value: EmployeeSummary | null;
   onChange: (employee: EmployeeSummary | null) => void;
   placeholder?: string;
+  source?: 'all' | 'my-team';
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
 
   const { data: employees, isFetching } = useQuery({
-    queryKey: ['employees-search', debouncedSearch],
+    queryKey: ['employees-search', source, debouncedSearch],
     queryFn: () =>
-      employeesApi
-        .list({ search: debouncedSearch || undefined, per_page: 20 })
-        .then((r) => r.data.data),
+      source === 'my-team'
+        ? employeesApi
+            .myTeam(debouncedSearch || undefined)
+            .then((r) => r.data.data)
+        : employeesApi
+            .list({ search: debouncedSearch || undefined, per_page: 20 })
+            .then((r) => r.data.data),
     enabled: open,
     staleTime: 30_000,
   });

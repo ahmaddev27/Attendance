@@ -148,9 +148,9 @@ export function KanbanBoard({ onTaskClick }: KanbanBoardProps) {
 
   if (statusesLoading || boardLoading) {
     return (
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-96 rounded-xl" />
+      <div className="flex gap-4 overflow-x-auto pb-2">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="h-[calc(100vh-260px)] w-80 shrink-0 rounded-xl" />
         ))}
       </div>
     );
@@ -163,7 +163,14 @@ export function KanbanBoard({ onTaskClick }: KanbanBoardProps) {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="flex gap-4 overflow-x-auto pb-2">
+      <div
+        className="flex h-[calc(100vh-260px)] min-h-[520px] gap-4 overflow-x-auto overflow-y-hidden pb-3
+          [&::-webkit-scrollbar]:h-2
+          [&::-webkit-scrollbar-thumb]:rounded-full
+          [&::-webkit-scrollbar-thumb]:bg-hairline
+          hover:[&::-webkit-scrollbar-thumb]:bg-muted
+          [&::-webkit-scrollbar-track]:bg-transparent"
+      >
         {sortedStatuses.map((status) => {
           const entry = board?.[status.code];
           return (

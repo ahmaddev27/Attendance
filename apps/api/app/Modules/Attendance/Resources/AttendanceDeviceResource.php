@@ -29,6 +29,8 @@ class AttendanceDeviceResource extends JsonResource
             'allowed_lng' => $this->allowed_lng !== null ? (float) $this->allowed_lng : null,
             'allowed_radius_meters' => $this->allowed_radius_meters,
             'ip_whitelist' => $this->ip_whitelist,
+            'enforce_geo' => (bool) $this->enforce_geo,
+            'enforce_ip' => (bool) $this->enforce_ip,
             'is_active' => $this->is_active,
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),

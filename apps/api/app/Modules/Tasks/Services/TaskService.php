@@ -100,30 +100,46 @@ class TaskService
         $isAdmin = $this->actorHasManageWorkflows($actor);
 
         if (! $isAdmin || empty($data['created_by'])) {
-            // Prefer the actor's own employee_id. If the admin user was
-            // seeded without one (common — the bootstrap admin isn't a
-            // real employee), fall back to the assignee, which is
-            // meaningful UX: "admin assigned this task to X, so X is
-            // both creator and owner". Only fail hard when the admin
-            // gave nothing (no assignee, no explicit created_by, no
-            // linked employee) — offer a clear fix hint.
+            // Prefer the actor's own employee_id. Fall back to the
+            // assignee (meaningful: "admin assigned this to X, so X
+            // owns it"). If neither is set AND the actor is NOT admin,
+            // that's a bug — every real employee has an employee_id.
+            // If the actor IS admin, allow created_by to be null
+            // (tasks.created_by column is nullable — see migration
+            // 2026_09_20_100003) — the task is authored on behalf of
+            // the org and renders as "النظام / الأدمن" in the UI.
             $fallback = $actor->employee_id
                 ?? (! empty($data['assigned_to']) ? (int) $data['assigned_to'] : null);
 
-            if ($fallback === null) {
+            if ($fallback === null && ! $isAdmin) {
                 throw ValidationException::withMessages([
-                    'created_by' => 'حسابك غير مرتبط بموظف. اختر موظفاً في "المسند إليه"، أو اربط حسابك بسجل موظف من إدارة الموظفين.',
+                    'created_by' => 'حسابك غير مرتبط بموظف — تواصل مع الإدارة لربط حسابك.',
                 ]);
             }
 
             $data['created_by'] = $fallback;
         }
-        $createdBy = (int) $data['created_by'];
+        $createdBy = $data['created_by'] !== null ? (int) $data['created_by'] : null;
 
-        // `assigned_to` stays as-given: assigning a task to a teammate is a
-        // normal collaborative action, not a privilege escalation. Employee
-        // + admin both pass through here. The FormRequest already validates
-        // the target exists.
+        // Non-admins can only assign to teammates (same team_id) — this
+        // prevents a rogue employee from spamming tasks to strangers or
+        // using cross-team assignment to probe the org chart. Admins with
+        // manage-workflows keep the full-org reach.
+        if (! $isAdmin && ! empty($data['assigned_to'])) {
+            $me = $actor->employee;
+            $assigneeTeamId = \App\Models\Employee::query()
+                ->whereKey($data['assigned_to'])
+                ->value('team_id');
+
+            $selfAssign = (int) $data['assigned_to'] === (int) ($me?->id);
+            $sameTeam = $me?->team_id !== null && $me->team_id === $assigneeTeamId;
+
+            if (! $selfAssign && ! $sameTeam) {
+                throw ValidationException::withMessages([
+                    'assigned_to' => 'يمكنك إسناد المهمة لأعضاء فريقك فقط.',
+                ]);
+            }
+        }
 
         $statusId = $data['status_id'] ?? $this->statuses->firstBySortOrder()?->id;
 
@@ -173,12 +189,28 @@ class TaskService
     {
         $this->assertCanActOnTask($task, $actor);
 
-        // Reassignment is a normal collaborative action (matches the create
-        // path — see comment there). We previously blocked non-admins from
-        // reassigning away from themselves to prevent losing access, but
-        // that broke task-delegation flows and there's no security angle:
-        // assertCanActOnTask above already confirms the actor may edit
-        // this task, and a legitimate delegation happens all the time.
+        // Same team-scope guard as create: non-admins can reassign only
+        // within their own team (or to themselves). Admins with
+        // manage-workflows are unrestricted.
+        if (
+            array_key_exists('assigned_to', $data)
+            && ! empty($data['assigned_to'])
+            && ! $this->actorHasManageWorkflows($actor)
+        ) {
+            $me = $actor->employee;
+            $assigneeTeamId = \App\Models\Employee::query()
+                ->whereKey($data['assigned_to'])
+                ->value('team_id');
+
+            $selfAssign = (int) $data['assigned_to'] === (int) ($me?->id);
+            $sameTeam = $me?->team_id !== null && $me->team_id === $assigneeTeamId;
+
+            if (! $selfAssign && ! $sameTeam) {
+                throw ValidationException::withMessages([
+                    'assigned_to' => 'يمكنك إسناد المهمة لأعضاء فريقك فقط.',
+                ]);
+            }
+        }
 
         $tags = $data['tags'] ?? null;
         unset($data['tags']);

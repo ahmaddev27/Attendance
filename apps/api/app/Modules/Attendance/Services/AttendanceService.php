@@ -84,7 +84,10 @@ class AttendanceService
                 'status' => AttendanceStatus::Present,
             ])->save();
 
-            return $attendance->fresh();
+            // Load employee — the kiosk `AttendanceResource` needs it for
+            // the success card (name + number). `whenLoaded` in the resource
+            // hides the key otherwise, and the FE crashes on `.employee`.
+            return $attendance->fresh(['employee']);
         });
     }
 
@@ -148,7 +151,10 @@ class AttendanceService
                 $this->calculator->computeForAttendance($attendance, $schedule);
             }
 
-            return $attendance->fresh();
+            // Load employee — the kiosk `AttendanceResource` needs it for
+            // the success card (name + number). `whenLoaded` in the resource
+            // hides the key otherwise, and the FE crashes on `.employee`.
+            return $attendance->fresh(['employee']);
         });
     }
 }

@@ -8,6 +8,7 @@ import type {
   PaginatedResponse,
   ScanDeviceInfo,
   ScanResponse,
+  ScanStatus,
 } from '../types';
 
 export type AttendanceListParams = {
@@ -85,4 +86,15 @@ export const scanApi = {
 
   checkOut: (payload: ScanCheckPayload) =>
     publicApiClient.post<ScanResponse>('/scan/check-out', payload).then((r) => r.data),
+
+  /**
+   * Read-only probe: given (qr_token, employee_number), returns the
+   * employee's current state so the kiosk can show ONE button
+   * (check-in OR check-out) instead of two-and-a-guess. State is
+   * derived from today's attendance row on the server.
+   */
+  status: (payload: { qr_token: string; employee_number: number }) =>
+    publicApiClient
+      .post<{ data: ScanStatus }>('/scan/status', payload)
+      .then((r) => r.data.data),
 };

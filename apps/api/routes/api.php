@@ -96,6 +96,11 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::prefix('scan')->group(function () {
     Route::post('/check-in', [ScanController::class, 'checkIn'])->middleware('throttle:30,1');
     Route::post('/check-out', [ScanController::class, 'checkOut'])->middleware('throttle:30,1');
+    // Read-only "what's my state?" probe — the kiosk hits this first,
+    // then shows a single check-in OR check-out button based on the
+    // returned `state`. Higher throttle (60/min) since it's read-only
+    // and the kiosk may poll it after a returning employee taps.
+    Route::post('/status', [ScanController::class, 'status'])->middleware('throttle:60,1');
 
     // Kiosk display polling: no employee credential involved, so it gets a
     // more generous limit than the scan actions above.
@@ -308,6 +313,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // Employee's personal dashboard (M7). Scoped to $request->user()
     // at the service layer — no permission gate needed.
     Route::get('/me/dashboard/kpis', [EmployeeDashboardController::class, 'kpis']);
+
+    // Team roster the current user can assign tasks to — same team_id
+    // members, or the caller alone when they have no team. Any auth user;
+    // controller scopes by request->user()->employee->team_id.
+    Route::get('/me/team', [\App\Modules\Employees\Controllers\EmployeeController::class, 'myTeam']);
 
     // Notifications (M7). Every user sees only their own inbox — the
     // controller uses $request->user()->notifications, not a global list.

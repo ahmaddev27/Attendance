@@ -26,13 +26,13 @@ export function KanbanColumn({ status, tasks, countTotal, onTaskClick }: KanbanC
   const hiddenCount = Math.max(0, total - tasks.length);
 
   return (
-    <div className="flex w-72 shrink-0 flex-col rounded-xl border border-hairline bg-surface">
+    <div className="flex h-full w-80 shrink-0 flex-col rounded-xl border border-hairline bg-surface shadow-sm">
       <div
-        className="flex items-center justify-between rounded-t-xl border-b border-hairline px-3 py-2.5"
+        className="flex items-center justify-between rounded-t-xl border-b border-hairline px-3 py-3"
         style={{ backgroundColor: withAlpha(status.color, 0.1) }}
       >
         <div className="flex min-w-0 items-center gap-2">
-          <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: status.color }} aria-hidden="true" />
+          <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: status.color }} aria-hidden="true" />
           <span className="truncate text-sm font-semibold text-ink">{status.name}</span>
         </div>
         <span className="num shrink-0 rounded-full bg-surface px-2 py-0.5 text-xs font-semibold text-ink-2">
@@ -43,11 +43,15 @@ export function KanbanColumn({ status, tasks, countTotal, onTaskClick }: KanbanC
       <div
         ref={setNodeRef}
         className={cn(
-          'flex min-h-[140px] flex-1 flex-col gap-2 overflow-y-auto p-2.5 transition-colors',
+          'flex flex-1 flex-col gap-2 overflow-y-auto p-2.5 transition-colors',
           isOver && 'bg-brand-soft/50'
         )}
       >
-        {tasks.length === 0 && <p className="py-8 text-center text-xs text-muted">لا مهام</p>}
+        {tasks.length === 0 && (
+          <div className="flex flex-1 items-center justify-center py-12 text-center text-xs text-muted">
+            لا مهام
+          </div>
+        )}
         {tasks.map((task) => (
           <TaskCard key={task.id} task={task} onClick={() => onTaskClick(task)} />
         ))}

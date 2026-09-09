@@ -41,6 +41,7 @@ import { TaskPicker, type TaskPickerOption } from '@/components/tasks/task-picke
 import { TaskTagPicker } from '@/components/tasks/task-tag-picker';
 import { taskPrioritiesApi, taskStatusesApi } from '@/lib/api/endpoints/task-config';
 import { tasksApi } from '@/lib/api/endpoints/tasks';
+import { hasPermission, useAuthStore } from '@/lib/stores/auth-store';
 import type { EmployeeSummary, Task, TaskDetail, TaskPayload, TaskTag } from '@/lib/api/types';
 
 const taskFormSchema = z
@@ -103,6 +104,8 @@ type TaskFormDialogProps = {
 export function TaskFormDialog({ open, onOpenChange, task, defaultParentTask }: TaskFormDialogProps) {
   const isEdit = !!task;
   const queryClient = useQueryClient();
+  const user = useAuthStore((s) => s.user);
+  const isAdmin = hasPermission(user, 'manage-workflows');
 
   const [assignee, setAssignee] = React.useState<EmployeeSummary | null>(null);
   const [parentTask, setParentTask] = React.useState<TaskPickerOption | null>(null);
@@ -289,7 +292,15 @@ export function TaskFormDialog({ open, onOpenChange, task, defaultParentTask }: 
 
             <div className="flex flex-col gap-2">
               <Label>الموظف المسند إليه (اختياري)</Label>
-              <EmployeeSearchSelect value={assignee} onChange={setAssignee} placeholder="بدون إسناد" />
+              <EmployeeSearchSelect
+                value={assignee}
+                onChange={setAssignee}
+                placeholder="بدون إسناد"
+                source={isAdmin ? 'all' : 'my-team'}
+              />
+              {!isAdmin && (
+                <p className="text-xs text-muted">تظهر لك أعضاء فريقك فقط</p>
+              )}
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

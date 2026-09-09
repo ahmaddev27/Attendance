@@ -116,21 +116,29 @@ export type AttendanceDevice = {
   id: number;
   name: string;
   qr_token: string;
+  /** 0 = QR never rotates (printed-poster mode). >0 = rotation window in seconds. */
   qr_rotates_every_seconds: number;
   last_token_rotated_at: string | null;
   allowed_lat: number | null;
   allowed_lng: number | null;
   allowed_radius_meters: number | null;
   ip_whitelist: string[] | null;
+  /** When true, FraudGuard rejects scans outside allowed_lat/lng/radius. */
+  enforce_geo: boolean;
+  /** When true, FraudGuard rejects scans from IPs not in ip_whitelist. */
+  enforce_ip: boolean;
   is_active: boolean;
 };
 
 export type AttendanceDevicePayload = {
   name: string;
+  qr_rotates_every_seconds?: number | null;
   allowed_lat?: number | null;
   allowed_lng?: number | null;
   allowed_radius_meters?: number | null;
   ip_whitelist?: string[] | null;
+  enforce_geo?: boolean;
+  enforce_ip?: boolean;
   is_active: boolean;
 };
 
@@ -208,6 +216,20 @@ export type ScanResponse = {
   attendance: Attendance;
   /** Arabic, user-facing */
   message: string;
+};
+
+export type ScanStatus = {
+  /**
+   * `not_checked_in`: today's row is missing check_in_at → kiosk shows the
+   * check-in button. `checked_in`: check_in_at set but no check_out yet →
+   * kiosk shows check-out. `checked_out`: both stamped → the daily cycle
+   * is done, kiosk shows a "see you tomorrow" state.
+   */
+  state: 'not_checked_in' | 'checked_in' | 'checked_out';
+  employee: { id: number; employee_number: number; full_name: string };
+  check_in_at: string | null;
+  check_out_at: string | null;
+  device_name: string;
 };
 
 // ---------------------------------------------------------------------------

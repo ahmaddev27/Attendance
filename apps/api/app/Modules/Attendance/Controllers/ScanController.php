@@ -55,6 +55,64 @@ class ScanController extends Controller
     }
 
     /**
+     * `POST /api/scan/status` — the kiosk asks: "what's the next action
+     * for this employee at this device?" Returns exactly one of:
+     *   - not_checked_in   → today's row has no check_in_at → show
+     *                        "تسجيل حضور" button
+     *   - checked_in       → check_in_at set + check_out_at null → show
+     *                        "تسجيل انصراف" button
+     *   - checked_out      → both set → today's cycle done, show a
+     *                        friendly "done for today" message
+     *
+     * The frontend uses this to auto-pick the correct button instead of
+     * asking the employee to guess. QR token + employee_number are the
+     * same auth as check-in/out — no session, kiosk-mode by design.
+     */
+    public function status(\App\Modules\Attendance\Requests\ScanStatusRequest $request): JsonResponse
+    {
+        try {
+            $device = $this->qrTokens->resolveDevice($request->qrToken());
+
+            $employee = Employee::query()
+                ->where('employee_number', $request->employeeNumber())
+                ->where('status', EmployeeStatus::Active)
+                ->first();
+
+            if (! $employee) {
+                throw new InvalidScanCredentialsException('Unknown employee number.');
+            }
+
+            $today = now()->toDateString();
+            $attendance = \App\Models\Attendance::query()
+                ->where('employee_id', $employee->id)
+                ->where('date', $today)
+                ->first();
+
+            $state = match (true) {
+                $attendance === null || $attendance->check_in_at === null => 'not_checked_in',
+                $attendance->check_out_at === null => 'checked_in',
+                default => 'checked_out',
+            };
+
+            return response()->json([
+                'data' => [
+                    'state' => $state,
+                    'employee' => [
+                        'id' => $employee->id,
+                        'employee_number' => $employee->employee_number,
+                        'full_name' => $employee->full_name,
+                    ],
+                    'check_in_at' => $attendance?->check_in_at?->toIso8601String(),
+                    'check_out_at' => $attendance?->check_out_at?->toIso8601String(),
+                    'device_name' => $device->name,
+                ],
+            ]);
+        } catch (AttendanceModuleException $exception) {
+            return response()->json(['message' => $exception->getMessage()], $exception->statusCode());
+        }
+    }
+
+    /**
      * Lightweight endpoint for the kiosk display: confirms the token is
      * still valid and returns the server clock, without requiring an
      * employee number.
@@ -102,18 +160,25 @@ class ScanController extends Controller
                 throw new InvalidScanCredentialsException('Unknown employee number.');
             }
 
-            // Separate check so a disabled User (revoked at off-boarding
-            // via EmployeeService::softDelete) gets a distinct signal
-            // rather than being lumped in with "unknown number".
+            // Merged with "unknown number" to avoid an enumeration oracle:
+            // an attacker with a valid kiosk QR token would otherwise be
+            // able to walk `employee_number` and distinguish
+            // "no such number" (200/422) from "number exists but disabled"
+            // (403), enumerating the terminated-employee directory.
             if ($employee->user && ! $employee->user->is_active) {
-                abort(403, 'Account not active.');
+                throw new InvalidScanCredentialsException('Unknown employee number.');
             }
 
             $attendance = $action($employee, $device);
 
-            return (new AttendanceResource($attendance))
-                ->response()
-                ->setStatusCode(200);
+            // FE contract: `{ attendance, message }`. We wrap the resource
+            // ourselves rather than let `AttendanceResource` bind it under
+            // `data`, so the kiosk can read `attendance.employee.*`
+            // directly for the success card.
+            return response()->json([
+                'attendance' => (new AttendanceResource($attendance))->resolve(),
+                'message' => 'تم تسجيل العملية بنجاح',
+            ]);
         } catch (AttendanceModuleException $exception) {
             return response()->json(['message' => $exception->getMessage()], $exception->statusCode());
         }
