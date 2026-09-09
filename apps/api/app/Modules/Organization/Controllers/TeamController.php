@@ -16,15 +16,18 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class TeamController extends Controller
 {
+    private const DEFAULT_PER_PAGE = 100;
+
     public function __construct(
         private readonly TeamService $teams,
     ) {}
 
     public function index(Request $request): AnonymousResourceCollection
     {
-        $teams = $this->teams->list($request->only(['active', 'department_id']));
+        $filters = $request->only(['active', 'is_active', 'department_id', 'search']);
+        $perPage = (int) $request->integer('per_page', self::DEFAULT_PER_PAGE);
 
-        return TeamResource::collection($teams);
+        return TeamResource::collection($this->teams->paginate($filters, $perPage));
     }
 
     public function store(StoreTeamRequest $request): JsonResponse

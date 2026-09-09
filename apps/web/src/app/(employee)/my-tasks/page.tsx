@@ -62,8 +62,8 @@ export default function MyTasksPage() {
     per_page: PER_PAGE,
     search: debouncedSearch || undefined,
     status_id: statusId ? Number(statusId) : undefined,
-    due_from: dueFrom || undefined,
-    due_to: dueTo || undefined,
+    due_date_from: dueFrom || undefined,
+    due_date_to: dueTo || undefined,
   };
 
   const { data, isLoading } = useQuery({

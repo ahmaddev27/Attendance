@@ -47,17 +47,25 @@ const serwist = new Serwist({
     // shell if the network drops. The camera + form component code
     // is precached (bundled Next.js chunk), so the page is fully
     // interactive without network.
+    //
+    // Serwist matches a RegExp matcher against `url.href` (the full
+    // absolute URL like `https://…/scan/xyz`) — a `^`-anchored path
+    // pattern like `/^\/scan\//` never matches, so this cache was
+    // silently empty and offline check-in didn't work. Use the same
+    // function-matcher form used below for `/_next/`.
     {
-      matcher: /^\/scan\//,
+      matcher: ({ url }) => url.pathname.startsWith('/scan/'),
       handler: new NetworkFirst({
         cacheName: 'taqat-scan',
         networkTimeoutSeconds: 3,
       }),
     },
     // Public GETs from the API (device_info) — brief cache so a re-open
-    // within the same shift is instant.
+    // within the same shift is instant. Same reason as above: a
+    // `^`-anchored path RegExp never matched `url.href`, so switch to
+    // the function-matcher form.
     {
-      matcher: /^\/api\/scan\/device\//,
+      matcher: ({ url }) => url.pathname.startsWith('/api/scan/device/'),
       handler: new StaleWhileRevalidate({
         cacheName: 'taqat-scan-device',
       }),

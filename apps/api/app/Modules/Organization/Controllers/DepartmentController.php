@@ -16,15 +16,18 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class DepartmentController extends Controller
 {
+    private const DEFAULT_PER_PAGE = 100;
+
     public function __construct(
         private readonly DepartmentService $departments,
     ) {}
 
     public function index(Request $request): AnonymousResourceCollection
     {
-        $departments = $this->departments->list($request->only(['active']));
+        $filters = $request->only(['active', 'is_active', 'search']);
+        $perPage = (int) $request->integer('per_page', self::DEFAULT_PER_PAGE);
 
-        return DepartmentResource::collection($departments);
+        return DepartmentResource::collection($this->departments->paginate($filters, $perPage));
     }
 
     public function store(StoreDepartmentRequest $request): JsonResponse

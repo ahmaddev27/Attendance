@@ -42,7 +42,7 @@ export default function EmployeeMonthlyAttendancePage() {
   const { data: monthAttendance } = useQuery({
     queryKey: ['attendance-monthly-days', employeeId, year, month],
     queryFn: () =>
-      attendanceApi.list({ employee_id: employeeId, from: range.from, to: range.to, per_page: 100 }),
+      attendanceApi.list({ employee_id: employeeId, date_from: range.from, date_to: range.to, per_page: 100 }),
     enabled: Number.isFinite(employeeId) && Boolean(year) && Boolean(month),
   });
 

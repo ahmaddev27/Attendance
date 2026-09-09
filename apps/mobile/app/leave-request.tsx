@@ -3,12 +3,14 @@
  *
  * Fields:
  *   - leave_type_id  (Select — fetched from /leave-types)
- *   - from_date      (YYYY-MM-DD)
- *   - to_date        (YYYY-MM-DD)
+ *   - start_date     (YYYY-MM-DD)
+ *   - end_date       (YYYY-MM-DD)
  *   - reason         (optional multi-line)
  *
- * Posts to /leave-requests then pops the modal and invalidates the leaves
- * list so the caller sees the pending row immediately.
+ * Posts to /me/leaves (self-service submit — admin /leave-requests
+ * requires employee_id and the manage-leaves permission) then pops the
+ * modal and invalidates the leaves list so the caller sees the pending
+ * row immediately.
  *
  * Date pickers are deferred — a plain TextInput with a YYYY-MM-DD hint keeps
  * the dep list clean for wave 3.
@@ -45,15 +47,15 @@ interface Paginated<T> {
 
 interface FormState {
   leave_type_id: number | null;
-  from_date: string;
-  to_date: string;
+  start_date: string;
+  end_date: string;
   reason: string;
 }
 
 const INITIAL: FormState = {
   leave_type_id: null,
-  from_date: '',
-  to_date: '',
+  start_date: '',
+  end_date: '',
   reason: '',
 };
 
@@ -76,10 +78,10 @@ export default function LeaveRequestScreen() {
 
   const submit = useMutation({
     mutationFn: () =>
-      api.post('/leave-requests', {
+      api.post('/me/leaves', {
         leave_type_id: form.leave_type_id,
-        from_date: form.from_date,
-        to_date: form.to_date,
+        start_date: form.start_date,
+        end_date: form.end_date,
         reason: form.reason || null,
       }),
     onSuccess: () => {
@@ -92,8 +94,8 @@ export default function LeaveRequestScreen() {
   const canSubmit = useMemo(
     () =>
       form.leave_type_id != null &&
-      DATE_RE.test(form.from_date) &&
-      DATE_RE.test(form.to_date),
+      DATE_RE.test(form.start_date) &&
+      DATE_RE.test(form.end_date),
     [form],
   );
 
@@ -147,8 +149,8 @@ export default function LeaveRequestScreen() {
 
         <Field label="من تاريخ">
           <TextInput
-            value={form.from_date}
-            onChangeText={(v) => setField('from_date', v.trim())}
+            value={form.start_date}
+            onChangeText={(v) => setField('start_date', v.trim())}
             placeholder="YYYY-MM-DD"
             placeholderTextColor={colors.textSubtle}
             autoCapitalize="none"
@@ -158,8 +160,8 @@ export default function LeaveRequestScreen() {
 
         <Field label="إلى تاريخ">
           <TextInput
-            value={form.to_date}
-            onChangeText={(v) => setField('to_date', v.trim())}
+            value={form.end_date}
+            onChangeText={(v) => setField('end_date', v.trim())}
             placeholder="YYYY-MM-DD"
             placeholderTextColor={colors.textSubtle}
             autoCapitalize="none"

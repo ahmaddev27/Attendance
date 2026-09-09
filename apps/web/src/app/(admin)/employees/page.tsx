@@ -18,6 +18,7 @@ import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { departmentsApi } from '@/lib/api/endpoints/departments';
 import { employeesApi } from '@/lib/api/endpoints/employees';
 import { teamsApi } from '@/lib/api/endpoints/teams';
+import { hasPermission, useAuthStore } from '@/lib/stores/auth-store';
 import type { Employee, EmployeeStatus } from '@/lib/api/types';
 import { EMPLOYEE_STATUS_OPTIONS } from '@/lib/constants/employee-options';
 
@@ -25,6 +26,8 @@ const PER_PAGE = 20;
 
 export default function EmployeesPage() {
   const router = useRouter();
+  const user = useAuthStore((s) => s.user);
+  const canManageUsers = hasPermission(user, 'manage-users');
   const [page, setPage] = React.useState(1);
   const [search, setSearch] = React.useState('');
   const [departmentId, setDepartmentId] = React.useState<string | undefined>();
@@ -187,7 +190,14 @@ export default function EmployeesPage() {
             onClick: (employee) => router.push(`/employees/${employee.id}/leaves`),
           },
           { label: 'تعديل', icon: Pencil, onClick: openEditDialog },
-          { label: 'إعادة تعيين كلمة السر', icon: KeyRound, onClick: setResetPasswordEmployee },
+          // The reset-password endpoint is gated by `permission:manage-users`
+          // on the API side; hide the row action for users who cannot call it.
+          {
+            label: 'إعادة تعيين كلمة السر',
+            icon: KeyRound,
+            onClick: setResetPasswordEmployee,
+            hidden: () => !canManageUsers,
+          },
           { label: 'حذف', icon: Trash2, variant: 'destructive', onClick: setDeletingEmployee },
         ]}
         pagination={data ? { meta: data.meta, onPageChange: setPage } : undefined}

@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Modules\Organization\Repositories\DepartmentRepository;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\ValidationException;
 
@@ -24,6 +25,14 @@ class DepartmentService
     public function list(array $filters): Collection
     {
         return $this->departments->list($filters);
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     */
+    public function paginate(array $filters, int $perPage): LengthAwarePaginator
+    {
+        return $this->departments->paginate($filters, $perPage);
     }
 
     public function find(int $id): Department

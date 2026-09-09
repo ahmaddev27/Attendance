@@ -62,8 +62,8 @@ export default function EmployeeLeavesPage() {
       (
         await leaveRequestsApi.list({
           employee_id: employeeId,
-          from: `${year}-01-01`,
-          to: `${year}-12-31`,
+          start_date: `${year}-01-01`,
+          end_date: `${year}-12-31`,
           per_page: 100,
         })
       ).data.data,

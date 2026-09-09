@@ -34,7 +34,14 @@ class RequestController extends Controller
 
     public function index(HttpRequest $request): AnonymousResourceCollection
     {
-        $filters = $request->only(['employee_id', 'request_type_id', 'status']);
+        $filters = $request->only([
+            'employee_id',
+            'request_type_id',
+            'status',
+            'search',
+            'from',
+            'to',
+        ]);
         $perPage = (int) $request->integer('per_page', self::DEFAULT_PER_PAGE);
 
         return RequestResource::collection($this->requests->listAdmin($filters, $perPage));

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Leaves\Services;
 
 use App\Models\Employee;
-use App\Models\Holiday;
+use App\Modules\Attendance\Repositories\HolidayRepository;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
 
@@ -20,6 +20,10 @@ use Illuminate\Validation\ValidationException;
  */
 class LeaveWorkingDaysCalculator
 {
+    public function __construct(
+        private readonly HolidayRepository $holidays,
+    ) {}
+
     public function compute(Employee $employee, Carbon $start, Carbon $end): float
     {
         $schedule = $employee->workSchedule;
@@ -33,11 +37,19 @@ class LeaveWorkingDaysCalculator
             ]);
         }
 
+        // Fetch every holiday in the range in a single query and hydrate a
+        // lookup set. Old code hit `Holiday::forDate($cursor)->exists()`
+        // inside the day loop — a 30-day leave triggered 30 SELECT
+        // EXISTS(...) queries on the holidays table (a documented N+1
+        // caught in the DB audit).
+        $holidayDates = $this->holidays->datesInRange($start, $end)->flip();
+
         $workingDays = 0;
         $cursor = $start->copy();
 
         while ($cursor->lte($end)) {
-            if ($schedule->isWorkday($cursor) && ! Holiday::forDate($cursor)->exists()) {
+            $dateKey = $cursor->toDateString();
+            if ($schedule->isWorkday($cursor) && ! $holidayDates->has($dateKey)) {
                 $workingDays++;
             }
 

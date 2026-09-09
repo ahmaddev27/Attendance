@@ -6,6 +6,7 @@ namespace App\Modules\Organization\Services;
 
 use App\Models\Position;
 use App\Modules\Organization\Repositories\PositionRepository;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 
 class PositionService
@@ -21,6 +22,14 @@ class PositionService
     public function list(array $filters): Collection
     {
         return $this->positions->list($filters);
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     */
+    public function paginate(array $filters, int $perPage): LengthAwarePaginator
+    {
+        return $this->positions->paginate($filters, $perPage);
     }
 
     public function find(int $id): Position

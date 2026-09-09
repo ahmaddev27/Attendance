@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Scout\Searchable;
 
 class Employee extends Model
@@ -172,6 +173,23 @@ class Employee extends Model
     public function getFullNameAttribute(): string
     {
         return trim("{$this->first_name} {$this->last_name}");
+    }
+
+    /**
+     * Public URL for the employee's uploaded avatar, or null when unset.
+     *
+     * `avatar_path` stores a filesystem-relative path on the configured
+     * public disk; the frontend renders <img src=avatar_url>, so the
+     * absolute URL is derived here rather than duplicated on every
+     * consumer resource.
+     */
+    public function getAvatarUrlAttribute(): ?string
+    {
+        if (empty($this->avatar_path)) {
+            return null;
+        }
+
+        return Storage::disk('public')->url($this->avatar_path);
     }
 
     /**

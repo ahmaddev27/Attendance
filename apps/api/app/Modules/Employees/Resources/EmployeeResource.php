@@ -31,7 +31,10 @@ class EmployeeResource extends JsonResource
             'gender' => $this->gender?->value,
             'joining_date' => $this->joining_date?->toDateString(),
             'birth_date' => $this->birth_date?->toDateString(),
-            'avatar_path' => $this->avatar_path,
+            // `avatar_path` is an internal storage key. The frontend
+            // only ever renders the resolved public URL, so expose that
+            // instead of the raw column.
+            'avatar_url' => $this->avatar_url,
             'notes' => $this->notes,
             'position' => $this->whenLoaded('position', fn () => $this->position === null ? null : [
                 'id' => $this->position->id,

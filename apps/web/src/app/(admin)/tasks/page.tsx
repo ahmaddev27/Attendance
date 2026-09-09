@@ -89,8 +89,8 @@ export default function TasksPage() {
         priority_id: priorityId ? Number(priorityId) : undefined,
         tag_id: tagId ? Number(tagId) : undefined,
         assigned_to: assignee?.id,
-        due_from: dueFrom || undefined,
-        due_to: dueTo || undefined,
+        due_date_from: dueFrom || undefined,
+        due_date_to: dueTo || undefined,
       });
       return data;
     },

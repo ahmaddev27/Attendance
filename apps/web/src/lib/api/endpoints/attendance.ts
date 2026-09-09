@@ -14,12 +14,23 @@ export type AttendanceListParams = {
   page?: number;
   per_page?: number;
   employee_id?: number;
-  from?: string;
-  to?: string;
+  date_from?: string;
+  date_to?: string;
   status?: AttendanceStatus;
 };
 
-export type AttendanceExportParams = Omit<AttendanceListParams, 'page' | 'per_page'>;
+/**
+ * `/admin/reports/attendance/monthly` — the shared monthly-report endpoint
+ * that streams CSV/xlsx/pdf. Kept separate from AttendanceListParams
+ * because the report is aggregated by employee/month, not a filtered
+ * copy of the raw attendance log.
+ */
+export type AttendanceExportParams = {
+  year: number;
+  month: number;
+  department_id?: number;
+  format?: 'csv' | 'xlsx' | 'pdf';
+};
 
 export const attendanceApi = {
   list: (params: AttendanceListParams = {}) =>
@@ -37,10 +48,15 @@ export const attendanceApi = {
       )
       .then((r) => r.data.data),
 
-  /** Downloads the filtered attendance log as a CSV blob. */
-  exportCsv: (params: AttendanceExportParams = {}) =>
+  /**
+   * Downloads the monthly attendance report as a CSV blob. Delegates to
+   * `/admin/reports/attendance/monthly?format=csv`, which is the only
+   * endpoint that actually knows how to stream a file — the raw
+   * `/attendance` list has no format branch.
+   */
+  exportCsv: (params: AttendanceExportParams) =>
     apiClient
-      .get('/attendance', {
+      .get('/admin/reports/attendance/monthly', {
         params: { ...params, format: 'csv' },
         responseType: 'blob',
       })

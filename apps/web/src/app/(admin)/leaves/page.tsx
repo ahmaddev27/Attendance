@@ -54,11 +54,13 @@ export default function LeavesPage() {
   const [viewTarget, setViewTarget] = React.useState<LeaveRequest | null>(null);
 
   const filters = {
-    status,
+    // The backend repository treats an unknown status as "match nothing";
+    // 'all' is a UI-only sentinel and must be dropped before the request.
+    status: status === 'all' ? undefined : status,
     leave_type_id: leaveTypeId ? Number(leaveTypeId) : undefined,
     employee_id: employee?.id,
-    from: from || undefined,
-    to: to || undefined,
+    start_date: from || undefined,
+    end_date: to || undefined,
   };
 
   React.useEffect(() => {

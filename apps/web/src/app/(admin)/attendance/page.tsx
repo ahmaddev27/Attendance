@@ -53,8 +53,8 @@ export default function AttendancePage() {
   const [exporting, setExporting] = useState(false);
 
   const filters = {
-    from: from || undefined,
-    to: to || undefined,
+    date_from: from || undefined,
+    date_to: to || undefined,
     employee_id: employee?.id,
     status: status === 'all' ? undefined : status,
   };
@@ -75,11 +75,16 @@ export default function AttendancePage() {
   const handleExport = async () => {
     setExporting(true);
     try {
-      const blob = await attendanceApi.exportCsv(filters);
+      // The report endpoint aggregates by (year, month). Derive them from
+      // the "from" filter when set, otherwise fall back to the current month.
+      const anchor = from ? new Date(`${from}T00:00:00`) : new Date();
+      const year = anchor.getFullYear();
+      const month = anchor.getMonth() + 1;
+      const blob = await attendanceApi.exportCsv({ year, month });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `attendance-${from || 'all'}-${to || 'all'}.csv`;
+      link.download = `attendance-${year}-${String(month).padStart(2, '0')}.csv`;
       document.body.appendChild(link);
       link.click();
       link.remove();

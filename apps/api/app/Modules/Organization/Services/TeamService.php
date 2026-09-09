@@ -6,6 +6,7 @@ namespace App\Modules\Organization\Services;
 
 use App\Models\Team;
 use App\Modules\Organization\Repositories\TeamRepository;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 
 class TeamService
@@ -21,6 +22,14 @@ class TeamService
     public function list(array $filters): Collection
     {
         return $this->teams->list($filters);
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     */
+    public function paginate(array $filters, int $perPage): LengthAwarePaginator
+    {
+        return $this->teams->paginate($filters, $perPage);
     }
 
     public function find(int $id): Team

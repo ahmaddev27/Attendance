@@ -53,7 +53,9 @@ export default function RequestsPage() {
         page,
         per_page: PER_PAGE,
         search: debouncedSearch || undefined,
-        status: (status as RequestStatus | undefined) ?? 'all',
+        // 'all' is a UI-only sentinel — the backend repository filters
+        // by status literally, so passing 'all' would match nothing.
+        status: status && status !== 'all' ? (status as RequestStatus) : undefined,
         request_type_id: requestTypeId ? Number(requestTypeId) : undefined,
         employee_id: employee?.id,
         from: from || undefined,

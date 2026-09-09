@@ -17,8 +17,8 @@ import { colors, radius, spacing, typography } from '../../lib/theme';
 interface LeaveRequest {
   id: number;
   leave_type?: { name?: string; color?: string } | null;
-  from_date?: string;
-  to_date?: string;
+  start_date?: string;
+  end_date?: string;
   days?: number;
   status?: string;
   reason?: string | null;
@@ -102,7 +102,7 @@ function LeaveRow({ leave }: { leave: LeaveRequest }) {
       </View>
 
       <Text style={styles.dates}>
-        {leave.from_date ?? '—'} → {leave.to_date ?? '—'}
+        {leave.start_date ?? '—'} → {leave.end_date ?? '—'}
         {typeof leave.days === 'number' ? `  •  ${leave.days} يوم` : ''}
       </Text>
 

@@ -21,6 +21,11 @@ class TeamResource extends JsonResource
         return [
             'id' => $this->id,
             'department_id' => $this->department_id,
+            'department' => $this->whenLoaded('department', fn () => $this->department === null ? null : [
+                'id' => $this->department->id,
+                'name' => $this->department->name,
+                'code' => $this->department->code,
+            ]),
             'name' => $this->name,
             'leader' => $this->whenLoaded('leader', fn () => $this->leader === null ? null : [
                 'id' => $this->leader->id,

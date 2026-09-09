@@ -40,6 +40,18 @@ class AttendanceController extends Controller
     {
         $summary = $this->calculator->monthlySummary($employee, $year, $month);
 
-        return response()->json($summary->toArray());
+        // Wrap in `data` to match every other resource-shaped endpoint in
+        // the app, and merge in the minimal employee block the frontend
+        // header renders (avatar + name + employee number).
+        return response()->json([
+            'data' => [
+                'employee' => [
+                    'id' => $employee->id,
+                    'employee_number' => $employee->employee_number,
+                    'full_name' => $employee->full_name,
+                ],
+                ...$summary->toArray(),
+            ],
+        ]);
     }
 }

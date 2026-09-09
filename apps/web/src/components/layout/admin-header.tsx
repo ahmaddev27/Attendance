@@ -2,11 +2,12 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { Menu } from 'lucide-react';
+import { Menu, Search } from 'lucide-react';
 
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { SidebarNav, UserFooter } from '@/components/layout/admin-sidebar';
 import { NotificationBell } from '@/components/notifications/notification-bell';
+import { GlobalSearch, useGlobalSearchTrigger } from '@/components/search/global-search';
 
 /**
  * Header bar visible on every admin page.
@@ -25,6 +26,10 @@ import { NotificationBell } from '@/components/notifications/notification-bell';
  */
 export function AdminHeader() {
   const [open, setOpen] = useState(false);
+  // The trigger hook owns the palette's open state AND the Cmd/Ctrl+K
+  // keyboard shortcut — mounting <GlobalSearch /> here is what makes
+  // the shortcut actually surface anywhere in the admin shell.
+  const { open: searchOpen, setOpen: setSearchOpen } = useGlobalSearchTrigger();
 
   return (
     <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-hairline bg-surface px-4 py-3 md:px-6">
@@ -52,8 +57,22 @@ export function AdminHeader() {
         />
       </div>
 
+      {/* Global search trigger — sits just before the bell at the reading
+          end. Cmd/Ctrl+K also opens it via the hook. */}
+      <button
+        type="button"
+        onClick={() => setSearchOpen(true)}
+        aria-label="بحث عام (⌘K)"
+        title="بحث عام (⌘K)"
+        className="grid h-9 w-9 place-items-center rounded-md text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
+      >
+        <Search className="h-5 w-5" />
+      </button>
+
       {/* Bell — reading-end anchor at every breakpoint. */}
       <NotificationBell />
+
+      <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} />
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="flex max-h-[80vh] flex-col gap-4 p-4">

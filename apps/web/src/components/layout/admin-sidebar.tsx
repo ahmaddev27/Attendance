@@ -115,8 +115,11 @@ export function UserFooter() {
 
   const initial = user?.name?.trim()?.charAt(0)?.toUpperCase() || '؟';
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    // `logout()` now revokes the Sanctum token on the server before
+    // clearing local state — await it so we don't race a still-in-flight
+    // POST /auth/logout against the /login navigation.
+    await logout();
     router.replace('/login');
   };
 

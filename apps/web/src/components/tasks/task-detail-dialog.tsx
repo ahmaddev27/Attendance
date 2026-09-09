@@ -100,10 +100,18 @@ export function TaskDetailDialog({ taskId, onOpenChange, onNavigate }: TaskDetai
     setProgressDraft(task.progress_percent);
   }, [task]);
 
+  // Every mutation pins the task id into its `variables` instead of
+  // closing over the current `taskId` prop. Without this, calling
+  // `onNavigate?.(subtask.id)` while a PATCH/COMPLETE was still
+  // in-flight would land task-A's response into task-B's cache
+  // (because mutationFn + onSuccess used the LATEST prop, not the
+  // one the request was issued against). Passing the id through the
+  // variables freezes it per-call.
   const updateMutation = useMutation({
-    mutationFn: (payload: Partial<TaskPayload>) => tasksApi.update(taskId!, payload),
-    onSuccess: (response) => {
-      queryClient.setQueryData(['tasks', 'detail', taskId], response.data.data);
+    mutationFn: ({ taskId, payload }: { taskId: number; payload: Partial<TaskPayload> }) =>
+      tasksApi.update(taskId, payload),
+    onSuccess: (response, vars) => {
+      queryClient.setQueryData(['tasks', 'detail', vars.taskId], response.data.data);
       queryClient.invalidateQueries({ queryKey: ['tasks', 'kanban'] });
       queryClient.invalidateQueries({ queryKey: ['tasks', 'list'] });
     },
@@ -111,10 +119,10 @@ export function TaskDetailDialog({ taskId, onOpenChange, onNavigate }: TaskDetai
   });
 
   const completeMutation = useMutation({
-    mutationFn: () => tasksApi.complete(taskId!),
-    onSuccess: (response) => {
+    mutationFn: (id: number) => tasksApi.complete(id),
+    onSuccess: (response, id) => {
       toast.success('تم إكمال المهمة');
-      queryClient.setQueryData(['tasks', 'detail', taskId], response.data.data);
+      queryClient.setQueryData(['tasks', 'detail', id], response.data.data);
       queryClient.invalidateQueries({ queryKey: ['tasks', 'kanban'] });
       queryClient.invalidateQueries({ queryKey: ['tasks', 'list'] });
     },
@@ -122,7 +130,7 @@ export function TaskDetailDialog({ taskId, onOpenChange, onNavigate }: TaskDetai
   });
 
   const deleteMutation = useMutation({
-    mutationFn: () => tasksApi.delete(taskId!),
+    mutationFn: (id: number) => tasksApi.delete(id),
     onSuccess: () => {
       toast.success('تم حذف المهمة');
       queryClient.invalidateQueries({ queryKey: ['tasks', 'kanban'] });
@@ -149,29 +157,31 @@ export function TaskDetailDialog({ taskId, onOpenChange, onNavigate }: TaskDetai
       setTitleDraft(task?.title ?? '');
       return;
     }
-    if (trimmed !== task.title) updateMutation.mutate({ title: trimmed });
+    if (trimmed !== task.title) updateMutation.mutate({ taskId: task.id, payload: { title: trimmed } });
     setEditingTitle(false);
   };
 
   const saveDescription = () => {
     if (!task) return;
     if (descriptionDraft !== (task.description ?? '')) {
-      updateMutation.mutate({ description: descriptionDraft || undefined });
+      updateMutation.mutate({ taskId: task.id, payload: { description: descriptionDraft || undefined } });
     }
     setEditingDescription(false);
   };
 
   const commitProgress = () => {
     if (!task || progressDraft === task.progress_percent) return;
-    updateMutation.mutate({ progress_percent: progressDraft });
+    updateMutation.mutate({ taskId: task.id, payload: { progress_percent: progressDraft } });
   };
 
   const handleAssigneeChange = (employee: EmployeeSummary | null) => {
-    updateMutation.mutate({ assigned_to: employee?.id ?? null });
+    if (!task) return;
+    updateMutation.mutate({ taskId: task.id, payload: { assigned_to: employee?.id ?? null } });
   };
 
   const handleTagsChange = (nextTags: TaskTag[]) => {
-    updateMutation.mutate({ tag_ids: nextTags.map((t) => t.id) });
+    if (!task) return;
+    updateMutation.mutate({ taskId: task.id, payload: { tag_ids: nextTags.map((t) => t.id) } });
   };
 
   const handleDialogOpenChange = (next: boolean) => {
@@ -323,7 +333,10 @@ export function TaskDetailDialog({ taskId, onOpenChange, onNavigate }: TaskDetai
                 <div className="space-y-5">
                   <div className="space-y-1.5">
                     <Label className="text-xs font-semibold text-ink-2">الحالة</Label>
-                    <Select value={String(task.status.id)} onValueChange={(v) => updateMutation.mutate({ status_id: Number(v) })}>
+                    <Select
+                      value={String(task.status.id)}
+                      onValueChange={(v) => updateMutation.mutate({ taskId: task.id, payload: { status_id: Number(v) } })}
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -339,7 +352,10 @@ export function TaskDetailDialog({ taskId, onOpenChange, onNavigate }: TaskDetai
 
                   <div className="space-y-1.5">
                     <Label className="text-xs font-semibold text-ink-2">الأولوية</Label>
-                    <Select value={String(task.priority.id)} onValueChange={(v) => updateMutation.mutate({ priority_id: Number(v) })}>
+                    <Select
+                      value={String(task.priority.id)}
+                      onValueChange={(v) => updateMutation.mutate({ taskId: task.id, payload: { priority_id: Number(v) } })}
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -367,7 +383,7 @@ export function TaskDetailDialog({ taskId, onOpenChange, onNavigate }: TaskDetai
                         defaultValue={task.start_date ?? ''}
                         onBlur={(e) => {
                           if (e.target.value !== (task.start_date ?? '')) {
-                            updateMutation.mutate({ start_date: e.target.value || null });
+                            updateMutation.mutate({ taskId: task.id, payload: { start_date: e.target.value || null } });
                           }
                         }}
                       />
@@ -380,7 +396,7 @@ export function TaskDetailDialog({ taskId, onOpenChange, onNavigate }: TaskDetai
                         defaultValue={task.due_date ?? ''}
                         onBlur={(e) => {
                           if (e.target.value !== (task.due_date ?? '')) {
-                            updateMutation.mutate({ due_date: e.target.value || null });
+                            updateMutation.mutate({ taskId: task.id, payload: { due_date: e.target.value || null } });
                           }
                         }}
                       />
@@ -399,7 +415,9 @@ export function TaskDetailDialog({ taskId, onOpenChange, onNavigate }: TaskDetai
                         defaultValue={task.estimated_hours ?? ''}
                         onBlur={(e) => {
                           const next = e.target.value === '' ? null : Number(e.target.value);
-                          if (next !== task.estimated_hours) updateMutation.mutate({ estimated_hours: next });
+                          if (next !== task.estimated_hours) {
+                            updateMutation.mutate({ taskId: task.id, payload: { estimated_hours: next } });
+                          }
                         }}
                       />
                     </div>
@@ -477,7 +495,7 @@ export function TaskDetailDialog({ taskId, onOpenChange, onNavigate }: TaskDetai
                   <Button
                     type="button"
                     disabled={completeMutation.isPending}
-                    onClick={() => completeMutation.mutate()}
+                    onClick={() => completeMutation.mutate(task.id)}
                     className="gap-1.5 bg-success text-white hover:bg-success/90"
                   >
                     {completeMutation.isPending ? <Spinner className="text-white" /> : <CheckCircle2 className="h-4 w-4" />}
@@ -505,7 +523,7 @@ export function TaskDetailDialog({ taskId, onOpenChange, onNavigate }: TaskDetai
               className="bg-danger text-white hover:bg-danger/90"
               onClick={(e) => {
                 e.preventDefault();
-                deleteMutation.mutate();
+                if (task) deleteMutation.mutate(task.id);
               }}
             >
               {deleteMutation.isPending && <Spinner className="text-white" />}

@@ -3,6 +3,8 @@
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
 
+import { useAuthStore } from '@/lib/stores/auth-store';
+
 /**
  * Laravel Echo instance wired to our Reverb server.
  *
@@ -60,14 +62,21 @@ export function getEcho(): Echo<'reverb'> | null {
     enabledTransports: ['ws', 'wss'],
     // Auth endpoint sends our bearer token so Sanctum-guarded
     // Broadcast::routes() can identify the user for private channels.
+    //
+    // Authorization is a getter (not a captured string) so pusher-js
+    // reads the CURRENT token on every /broadcasting/auth request. A
+    // static value would freeze the token from the first getEcho()
+    // call — after a sign-out/sign-in on the same tab (or any token
+    // rotation without a full page reload), private channel auth
+    // would keep sending the previous user's bearer.
     authEndpoint: '/api/broadcasting/auth',
     auth: {
       headers: {
         Accept: 'application/json',
-        Authorization:
-          typeof localStorage !== 'undefined'
-            ? `Bearer ${localStorage.getItem('taqat_token') ?? ''}`
-            : '',
+        get Authorization() {
+          const token = useAuthStore.getState().token;
+          return token ? `Bearer ${token}` : '';
+        },
       },
     },
   });

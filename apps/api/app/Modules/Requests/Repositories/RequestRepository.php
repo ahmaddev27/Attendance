@@ -83,5 +83,22 @@ class RequestRepository
                 $query->where($field, $filters[$field]);
             }
         }
+
+        if (! empty($filters['search'])) {
+            $search = (string) $filters['search'];
+            $query->where(function (Builder $q) use ($search): void {
+                $q->where('request_number', 'like', "%{$search}%");
+            });
+        }
+
+        // `from`/`to` bound the submission window inclusively — matching
+        // the admin UI filter labels ("من تاريخ" / "إلى تاريخ").
+        if (! empty($filters['from'])) {
+            $query->whereDate('submitted_at', '>=', $filters['from']);
+        }
+
+        if (! empty($filters['to'])) {
+            $query->whereDate('submitted_at', '<=', $filters['to']);
+        }
     }
 }

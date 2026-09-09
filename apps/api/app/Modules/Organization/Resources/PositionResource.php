@@ -21,6 +21,11 @@ class PositionResource extends JsonResource
         return [
             'id' => $this->id,
             'department_id' => $this->department_id,
+            'department' => $this->whenLoaded('department', fn () => $this->department === null ? null : [
+                'id' => $this->department->id,
+                'name' => $this->department->name,
+                'code' => $this->department->code,
+            ]),
             'title' => $this->title,
             'code' => $this->code,
             'description' => $this->description,

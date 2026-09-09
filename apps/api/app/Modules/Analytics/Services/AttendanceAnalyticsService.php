@@ -44,12 +44,20 @@ class AttendanceAnalyticsService
         // One grouped scan: buckets per status plus the two clock aggregates.
         // AVG on TIME columns in MySQL 8 returns seconds-since-midnight; we
         // convert to HH:MM in PHP land so the frontend renders it as-is.
+        // SUM + COUNT(is-not-null) instead of AVG × row-count. AVG in
+        // MySQL ignores NULLs correctly, but weighting the per-status
+        // average by `COUNT(*)` (which INCLUDES rows where check_in_at
+        // is null, e.g. absent/on_leave) inflates the denominator and
+        // pulls the org-wide "avg check-in" toward whichever bucket
+        // has the most nulls — a systematic bias, not a one-off.
         $rows = (clone $query)
             ->selectRaw('
                 a.status,
                 COUNT(*) as c,
-                AVG(TIME_TO_SEC(TIME(a.check_in_at))) as avg_in_sec,
-                AVG(TIME_TO_SEC(TIME(a.check_out_at))) as avg_out_sec
+                SUM(TIME_TO_SEC(TIME(a.check_in_at))) as sum_in_sec,
+                SUM(a.check_in_at IS NOT NULL) as n_in,
+                SUM(TIME_TO_SEC(TIME(a.check_out_at))) as sum_out_sec,
+                SUM(a.check_out_at IS NOT NULL) as n_out
             ')
             ->groupBy('a.status')
             ->get();
@@ -74,22 +82,19 @@ class AttendanceAnalyticsService
             };
             $totals[$bucket] += (int) $row->c;
 
-            if ($row->avg_in_sec !== null) {
-                $checkInSecTotal += (float) $row->avg_in_sec * (int) $row->c;
-                $checkInWeight += (int) $row->c;
-            }
-            if ($row->avg_out_sec !== null) {
-                $checkOutSecTotal += (float) $row->avg_out_sec * (int) $row->c;
-                $checkOutWeight += (int) $row->c;
-            }
+            $checkInSecTotal += (float) ($row->sum_in_sec ?? 0);
+            $checkInWeight += (int) ($row->n_in ?? 0);
+            $checkOutSecTotal += (float) ($row->sum_out_sec ?? 0);
+            $checkOutWeight += (int) ($row->n_out ?? 0);
         }
 
         $totalRecords = array_sum($totals);
-        // Attendance rate = "showed up" ÷ "should have shown up (not weekend/holiday)".
-        // We approximate the denominator as everything except pure `other`
-        // (weekend / holiday), so the % reflects the workforce that had a
-        // real expectation on that day.
-        $eligible = $totalRecords - $totals['other'];
+        // Attendance rate = "showed up" ÷ "should have shown up (not
+        // weekend / holiday / approved leave)". Excluding on_leave was
+        // missing — employees on approved leave were counted as missed
+        // workdays, so the org rate was systematically depressed by the
+        // vacation calendar.
+        $eligible = $totalRecords - $totals['other'] - $totals['on_leave'];
         $rate = $eligible > 0
             ? round(($totals['present'] + $totals['late']) / $eligible * 100, 1)
             : 0.0;
