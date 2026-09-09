@@ -113,9 +113,25 @@ class EmployeeService
         return $this->employees->update($employee, ['direct_manager_id' => $managerId]);
     }
 
+    /**
+     * Off-boarding: soft-delete the employees row AND disable the linked
+     * User (revoke every Sanctum token + flip is_active=false). Without
+     * the User-side steps a terminated employee kept full API access
+     * indefinitely — their bearer tokens never expired and their login
+     * still worked because auth only checks users.is_active, not the
+     * employee row's soft-delete state.
+     */
     public function softDelete(Employee $employee): bool
     {
-        return $this->employees->softDelete($employee);
+        return DB::transaction(function () use ($employee) {
+            $user = $employee->user;
+            if ($user !== null) {
+                $user->tokens()->delete();
+                $user->forceFill(['is_active' => false])->save();
+            }
+
+            return $this->employees->softDelete($employee);
+        });
     }
 
     public function restore(int $id): Employee
@@ -188,19 +204,35 @@ class EmployeeService
 
             $employee->user_id = $user->id;
             $employee->save();
+
+            // New user — assign the default 'employee' role additively so
+            // downstream policy checks work. syncRoles is intentionally NOT
+            // used here (see below).
+            if (Role::query()->where('name', 'employee')->exists()) {
+                $user->assignRole('employee');
+            }
         } else {
             $user->password = Hash::make($plaintextPassword);
             $user->is_active = true;
             $user->save();
+
+            // Reset-password path: DO NOT touch roles unless the caller
+            // explicitly requested a role change. The previous version
+            // called syncRoles(['employee']) unconditionally, which stripped
+            // super-admin (or any other role) off the target user — an
+            // admin resetting the sole super-admin's password locked the
+            // whole tenant out of admin functions. Now roles change only
+            // when $role is explicitly non-null.
+            if ($role !== null && Role::query()->where('name', $role)->exists()) {
+                $user->syncRoles([$role]);
+            }
         }
 
-        // Silent fallback on unknown role names so a typo on the create
-        // form doesn't turn a routine provision into a 500. Default to
-        // 'employee' — the seeded no-op role every user gets.
-        $roleName = $role ?: 'employee';
-        if (Role::query()->where('name', $roleName)->exists()) {
-            $user->syncRoles([$roleName]);
-        }
+        // Revoke any Sanctum tokens minted before this password change so a
+        // rotation actually rotates — otherwise a compromised token stays
+        // valid forever after the password reset. Same call on new-user
+        // provision is a no-op (no tokens yet) and cheap.
+        $user->tokens()->delete();
 
         return $user;
     }

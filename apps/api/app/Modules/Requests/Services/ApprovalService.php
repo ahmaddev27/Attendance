@@ -35,7 +35,7 @@ class ApprovalService
 
     public function approve(RequestModel $request, Employee $approver, ?string $comment = null): RequestModel
     {
-        return DB::transaction(function () use ($request, $approver, $comment) {
+        [$fresh, $nextStep] = DB::transaction(function () use ($request, $approver, $comment) {
             $locked = $this->requests->findForUpdate($request->id);
             $step = $this->guardActionable($locked, $approver);
 
@@ -60,28 +60,29 @@ class ApprovalService
                 ]);
             }
 
-            $fresh = $this->requests->findOrFail($locked->id);
-
-            if ($nextStep === null) {
-                // Terminal approval — tell the requester their request went
-                // through. Kept out of the "intermediate step" branch because
-                // requestDecided()'s "pending" arm sends a confusing
-                // "update: pending" push otherwise.
-                RequestApproved::dispatch($fresh);
-                $this->notifier->requestDecided($fresh);
-            } else {
-                // Non-terminal — ping the newly-active approvers so they can
-                // act on the request without polling the inbox. This dispatch
-                // was missing entirely, so multi-step workflows silently
-                // stalled after the first approval.
-                $approvers = $this->resolver->resolve($nextStep, $fresh);
-                foreach ($approvers as $nextApprover) {
-                    $this->notifier->requestPendingApproval($fresh, $nextApprover);
-                }
-            }
-
-            return $fresh;
+            return [$this->requests->findOrFail($locked->id), $nextStep];
         });
+
+        // Notifications + events dispatched AFTER the transaction commits so
+        // a listener that throws can't roll back the approval, and a broadcast
+        // can't reach the frontend before the DB row it references exists.
+        if ($nextStep === null) {
+            RequestApproved::dispatch($fresh);
+            $this->notifier->requestDecided($fresh);
+        } else {
+            // Non-terminal — ping the newly-active approvers so they can act
+            // on the request without polling the inbox. Resolver returns
+            // Employees; the notifier expects Users, so map and filter out
+            // employees whose login user was never provisioned.
+            $approvers = $this->resolver->resolve($nextStep, $fresh);
+            $users = $approvers
+                ->map(fn (Employee $employee) => $employee->user)
+                ->filter(fn ($user) => $user instanceof User)
+                ->values();
+            $this->notifier->requestPendingApproval($fresh, $users);
+        }
+
+        return $fresh;
     }
 
     public function reject(RequestModel $request, Employee $approver, string $comment): RequestModel
