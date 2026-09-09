@@ -17,6 +17,7 @@ use App\Modules\Whatsapp\Gateways\MetaCloudGateway;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Throwable;
 
@@ -44,6 +45,31 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->applyMailSettingsOverrides();
+        $this->registerSuperAdminBypass();
+    }
+
+    /**
+     * Grant super-admin holders every permission via Gate::before — the
+     * pattern spatie/laravel-permission recommends in its docs. Without
+     * this, seeding a "super-admin" role only gets a user through the
+     * checks whose specific permissions were synced onto that role — a
+     * hard-coded list that fell behind as new permissions landed on
+     * routes (`manage-departments`, `manage-schedules`,
+     * `manage-devices`, ...). Every hardened admin route was 403'ing
+     * for super-admin in tests as a result. This closes that gap for
+     * both prod and tests: the role name itself is the bypass.
+     *
+     * Null return preserves normal permission checks for every other
+     * user — Gate::before honours a non-boolean return by continuing.
+     */
+    private function registerSuperAdminBypass(): void
+    {
+        Gate::before(function ($user, string $ability) {
+            if (method_exists($user, 'hasRole') && $user->hasRole('super-admin')) {
+                return true;
+            }
+            return null;
+        });
     }
 
     /**
