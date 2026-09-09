@@ -383,26 +383,23 @@ export function TaskDetailDialog({ taskId, onOpenChange, onNavigate }: TaskDetai
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <Label className="text-xs font-semibold text-ink-2">تاريخ البدء</Label>
-                      <Input
-                        type="date"
-                        dir="ltr"
-                        defaultValue={task.start_date ?? ''}
-                        onBlur={(e) => {
-                          if (e.target.value !== (task.start_date ?? '')) {
-                            updateMutation.mutate({ taskId: task.id, payload: { start_date: e.target.value || null } });
+                      <DatePicker
+                        value={task.start_date ?? ''}
+                        onChange={(v) => {
+                          if (v !== (task.start_date ?? '')) {
+                            updateMutation.mutate({ taskId: task.id, payload: { start_date: v || null } });
                           }
                         }}
+                        placeholder="اختر تاريخاً"
                       />
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs font-semibold text-ink-2">تاريخ الاستحقاق</Label>
-                      <Input
-                        type="date"
-                        dir="ltr"
-                        defaultValue={task.due_date ?? ''}
-                        onBlur={(e) => {
-                          if (e.target.value !== (task.due_date ?? '')) {
-                            updateMutation.mutate({ taskId: task.id, payload: { due_date: e.target.value || null } });
+                      <DatePicker
+                        value={task.due_date ?? ''}
+                        onChange={(v) => {
+                          if (v !== (task.due_date ?? '')) {
+                            updateMutation.mutate({ taskId: task.id, payload: { due_date: v || null } });
                           }
                         }}
                       />

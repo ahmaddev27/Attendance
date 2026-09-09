@@ -100,12 +100,23 @@ class TaskService
         $isAdmin = $this->actorHasManageWorkflows($actor);
 
         if (! $isAdmin || empty($data['created_by'])) {
-            if (empty($actor->employee_id)) {
+            // Prefer the actor's own employee_id. If the admin user was
+            // seeded without one (common — the bootstrap admin isn't a
+            // real employee), fall back to the assignee, which is
+            // meaningful UX: "admin assigned this task to X, so X is
+            // both creator and owner". Only fail hard when the admin
+            // gave nothing (no assignee, no explicit created_by, no
+            // linked employee) — offer a clear fix hint.
+            $fallback = $actor->employee_id
+                ?? (! empty($data['assigned_to']) ? (int) $data['assigned_to'] : null);
+
+            if ($fallback === null) {
                 throw ValidationException::withMessages([
-                    'created_by' => 'The acting user has no linked employee profile — cannot create a task.',
+                    'created_by' => 'حسابك غير مرتبط بموظف. اختر موظفاً في "المسند إليه"، أو اربط حسابك بسجل موظف من إدارة الموظفين.',
                 ]);
             }
-            $data['created_by'] = $actor->employee_id;
+
+            $data['created_by'] = $fallback;
         }
         $createdBy = (int) $data['created_by'];
 

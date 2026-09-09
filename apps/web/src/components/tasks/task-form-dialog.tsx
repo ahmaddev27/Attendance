@@ -24,6 +24,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -299,7 +300,11 @@ export function TaskFormDialog({ open, onOpenChange, task, defaultParentTask }: 
                   <FormItem>
                     <FormLabel>تاريخ البدء</FormLabel>
                     <FormControl>
-                      <Input type="date" dir="ltr" {...field} />
+                      <DatePicker
+                        value={(field.value as string) ?? ''}
+                        onChange={field.onChange}
+                        placeholder="اختر تاريخاً"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -312,7 +317,11 @@ export function TaskFormDialog({ open, onOpenChange, task, defaultParentTask }: 
                   <FormItem>
                     <FormLabel>تاريخ الاستحقاق</FormLabel>
                     <FormControl>
-                      <Input type="date" dir="ltr" {...field} />
+                      <DatePicker
+                        value={(field.value as string) ?? ''}
+                        onChange={field.onChange}
+                        placeholder="اختر تاريخاً"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

@@ -33,7 +33,9 @@ class TeamRepository
      */
     private function query(array $filters): \Illuminate\Database\Eloquent\Builder
     {
-        $query = Team::query()->with(['department', 'leader']);
+        $query = Team::query()
+            ->with(['department', 'leader'])
+            ->withCount('employees');
 
         // Legacy `active` alias — kept for callers that still pass the
         // old key. The web + tests use `is_active` now.

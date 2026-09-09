@@ -33,7 +33,12 @@ class DepartmentRepository
      */
     private function query(array $filters): \Illuminate\Database\Eloquent\Builder
     {
-        $query = Department::query()->with(['manager', 'parent']);
+        // withCount powers the `employees_count` column in the admin list —
+        // one COUNT(*) subselect per department, no N+1. Same on the Team
+        // repo below.
+        $query = Department::query()
+            ->with(['manager', 'parent'])
+            ->withCount('employees');
 
         // Legacy `active` alias — kept for callers that still pass the
         // old key. The web + tests use `is_active` now.

@@ -33,7 +33,9 @@ class PositionRepository
      */
     private function query(array $filters): \Illuminate\Database\Eloquent\Builder
     {
-        $query = Position::query()->with('department');
+        $query = Position::query()
+            ->with('department')
+            ->withCount('employees');
 
         // Legacy `active` alias — kept for callers that still pass the
         // old key. The web + tests use `is_active` now.

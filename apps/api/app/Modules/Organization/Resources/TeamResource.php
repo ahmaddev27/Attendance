@@ -33,6 +33,9 @@ class TeamResource extends JsonResource
             ]),
             'description' => $this->description,
             'is_active' => $this->is_active,
+            // Populated by TeamRepository::query()->withCount('employees').
+            // Frontend renders it in the "عدد الموظفين" column.
+            'employees_count' => $this->employees_count ?? 0,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];
