@@ -22,6 +22,18 @@
 #   docker compose -f docker-compose.simple.yml up -d
 #   docker compose -f docker-compose.simple.yml exec -T api php artisan migrate --force
 
+# Bounded log rotation for every container. Docker's default json-file
+# driver has NO cap — a chatty container fills the host disk with multi-GB
+# log files silently. 10MB × 5 files caps each container at ~50MB on-disk,
+# plenty for post-incident triage without ever taking the box down for
+# want of space.
+x-logging: &default-logging
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
+
 # All api-based services (api, queue, scheduler, reverb) share the same
 # image. Defining it once here keeps them in lock-step and makes the file
 # shorter. Docker Compose builds it once when any of them is built.
@@ -35,9 +47,15 @@ x-api-service: &api-service
   volumes:
     - api_storage:/var/www/html/storage
   networks: [taqat]
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
 
 services:
   db:
+    <<: *default-logging
     image: mysql:8.4
     container_name: taqat_db
     restart: unless-stopped
@@ -56,6 +74,7 @@ services:
     networks: [taqat]
 
   redis:
+    <<: *default-logging
     image: redis:7-alpine
     container_name: taqat_redis
     restart: unless-stopped
@@ -84,6 +103,7 @@ services:
   # crosses the public boundary. Scout's queued indexer talks to it via
   # http://meilisearch:7700; the frontend never calls it directly.
   meilisearch:
+    <<: *default-logging
     image: getmeili/meilisearch:v1.10
     container_name: taqat_meilisearch
     restart: unless-stopped
@@ -96,6 +116,7 @@ services:
     networks: [taqat]
 
   minio:
+    <<: *default-logging
     image: minio/minio:latest
     container_name: taqat_minio
     restart: unless-stopped
@@ -117,6 +138,7 @@ services:
       redis: { condition: service_healthy }
 
   nginx:
+    <<: *default-logging
     image: nginx:alpine
     container_name: taqat_nginx
     restart: unless-stopped
@@ -181,6 +203,11 @@ services:
     ports:
       - "127.0.0.1:${WEB_HTTP_PORT:-8181}:3000"
     networks: [taqat]
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
 volumes:
   db_data:

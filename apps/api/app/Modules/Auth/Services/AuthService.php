@@ -24,12 +24,18 @@ class AuthService
      * one the caller passed — an '@' anywhere in $identifier switches the
      * lookup to the email path.
      *
+     * $tokenName is the Sanctum token name (bucket) for this login. Prior
+     * tokens with the SAME name are revoked before the new one is issued
+     * so a relogin doesn't leave a 60-day pile of live tokens behind. Names
+     * are per-client (e.g. `web`, `mobile`) so a mobile relogin only
+     * rotates mobile tokens and never kicks an active web session.
+     *
      * @return array{user: User, token: string}
      *
      * @throws ValidationException when the credentials are invalid or the
      *                             account is inactive.
      */
-    public function login(int|string $identifier, string $password): array
+    public function login(int|string $identifier, string $password, string $tokenName = 'web'): array
     {
         $identifier = trim((string) $identifier);
 
@@ -43,7 +49,14 @@ class AuthService
             ]);
         }
 
-        $token = $user->createToken('web')->plainTextToken;
+        // Revoke any prior tokens issued under the same client bucket
+        // BEFORE minting the new one. Sanctum otherwise keeps them alive
+        // for their full expiration window (default 60 days) and the
+        // personal_access_tokens table grows unboundedly for any user
+        // who logs in more than once.
+        $user->tokens()->where('name', $tokenName)->delete();
+
+        $token = $user->createToken($tokenName)->plainTextToken;
 
         $user->forceFill(['last_login_at' => now()])->save();
 

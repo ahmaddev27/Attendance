@@ -25,6 +25,7 @@ class AuthController extends Controller
         $result = $this->authService->login(
             identifier: $request->identifier(),
             password: (string) $request->validated('password'),
+            tokenName: $request->deviceName(),
         );
 
         return response()->json([

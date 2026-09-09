@@ -15,6 +15,18 @@
 #   docker compose -f docker-compose.prod.yml up -d
 #   docker compose -f docker-compose.prod.yml exec -T api php artisan migrate --force
 
+# Bounded log rotation for every container. Docker's default json-file
+# driver has NO cap — a chatty container fills the host disk with
+# multi-GB log files silently. 10MB × 5 files caps each container at
+# ~50MB of on-disk log, plenty for post-incident triage without ever
+# taking the VPS down for want of space.
+x-logging: &default-logging
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
+
 x-api-image: &api-image ghcr.io/${GHCR_OWNER:-OWNER}/taqat-api:${IMAGE_TAG:-latest}
 
 x-api-env: &api-env
@@ -63,6 +75,7 @@ x-api-env: &api-env
 
 services:
   db:
+    <<: *default-logging
     image: mysql:8.4
     container_name: taqat_db
     restart: unless-stopped
@@ -83,10 +96,21 @@ services:
     networks: [taqat]
 
   redis:
+    <<: *default-logging
     image: redis:7-alpine
     container_name: taqat_redis
     restart: unless-stopped
-    command: redis-server --requirepass ${REDIS_PASSWORD}
+    # Bounded memory + LRU eviction so a queue-backlog spike (jobs piling
+    # up faster than they drain) can't consume every byte of RAM on the
+    # box and start evicting active session data unpredictably.
+    # Persistence is turned off: this Redis is only used for cache /
+    # sessions / queues / Reverb pub-sub — every piece of state has a
+    # canonical source elsewhere (MySQL, MinIO), so we treat it as a
+    # pure warm memory tier and skip both RDB snapshots and AOF fsyncs.
+    command: >-
+      redis-server --requirepass ${REDIS_PASSWORD}
+      --maxmemory 512mb --maxmemory-policy allkeys-lru
+      --save "" --appendonly no
     ports:
       - "127.0.0.1:6379:6379"
     volumes:
@@ -99,6 +123,7 @@ services:
     networks: [taqat]
 
   minio:
+    <<: *default-logging
     image: minio/minio:latest
     container_name: taqat_minio
     restart: unless-stopped
@@ -123,6 +148,7 @@ services:
   # infra/docker/api/Dockerfile) — that's what lets nginx reach
   # public/index.php below without ever bind-mounting live source code.
   api:
+    <<: *default-logging
     image: *api-image
     container_name: taqat_api
     restart: unless-stopped
@@ -143,6 +169,7 @@ services:
     networks: [taqat]
 
   nginx:
+    <<: *default-logging
     image: nginx:1.27-alpine
     container_name: taqat_nginx
     restart: unless-stopped
@@ -161,6 +188,7 @@ services:
     networks: [taqat]
 
   queue:
+    <<: *default-logging
     image: *api-image
     container_name: taqat_queue
     restart: unless-stopped
@@ -173,6 +201,7 @@ services:
     networks: [taqat]
 
   scheduler:
+    <<: *default-logging
     image: *api-image
     container_name: taqat_scheduler
     restart: unless-stopped
@@ -185,6 +214,7 @@ services:
     networks: [taqat]
 
   reverb:
+    <<: *default-logging
     image: *api-image
     container_name: taqat_reverb
     restart: unless-stopped
@@ -198,6 +228,7 @@ services:
     networks: [taqat]
 
   web:
+    <<: *default-logging
     image: ghcr.io/${GHCR_OWNER:-OWNER}/taqat-web:${IMAGE_TAG:-latest}
     container_name: taqat_web
     restart: unless-stopped
@@ -213,8 +244,14 @@ services:
       # .github/workflows/deploy.yml instead. See infra/docker/web/Dockerfile.
     ports:
       - "127.0.0.1:3000:3000"
+    # Next.js never speaks to MySQL directly — the previous `depends_on: db`
+    # had the web container blocked on a service it never opens a connection
+    # to. Its real dependency is the api (Next.js SSR fans out to /api via
+    # nginx). We can't depend on nginx here because nginx already depends
+    # on web — instead wait for api to be healthy, which is what actually
+    # matters for SSR to serve real data on first request.
     depends_on:
-      db: { condition: service_healthy }
+      api: { condition: service_healthy }
     networks: [taqat]
 
 volumes:

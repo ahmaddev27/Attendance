@@ -30,6 +30,10 @@ class LoginRequest extends FormRequest
             'identifier' => ['required_without:employee_number', 'string'],
             'employee_number' => ['required_without:identifier'],
             'password' => ['required', 'string'],
+            // Optional client tag — used as the Sanctum token name so
+            // relogins from one client only rotate that client's own
+            // tokens (a mobile relogin never kills a web session).
+            'device_name' => ['sometimes', 'string', 'max:64'],
         ];
     }
 
@@ -40,5 +44,17 @@ class LoginRequest extends FormRequest
     public function identifier(): string
     {
         return (string) ($this->input('identifier') ?? $this->input('employee_number'));
+    }
+
+    /**
+     * Sanctum token name for this login attempt. Defaults to `web` so
+     * legacy clients (which never sent a device_name) keep grouping
+     * under the same bucket the historical `createToken('web')` used.
+     */
+    public function deviceName(): string
+    {
+        $name = trim((string) $this->input('device_name', 'web'));
+
+        return $name === '' ? 'web' : $name;
     }
 }

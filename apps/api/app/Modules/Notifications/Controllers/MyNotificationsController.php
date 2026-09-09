@@ -60,7 +60,12 @@ class MyNotificationsController extends Controller
 
     public function markAllRead(Request $request): JsonResponse
     {
-        $request->user()->unreadNotifications->markAsRead();
+        // Direct UPDATE on the relation query — the previous
+        // `->unreadNotifications->markAsRead()` (property access) hydrated
+        // every unread row into memory and looped one-by-one, which balloons
+        // linearly with backlog. This is a single UPDATE ... WHERE read_at IS
+        // NULL AND notifiable_* = ? with no hydration.
+        $request->user()->unreadNotifications()->update(['read_at' => now()]);
 
         return response()->json(['data' => ['ok' => true]]);
     }
