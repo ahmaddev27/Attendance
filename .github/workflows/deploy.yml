@@ -12,6 +12,12 @@ on:
   # Useful for the very first deploy (workflow_run needs the file on main
   # first) or to redeploy without re-running CI.
   workflow_dispatch:
+    inputs:
+      no_cache:
+        description: 'Build with --no-cache (nukes buildx cache first). Slow (~5-8 min), but bulletproof when a previous build left broken layers.'
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -259,7 +265,19 @@ jobs:
             echo "════════════════════════════════════════"
             echo "▶ 3/8  Rebuilding api + web images"
             echo "════════════════════════════════════════"
-            $DC build --pull api web
+            # workflow_dispatch `no_cache: true` → nuke the buildx cache
+            # first, then build with --no-cache. Slow (~5-8 min) but
+            # rescues a stuck deploy where a previous partial-install
+            # left cached layers that keep referencing files that were
+            # never actually downloaded (symfony/polyfill-mbstring was
+            # the recurring symptom).
+            if [ "${{ inputs.no_cache }}" = "true" ]; then
+              echo "   ⚠ --no-cache requested — pruning buildx cache first"
+              docker builder prune -af || true
+              $DC build --pull --no-cache api web
+            else
+              $DC build --pull api web
+            fi
 
             echo ""
             echo "════════════════════════════════════════"
