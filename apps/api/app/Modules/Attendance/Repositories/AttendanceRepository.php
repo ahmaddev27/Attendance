@@ -68,7 +68,17 @@ class AttendanceRepository
     public function paginate(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
         return Attendance::query()
-            ->with(['employee', 'checkInDevice', 'checkOutDevice'])
+            // withTrashed() on the `employee` relation so historical
+            // attendance rows keep showing the former employee's name
+            // instead of collapsing to null when the person leaves and
+            // gets soft-deleted. The row itself is the audit trail;
+            // dropping the join just because the person quit would erase
+            // months of past-tense reporting from the admin table.
+            ->with([
+                'employee' => fn ($q) => $q->withTrashed(),
+                'checkInDevice',
+                'checkOutDevice',
+            ])
             ->when($filters['employee_id'] ?? null, fn (Builder $query, $employeeId) => $query->where('employee_id', $employeeId))
             ->when($filters['status'] ?? null, fn (Builder $query, $status) => $query->where('status', $status))
             ->when($filters['date_from'] ?? null, fn (Builder $query, $date) => $query->whereDate('date', '>=', $date))
