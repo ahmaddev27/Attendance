@@ -62,9 +62,11 @@ class EmployeeDashboardService
      */
     private function today(Employee $employee, CarbonImmutable $today): array
     {
+        // Bare where() on the DATE column so the
+        // UNIQUE(employee_id, date) index is used.
         $record = Attendance::query()
             ->where('employee_id', $employee->id)
-            ->whereDate('date', $today->toDateString())
+            ->where('date', $today->toDateString())
             ->first();
 
         if (! $record) {
@@ -118,7 +120,9 @@ class EmployeeDashboardService
             ->with('leaveType:id,name')
             ->where('employee_id', $employee->id)
             ->where('status', LeaveStatus::Approved->value)
-            ->whereDate('start_date', '>=', $today->toDateString())
+            // start_date is a DATE column — bare where() keeps the
+            // leave_requests(start_date, end_date) index usable.
+            ->where('start_date', '>=', $today->toDateString())
             ->orderBy('start_date')
             ->first();
 
@@ -178,14 +182,16 @@ class EmployeeDashboardService
         $inProgress = (clone $baseOpen)
             ->whereNull('completed_at')
             ->where(function ($q) use ($today): void {
-                $q->whereDate('start_date', '<=', $today->toDateString())
+                // start_date/due_date are DATE columns — bare where()
+                // keeps any future index on them usable.
+                $q->where('start_date', '<=', $today->toDateString())
                     ->orWhere('progress_percent', '>', 0);
             })
             ->count();
         $overdue = (clone $baseOpen)
             ->whereNull('completed_at')
             ->whereNotNull('due_date')
-            ->whereDate('due_date', '<', $today->toDateString())
+            ->where('due_date', '<', $today->toDateString())
             ->count();
 
         $completedThisWeek = Task::query()

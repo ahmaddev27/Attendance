@@ -51,9 +51,12 @@ class AttendanceService
 
             $today = Carbon::today();
 
+            // Bare where() on the DATE column — keeps the
+            // UNIQUE(employee_id, date) index in play (DATE() wrappers
+            // would disqualify it and force a full-table scan).
             $attendance = Attendance::query()
                 ->where('employee_id', $employee->id)
-                ->whereDate('date', $today->toDateString())
+                ->where('date', $today->toDateString())
                 ->lockForUpdate()
                 ->first();
 

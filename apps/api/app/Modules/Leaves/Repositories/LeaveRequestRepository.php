@@ -82,12 +82,14 @@ class LeaveRequestRepository
             }
         }
 
+        // Both columns are true DATE — bare where() so the
+        // (start_date, end_date) composite index actually gets used.
         if (! empty($filters['start_date'])) {
-            $query->whereDate('end_date', '>=', $filters['start_date']);
+            $query->where('end_date', '>=', $filters['start_date']);
         }
 
         if (! empty($filters['end_date'])) {
-            $query->whereDate('start_date', '<=', $filters['end_date']);
+            $query->where('start_date', '<=', $filters['end_date']);
         }
     }
 }

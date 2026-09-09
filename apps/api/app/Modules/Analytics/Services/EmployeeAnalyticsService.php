@@ -23,7 +23,7 @@ class EmployeeAnalyticsService
      *   headcount: array{total: int, active: int, inactive: int, on_leave: int, terminated: int},
      *   by_department: array<int, array{name: string, count: int}>,
      *   by_team: array<int, array{name: string, count: int}>,
-     *   recent_hires: array<int, array{id: int, name: string, employee_number: int, hire_date: ?string, department: ?string}>,
+     *   recent_hires: array<int, array{id: int, name: string, employee_number: int, joining_date: ?string, department: ?string}>,
      * }
      */
     public function summary(AnalyticsFiltersRequest $filters): array
@@ -101,22 +101,26 @@ class EmployeeAnalyticsService
      * list is scoped to the same reporting window every other card uses,
      * so a filter change consistently refreshes the whole page.
      *
-     * @return array<int, array{id: int, name: string, employee_number: int, hire_date: ?string, department: ?string}>
+     * @return array<int, array{id: int, name: string, employee_number: int, joining_date: ?string, department: ?string}>
      */
     private function recentHires(AnalyticsFiltersRequest $filters): array
     {
+        // Column names must match the schema: `joining_date` (not
+        // hire_date) and there is no `full_name` column — the
+        // Employee::getFullNameAttribute() accessor is PHP-only, so we
+        // CONCAT_WS at the SQL layer instead.
         return $this->applyFilters(DB::table('employees as e'), $filters, 'e')
             ->leftJoin('departments as d', 'd.id', '=', 'e.department_id')
-            ->whereBetween('e.hire_date', [$filters->from()->toDateString(), $filters->to()->toDateString()])
-            ->selectRaw('e.id, e.full_name as name, e.employee_number, e.hire_date, d.name as department')
-            ->orderByDesc('e.hire_date')
+            ->whereBetween('e.joining_date', [$filters->from()->toDateString(), $filters->to()->toDateString()])
+            ->selectRaw("e.id, CONCAT_WS(' ', e.first_name, e.last_name) as name, e.employee_number, e.joining_date, d.name as department")
+            ->orderByDesc('e.joining_date')
             ->limit(10)
             ->get()
             ->map(fn ($row) => [
                 'id' => (int) $row->id,
                 'name' => (string) $row->name,
                 'employee_number' => (int) $row->employee_number,
-                'hire_date' => $row->hire_date ? (string) $row->hire_date : null,
+                'joining_date' => $row->joining_date ? (string) $row->joining_date : null,
                 'department' => $row->department ? (string) $row->department : null,
             ])
             ->all();

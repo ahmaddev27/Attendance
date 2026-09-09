@@ -141,7 +141,9 @@ class AdminDashboardService
         $inProgress = (clone $baseOpen)
             ->whereNull('completed_at')
             ->where(function ($q) use ($today): void {
-                $q->whereDate('start_date', '<=', $today->toDateString())
+                // start_date/due_date are DATE columns — bare where()
+                // so the index isn't disqualified by a DATE() wrapper.
+                $q->where('start_date', '<=', $today->toDateString())
                     ->orWhere('progress_percent', '>', 0);
             })
             ->count();
@@ -149,7 +151,7 @@ class AdminDashboardService
         $overdue = (clone $baseOpen)
             ->whereNull('completed_at')
             ->whereNotNull('due_date')
-            ->whereDate('due_date', '<', $today->toDateString())
+            ->where('due_date', '<', $today->toDateString())
             ->count();
 
         return [

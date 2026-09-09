@@ -96,6 +96,24 @@ RUN apk add --no-cache \
 # all interfaces. Same as `listen = 0.0.0.0:9000` in www.conf.
 RUN sed -i 's|^listen = .*|listen = 0.0.0.0:9000|' /usr/local/etc/php-fpm.d/www.conf
 
+# --- PHP-FPM process manager -------------------------------------------------
+# Alpine's default pm.max_children is 5, which caps the container at five
+# concurrent PHP requests — the scale audit showed us starving around ~100
+# concurrent users, with nginx queuing every extra request behind a busy
+# worker. Raise the pool to a size that fits comfortably inside the API
+# container's 256M memory_limit budget (~40 workers × ~30-50MB peak) and let
+# it grow/shrink on demand. `pm.max_requests = 500` recycles each worker
+# periodically so a slow leak in vendor code can't accumulate over the
+# lifetime of the container.
+RUN { \
+        echo "pm = dynamic"; \
+        echo "pm.max_children = 40"; \
+        echo "pm.start_servers = 8"; \
+        echo "pm.min_spare_servers = 4"; \
+        echo "pm.max_spare_servers = 16"; \
+        echo "pm.max_requests = 500"; \
+    } >> /usr/local/etc/php-fpm.d/www.conf
+
 ENV TZ=Asia/Amman
 
 # --- PHP runtime configuration -----------------------------------------------

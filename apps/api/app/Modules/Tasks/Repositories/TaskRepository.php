@@ -5,12 +5,23 @@ declare(strict_types=1);
 namespace App\Modules\Tasks\Repositories;
 
 use App\Models\Task;
+use App\Models\TaskStatus;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 class TaskRepository
 {
+    /**
+     * Hard cap on the number of task rows returned per Kanban column.
+     * Anything beyond this stays counted (see `count_total` in the
+     * groupByStatus() payload) but isn't shipped in the initial render —
+     * a status with 2000 stale "todo" cards used to serialise every row
+     * on every board load. 200 fits several scroll pages and leaves a
+     * clear "+ N more" affordance for the frontend.
+     */
+    private const KANBAN_COLUMN_LIMIT = 200;
+
     /**
      * Relations eager-loaded on every read so the resource layer never
      * triggers an N+1 query per row.
@@ -35,18 +46,45 @@ class TaskRepository
     }
 
     /**
-     * Every task matching $filters, grouped by its status code — the
-     * shape the Kanban board needs. Not paginated: a board view is
-     * expected to render every column in one shot.
+     * Tasks matching $filters grouped by status code, capped at
+     * KANBAN_COLUMN_LIMIT rows per column. The old implementation loaded
+     * every task in one shot and grouped in PHP — a board with a large
+     * backlog would return tens of thousands of rows on each request.
+     *
+     * Each entry carries the top-N cards (ordered by `updated_at DESC`,
+     * so recently-touched work stays visible) plus `count_total`, the
+     * unlimited number of tasks in that column. The frontend uses the
+     * gap between `tasks.length` and `count_total` to render a "+ N
+     * more" affordance.
      *
      * @param  array<string, mixed>  $filters
-     * @return Collection<string, Collection<int, Task>>
+     * @return Collection<string, array{tasks: Collection<int, Task>, count_total: int}>
      */
     public function groupByStatus(array $filters = []): Collection
     {
-        return $this->applySort($this->baseQuery($filters), $filters)
-            ->get()
-            ->groupBy(fn (Task $task) => $task->status->code);
+        $statuses = TaskStatus::query()->orderBy('sort_order')->get();
+        $result = new Collection();
+
+        foreach ($statuses as $status) {
+            // Lean count query — no eager loads, no withCount subqueries —
+            // so the total lookup stays a single COUNT(*) per column.
+            $countQuery = Task::query()->where('status_id', $status->id);
+            $this->applyFilters($countQuery, $filters);
+            $total = $countQuery->count();
+
+            $tasksQuery = $this->baseQuery($filters)->where('status_id', $status->id);
+            $tasks = $tasksQuery
+                ->orderByDesc('updated_at')
+                ->limit(self::KANBAN_COLUMN_LIMIT)
+                ->get();
+
+            $result->put($status->code, [
+                'tasks' => $tasks,
+                'count_total' => $total,
+            ]);
+        }
+
+        return $result;
     }
 
     /**
@@ -156,12 +194,14 @@ class TaskRepository
             $query->where('title', 'like', '%'.$filters['search'].'%');
         }
 
+        // due_date is a DATE column — bare where() so the tasks(due_date)
+        // index actually gets used (DATE() wrappers would disqualify it).
         if (! empty($filters['due_date_from'])) {
-            $query->whereDate('due_date', '>=', $filters['due_date_from']);
+            $query->where('due_date', '>=', $filters['due_date_from']);
         }
 
         if (! empty($filters['due_date_to'])) {
-            $query->whereDate('due_date', '<=', $filters['due_date_to']);
+            $query->where('due_date', '<=', $filters['due_date_to']);
         }
 
         // Present-but-empty (including the literal string "null") means

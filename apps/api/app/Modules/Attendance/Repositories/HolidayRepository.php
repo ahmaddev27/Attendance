@@ -51,13 +51,12 @@ class HolidayRepository
     {
         return Holiday::query()
             ->where(function (Builder $query) use ($start, $end) {
-                // whereDate() rather than whereBetween on the raw strings —
-                // see AttendanceRepository::forEmployeeInRange() for why a
-                // bare 'Y-m-d' upper bound would otherwise drop the range's
-                // last day on a loosely typed connection like SQLite.
+                // Bare where() on the DATE column so the (date, name)
+                // UNIQUE index is used for the range scan (DATE()
+                // wrappers via whereDate() would disqualify it).
                 $query->where(function (Builder $query) use ($start, $end) {
-                    $query->whereDate('date', '>=', $start->toDateString())
-                        ->whereDate('date', '<=', $end->toDateString());
+                    $query->where('date', '>=', $start->toDateString())
+                        ->where('date', '<=', $end->toDateString());
                 })->orWhere('is_recurring', true);
             })
             ->get()

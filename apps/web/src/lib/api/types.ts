@@ -408,9 +408,9 @@ export type LeaveRequestListParams = {
   per_page?: number;
   employee_id?: number;
   leave_type_id?: number;
-  status?: LeaveStatus | 'all';
-  from?: string;
-  to?: string;
+  status?: LeaveStatus;
+  start_date?: string;
+  end_date?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -548,19 +548,20 @@ export type TaskListParams = {
   priority_id?: number;
   tag_id?: number;
   parent_task_id?: number | null;
-  due_from?: string;
-  due_to?: string;
+  due_date_from?: string;
+  due_date_to?: string;
   search?: string;
 };
 
 /**
  * `/tasks/kanban` shape — keyed by status.code, each entry carries the
- * TaskStatus object AND the tasks in that column. The backend
- * (TaskService::kanban) returns this so the frontend has a single
- * source of truth for column ordering + color, without a second
- * `/task-statuses` round-trip on the kanban render path.
+ * TaskStatus object, the (capped) tasks in that column, and the
+ * unlimited total count. The backend (TaskService::kanban) caps every
+ * column at 200 rows to keep the payload bounded; `count_total` is the
+ * true row count so the board can render a "+ N more" hint whenever it
+ * exceeds `tasks.length`.
  */
-export type KanbanBoardEntry = { status: TaskStatus; tasks: Task[] };
+export type KanbanBoardEntry = { status: TaskStatus; tasks: Task[]; count_total: number };
 export type KanbanBoard = Record<string, KanbanBoardEntry>; // keyed by status.code
 
 // ---------------------------------------------------------------------------
@@ -704,7 +705,7 @@ export type RequestListParams = {
   page?: number;
   per_page?: number;
   search?: string;
-  status?: RequestStatus | 'all';
+  status?: RequestStatus;
   request_type_id?: number;
   employee_id?: number;
   from?: string;

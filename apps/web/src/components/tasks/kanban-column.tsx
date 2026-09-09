@@ -10,12 +10,20 @@ import { cn } from '@/lib/utils';
 type KanbanColumnProps = {
   status: TaskStatus;
   tasks: Task[];
+  /**
+   * True (unlimited) row count for this column — may exceed
+   * `tasks.length` when the backend capped the payload. Defaults to
+   * `tasks.length` so older payloads without the field still render.
+   */
+  countTotal?: number;
   onTaskClick: (task: Task) => void;
 };
 
 /** One Kanban column — a droppable zone (by `status.code`) listing its tasks. */
-export function KanbanColumn({ status, tasks, onTaskClick }: KanbanColumnProps) {
+export function KanbanColumn({ status, tasks, countTotal, onTaskClick }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: status.code });
+  const total = countTotal ?? tasks.length;
+  const hiddenCount = Math.max(0, total - tasks.length);
 
   return (
     <div className="flex w-72 shrink-0 flex-col rounded-xl border border-hairline bg-surface">
@@ -28,7 +36,7 @@ export function KanbanColumn({ status, tasks, onTaskClick }: KanbanColumnProps) 
           <span className="truncate text-sm font-semibold text-ink">{status.name}</span>
         </div>
         <span className="num shrink-0 rounded-full bg-surface px-2 py-0.5 text-xs font-semibold text-ink-2">
-          {tasks.length}
+          {total}
         </span>
       </div>
 
@@ -43,6 +51,14 @@ export function KanbanColumn({ status, tasks, onTaskClick }: KanbanColumnProps) 
         {tasks.map((task) => (
           <TaskCard key={task.id} task={task} onClick={() => onTaskClick(task)} />
         ))}
+        {hiddenCount > 0 && (
+          // Payload cap indicator — the column is truncated to the most
+          // recently updated cards; the rest are still there in the DB
+          // (use the list view or a search to reach them).
+          <p className="num mt-1 border-t border-hairline pt-2 text-center text-[11px] text-muted" dir="ltr">
+            + {hiddenCount} more
+          </p>
+        )}
       </div>
     </div>
   );

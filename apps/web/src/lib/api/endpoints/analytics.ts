@@ -83,7 +83,8 @@ export type EmployeeSummary = {
     id: number;
     name: string;
     employee_number: number;
-    hire_date: string | null;
+    // Backend column is `joining_date` (no `hire_date` in the schema).
+    joining_date: string | null;
     department: string | null;
   }>;
 };

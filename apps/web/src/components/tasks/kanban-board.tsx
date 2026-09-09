@@ -79,27 +79,35 @@ export function KanbanBoard({ onTaskClick }: KanbanBoardProps) {
       const targetStatus = sortedStatuses.find((s) => s.id === statusId);
 
       if (previousBoard && targetStatus) {
-        // The board is now `Record<code, { status, tasks }>` — flatten
-        // by pulling each entry's `.tasks` array, then find the row.
+        // The board is now `Record<code, { status, tasks, count_total }>` —
+        // flatten by pulling each entry's `.tasks` array to find the row,
+        // then move it across columns while keeping `count_total` in
+        // sync so the "+ N more" hint doesn't briefly show a stale total.
         const movedTask = Object.values(previousBoard)
           .flatMap((entry) => entry.tasks ?? [])
           .find((t) => t.id === taskId);
+        const sourceCode = movedTask?.status?.code;
 
         if (movedTask) {
           const nextBoard: KanbanBoardData = {};
           for (const [code, entry] of Object.entries(previousBoard)) {
+            const wasHere = (entry.tasks ?? []).some((t) => t.id === taskId);
             nextBoard[code] = {
               status: entry.status,
               tasks: (entry.tasks ?? []).filter((t) => t.id !== taskId),
+              count_total: Math.max(0, (entry.count_total ?? entry.tasks?.length ?? 0) - (wasHere ? 1 : 0)),
             };
           }
           const targetEntry = nextBoard[targetStatus.code];
+          const previousTargetEntry = previousBoard[targetStatus.code];
           nextBoard[targetStatus.code] = {
             status: targetStatus,
             tasks: [
               { ...movedTask, status: targetStatus },
               ...((targetEntry?.tasks) ?? []),
             ],
+            count_total: (previousTargetEntry?.count_total ?? previousTargetEntry?.tasks?.length ?? 0)
+              + (sourceCode === targetStatus.code ? 0 : 1),
           };
           queryClient.setQueryData(KANBAN_QUERY_KEY, nextBoard);
         }
@@ -156,14 +164,18 @@ export function KanbanBoard({ onTaskClick }: KanbanBoardProps) {
       onDragEnd={handleDragEnd}
     >
       <div className="flex gap-4 overflow-x-auto pb-2">
-        {sortedStatuses.map((status) => (
-          <KanbanColumn
-            key={status.id}
-            status={status}
-            tasks={board?.[status.code]?.tasks ?? []}
-            onTaskClick={onTaskClick}
-          />
-        ))}
+        {sortedStatuses.map((status) => {
+          const entry = board?.[status.code];
+          return (
+            <KanbanColumn
+              key={status.id}
+              status={status}
+              tasks={entry?.tasks ?? []}
+              countTotal={entry?.count_total}
+              onTaskClick={onTaskClick}
+            />
+          );
+        })}
       </div>
       <DragOverlay>{activeTask && <TaskCard task={activeTask} dragOverlay />}</DragOverlay>
     </DndContext>

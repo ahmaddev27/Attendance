@@ -15,9 +15,13 @@ class AttendanceRepository
 {
     public function findByEmployeeAndDate(Employee $employee, Carbon $date): ?Attendance
     {
+        // Bare where() on a DATE column — MySQL only uses the
+        // UNIQUE(employee_id, date) index when the column is not wrapped
+        // in a DATE()/YEAR()/etc. function call. whereDate() would emit
+        // DATE(`date`) = ? and force a full-table scan.
         return Attendance::query()
             ->where('employee_id', $employee->id)
-            ->whereDate('date', $date->toDateString())
+            ->where('date', $date->toDateString())
             ->first();
     }
 
@@ -52,13 +56,13 @@ class AttendanceRepository
     {
         return Attendance::query()
             ->where('employee_id', $employee->id)
-            // whereDate() (not whereBetween on the raw strings) so the
-            // range's last day isn't dropped: a `date`-cast column is
-            // stored as a full 'Y-m-d H:i:s' string, which — on a loosely
-            // typed connection such as SQLite — sorts *after* a bare
-            // 'Y-m-d' upper bound and would otherwise be excluded.
-            ->whereDate('date', '>=', $start->toDateString())
-            ->whereDate('date', '<=', $end->toDateString())
+            // Bare where() on the DATE column so MySQL keeps the
+            // UNIQUE(employee_id, date) index — DATE()-wrapping via
+            // whereDate() would rule the index out. Column stores a
+            // pure 'Y-m-d' value so bare string comparisons range-scan
+            // cleanly on both MySQL and SQLite.
+            ->where('date', '>=', $start->toDateString())
+            ->where('date', '<=', $end->toDateString())
             ->get();
     }
 
@@ -81,8 +85,10 @@ class AttendanceRepository
             ])
             ->when($filters['employee_id'] ?? null, fn (Builder $query, $employeeId) => $query->where('employee_id', $employeeId))
             ->when($filters['status'] ?? null, fn (Builder $query, $status) => $query->where('status', $status))
-            ->when($filters['date_from'] ?? null, fn (Builder $query, $date) => $query->whereDate('date', '>=', $date))
-            ->when($filters['date_to'] ?? null, fn (Builder $query, $date) => $query->whereDate('date', '<=', $date))
+            // Bare where() so the composite (employee_id, status, date)
+            // index actually gets used — DATE() wrappers disqualify it.
+            ->when($filters['date_from'] ?? null, fn (Builder $query, $date) => $query->where('date', '>=', $date))
+            ->when($filters['date_to'] ?? null, fn (Builder $query, $date) => $query->where('date', '<=', $date))
             ->orderByDesc('date')
             ->paginate($perPage);
     }

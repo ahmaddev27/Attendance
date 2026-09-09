@@ -41,7 +41,9 @@ class Holiday extends Model
     public function scopeForDate(Builder $query, Carbon $date): Builder
     {
         return $query->where(function (Builder $query) use ($date) {
-            $query->whereDate('date', $date->toDateString())
+            // date is a true DATE column — bare where() keeps the
+            // (date, name) UNIQUE index usable for the one-off match.
+            $query->where('date', $date->toDateString())
                 ->orWhere(function (Builder $query) use ($date) {
                     $query->where('is_recurring', true)
                         ->whereMonth('date', $date->month)

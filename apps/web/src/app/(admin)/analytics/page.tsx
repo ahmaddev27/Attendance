@@ -367,9 +367,9 @@ export default function AnalyticsPage() {
                       </span>
                       {emp.department && ` · ${emp.department}`}
                     </p>
-                    {emp.hire_date && (
+                    {emp.joining_date && (
                       <p className="num text-[10px] text-muted" dir="ltr">
-                        {emp.hire_date}
+                        {emp.joining_date}
                       </p>
                     )}
                   </div>

@@ -51,12 +51,15 @@ class TaskService
     }
 
     /**
-     * Every status (in board order), each carrying the tasks matching
-     * $filters that currently sit in it — including statuses with zero
-     * matching tasks, so a Kanban board can render every column.
+     * Every status (in board order), each carrying up to
+     * TaskRepository::KANBAN_COLUMN_LIMIT tasks matching $filters plus
+     * the unlimited `count_total` for that column. Statuses with no
+     * matching tasks are still emitted so the board can render every
+     * column, and the count_total lets the UI render a "+ N more"
+     * affordance when the visible slice is short of the true total.
      *
      * @param  array<string, mixed>  $filters
-     * @return Collection<string, array{status: TaskStatus, tasks: Collection<int, Task>}>
+     * @return Collection<string, array{status: TaskStatus, tasks: Collection<int, Task>, count_total: int}>
      */
     public function kanban(array $filters = []): Collection
     {
@@ -64,10 +67,15 @@ class TaskService
 
         return $this->statuses->all()
             ->keyBy(fn (TaskStatus $status) => $status->code)
-            ->map(fn (TaskStatus $status) => [
-                'status' => $status,
-                'tasks' => $grouped->get($status->code, new Collection()),
-            ]);
+            ->map(function (TaskStatus $status) use ($grouped) {
+                $entry = $grouped->get($status->code);
+
+                return [
+                    'status' => $status,
+                    'tasks' => $entry['tasks'] ?? new Collection(),
+                    'count_total' => $entry['count_total'] ?? 0,
+                ];
+            });
     }
 
     public function find(int $id): Task

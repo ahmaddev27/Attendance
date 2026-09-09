@@ -49,6 +49,9 @@ class TaskController extends Controller
         $columns = $this->taskService->kanban($filters)->map(fn (array $entry) => [
             'status' => new TaskStatusResource($entry['status']),
             'tasks' => TaskResource::collection($entry['tasks']),
+            // count_total > tasks.length signals the column was capped —
+            // the frontend uses the delta to render "+ N more".
+            'count_total' => $entry['count_total'],
         ]);
 
         return response()->json(['data' => $columns]);

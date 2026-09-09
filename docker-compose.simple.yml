@@ -59,7 +59,17 @@ services:
     image: redis:7-alpine
     container_name: taqat_redis
     restart: unless-stopped
-    command: redis-server --requirepass ${REDIS_PASSWORD}
+    # Bounded memory + LRU eviction so a queue-backlog spike (jobs
+    # piling up faster than they drain) can't consume every byte of RAM
+    # on the box and start evicting active session data unpredictably.
+    # Persistence is turned off: this Redis is only used for cache /
+    # sessions / queues / Reverb pub-sub — every piece of state has a
+    # canonical source elsewhere (MySQL, MinIO), so we treat it as a
+    # pure warm memory tier and skip both RDB snapshots and AOF fsyncs.
+    command: >-
+      redis-server --requirepass ${REDIS_PASSWORD}
+      --maxmemory 512mb --maxmemory-policy allkeys-lru
+      --save "" --appendonly no
     volumes:
       - redis_data:/data
     healthcheck:
@@ -140,6 +150,13 @@ services:
     <<: *api-service
     container_name: taqat_reverb
     command: php artisan reverb:start --host=0.0.0.0 --port=8080
+    # Reverb's Redis pub-sub bus — single-process worked at ~100 users,
+    # but broadcasts are dropped once a second Reverb instance is added
+    # for horizontal scaling unless every node subscribes to the same
+    # Redis channel. Turning this on now keeps the single-node config
+    # working AND lets us scale out without redeploying config.
+    environment:
+      REVERB_SCALING_ENABLED: "true"
     ports:
       - "127.0.0.1:${REVERB_PORT:-8182}:8080"
     depends_on:
