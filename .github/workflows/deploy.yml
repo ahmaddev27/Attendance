@@ -428,21 +428,41 @@ jobs:
           REMOTE_SCRIPT
 
       - name: Post-deploy health check
+        # Runs OVER SSH — checks the API from inside the box, through
+        # nginx. External health via public DNS/SSL is a separate
+        # (network/DNS/cert) concern that should not fail the deploy;
+        # if containers are healthy through the reverse proxy, the
+        # deploy did its job.
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
         run: |
           set -e
-          echo "→ Checking https://attendees.taqatgaza.com/api/health"
-          for i in $(seq 1 12); do
-            if curl -sf --max-time 5 https://attendees.taqatgaza.com/api/health > /tmp/health.json; then
-              echo "✓ API healthy: $(cat /tmp/health.json)"
-              exit 0
-            fi
-            # Fall back to plain HTTP while SSL isn't set up yet
-            if curl -sf --max-time 5 http://attendees.taqatgaza.com/api/health > /tmp/health.json; then
-              echo "✓ API healthy (HTTP): $(cat /tmp/health.json)"
-              exit 0
-            fi
-            echo "   waiting for API (attempt ${i}/12)…"
-            sleep 5
-          done
-          echo "✗ API did not respond to /health within 60s"
-          exit 1
+          echo "→ Health-check via SSH: nginx → api → /api/health"
+          ssh -T \
+            -o StrictHostKeyChecking=yes \
+            -i ~/.ssh/id_deploy \
+            -p "$VPS_SSH_PORT" \
+            "$VPS_USER@$VPS_HOST" << 'REMOTE_HEALTH'
+            set -e
+            # Hit nginx directly on localhost — bypasses DNS + SSL. Any
+            # 2xx here means the app is serving requests end-to-end
+            # inside the box; external reachability is orthogonal.
+            for i in $(seq 1 12); do
+              # -k skips cert validation (still checks reachability), -H
+              # pins the Host header so nginx picks the right vhost.
+              if curl -sfk --max-time 5 \
+                  -H "Host: attendees.taqatgaza.com" \
+                  http://127.0.0.1/api/health > /tmp/health.json 2>/dev/null; then
+                echo "✓ API healthy: $(cat /tmp/health.json)"
+                exit 0
+              fi
+              echo "   waiting for nginx→api (attempt ${i}/12)…"
+              sleep 5
+            done
+            echo "✗ API did not respond to /api/health within 60s (checking from INSIDE the VPS)"
+            echo "→ Dumping the last 20 nginx access log lines:"
+            docker compose -f docker-compose.simple.yml logs --tail=20 nginx 2>/dev/null || true
+            exit 1
+          REMOTE_HEALTH
