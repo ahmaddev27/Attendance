@@ -33,7 +33,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/my-tasks', label: 'مهامي', icon: ClipboardList },
   { href: '/my-leaves', label: 'إجازاتي', icon: CalendarCheck },
   { href: '/my-requests', label: 'طلباتي', icon: FileText },
-  { href: '/notifications', label: 'الإشعارات', icon: Bell },
+  { href: '/my-notifications', label: 'الإشعارات', icon: Bell },
 ];
 
 function isActivePath(pathname: string | null, href: string) {
