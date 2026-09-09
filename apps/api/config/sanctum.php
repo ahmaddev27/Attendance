@@ -50,7 +50,12 @@ return [
     |
     */
 
-    'expiration' => null,
+    // 60 days = a typical mobile session lifetime. Long enough that
+    // users don't re-login weekly, short enough that a stolen token
+    // eventually stops working without a manual revoke. Web tokens
+    // rotate on every login; mobile tokens persist in expo-secure-store
+    // and would otherwise be valid forever.
+    'expiration' => (int) env('SANCTUM_TOKEN_EXPIRATION_MINUTES', 60 * 24 * 60),
 
     /*
     |--------------------------------------------------------------------------

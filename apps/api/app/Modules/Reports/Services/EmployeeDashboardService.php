@@ -129,8 +129,12 @@ class EmployeeDashboardService
             ->get()
             ->map(fn (LeaveBalance $b) => [
                 'type' => $b->leaveType?->name ?? '—',
-                'remaining' => (float) max(0, $b->entitled - $b->used - $b->pending),
-                'entitled' => (float) $b->entitled,
+                // Column is `entitlement`, not `entitled` — the old
+                // code silently returned 0 for every employee because
+                // `$b->entitled` was null → (float) null = 0.0. Use the
+                // model's `remaining` accessor instead of re-deriving.
+                'remaining' => (float) $b->remaining,
+                'entitled' => (float) $b->entitlement,
             ])
             ->values()
             ->all();

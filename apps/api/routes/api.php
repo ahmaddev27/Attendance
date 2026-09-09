@@ -53,7 +53,10 @@ Route::get('/health', function () {
 Broadcast::routes(['middleware' => ['auth:sanctum']]);
 
 Route::prefix('auth')->group(function () {
-    Route::post('/login', [AuthController::class, 'login']);
+    // 5 attempts/min per (identifier + IP) so a brute-forcer can't
+    // enumerate employee_numbers at line-rate. See RouteServiceProvider
+    // for the 'login' rate-limiter definition.
+    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
@@ -61,21 +64,27 @@ Route::prefix('auth')->group(function () {
     });
 });
 
-// M2 — Employees + Organization Structure. Permission-based authorization
-// (per role) is layered on top of auth:sanctum in a later milestone.
+// M2 — Employees + Organization Structure.
+// Admin-only after security audit (2026-09-09): every write was reachable
+// by any employee-level token. Reads on the employees resource stay
+// admin-only too — they expose contact info + hire dates that shouldn't
+// leak between peers. Employees fetch their own profile via /auth/me.
 Route::middleware('auth:sanctum')->group(function () {
-    Route::prefix('org')->group(function () {
-        Route::apiResource('departments', DepartmentController::class);
-        Route::apiResource('teams', TeamController::class);
-        Route::apiResource('positions', PositionController::class);
+    Route::middleware('permission:manage-departments')->group(function () {
+        Route::prefix('org')->group(function () {
+            Route::apiResource('departments', DepartmentController::class);
+            Route::apiResource('teams', TeamController::class);
+            Route::apiResource('positions', PositionController::class);
+        });
     });
 
-    Route::apiResource('employees', EmployeeController::class);
-    Route::post('/employees/{employee}/restore', [EmployeeController::class, 'restore']);
-    // Admin-only: hand the employee a new password + create a User for
-    // them if one doesn't already exist. Returns the plaintext once.
-    Route::post('/employees/{employee}/reset-password', [EmployeeController::class, 'resetPassword'])
-        ->middleware('permission:manage-users');
+    Route::middleware('permission:manage-users')->group(function () {
+        Route::apiResource('employees', EmployeeController::class);
+        Route::post('/employees/{employee}/restore', [EmployeeController::class, 'restore']);
+        // Admin-only: hand the employee a new password + create a User for
+        // them if one doesn't already exist. Returns the plaintext once.
+        Route::post('/employees/{employee}/reset-password', [EmployeeController::class, 'resetPassword']);
+    });
 });
 
 // M3 — Attendance + Working Hours Engine.
@@ -89,29 +98,42 @@ Route::prefix('scan')->group(function () {
 });
 
 Route::middleware('auth:sanctum')->group(function () {
-    Route::apiResource('attendance', AttendanceController::class)->only(['index', 'show']);
-    Route::get('/attendance/employee/{employee}/monthly/{year}/{month}', [AttendanceController::class, 'monthlySummary']);
+    // Attendance read (admin dashboards). Employees see their own
+    // attendance via /me/dashboard/kpis and /me/... routes.
+    Route::middleware('permission:view-all-attendance')->group(function () {
+        Route::apiResource('attendance', AttendanceController::class)->only(['index', 'show']);
+        Route::get('/attendance/employee/{employee}/monthly/{year}/{month}', [AttendanceController::class, 'monthlySummary']);
+    });
 
-    Route::apiResource('attendance-devices', AttendanceDeviceController::class)
-        ->parameters(['attendance-devices' => 'device']);
-    Route::post('/attendance-devices/{device}/rotate', [AttendanceDeviceController::class, 'rotateToken']);
+    // Attendance devices — the resource returns qr_token in the payload
+    // (needed for kiosk provisioning). Locked to manage-departments so
+    // an employee can't harvest tokens to forge check-ins for peers.
+    Route::middleware('permission:manage-departments')->group(function () {
+        Route::apiResource('attendance-devices', AttendanceDeviceController::class)
+            ->parameters(['attendance-devices' => 'device']);
+        Route::post('/attendance-devices/{device}/rotate', [AttendanceDeviceController::class, 'rotateToken']);
 
-    Route::apiResource('holidays', HolidayController::class);
+        Route::apiResource('holidays', HolidayController::class);
 
-    Route::apiResource('work-schedules', WorkScheduleController::class)
-        ->parameters(['work-schedules' => 'schedule']);
+        Route::apiResource('work-schedules', WorkScheduleController::class)
+            ->parameters(['work-schedules' => 'schedule']);
+    });
 });
 
 // M4 — Leaves: types + balances + requests.
 Route::middleware('auth:sanctum')->group(function () {
-    // Admin
-    Route::apiResource('leave-types', LeaveTypeController::class);
-    Route::apiResource('leave-requests', LeaveRequestController::class)->except(['update']);
-    Route::post('/leave-requests/{leave_request}/approve', [LeaveRequestController::class, 'approve']);
-    Route::post('/leave-requests/{leave_request}/reject', [LeaveRequestController::class, 'reject']);
-    Route::post('/leave-requests/{leave_request}/cancel', [LeaveRequestController::class, 'cancel']);
-    Route::get('/leave-balances', [LeaveBalanceController::class, 'index']); // ?employee_id=X&year=Y
-    Route::post('/leave-balances/adjust', [LeaveBalanceController::class, 'adjust']);
+    // Admin — approve-leaves gate. Without this, an employee could POST
+    // /leave-requests/{their-own-id}/approve and self-approve their leave
+    // (security audit finding, 2026-09-09).
+    Route::middleware('permission:approve-leaves')->group(function () {
+        Route::apiResource('leave-types', LeaveTypeController::class);
+        Route::apiResource('leave-requests', LeaveRequestController::class)->except(['update']);
+        Route::post('/leave-requests/{leave_request}/approve', [LeaveRequestController::class, 'approve']);
+        Route::post('/leave-requests/{leave_request}/reject', [LeaveRequestController::class, 'reject']);
+        Route::post('/leave-requests/{leave_request}/cancel', [LeaveRequestController::class, 'cancel']);
+        Route::get('/leave-balances', [LeaveBalanceController::class, 'index']); // ?employee_id=X&year=Y
+        Route::post('/leave-balances/adjust', [LeaveBalanceController::class, 'adjust']);
+    });
 
     // Employee self-service (uses request()->user()->employee)
     Route::prefix('me/leaves')->group(function () {
@@ -127,10 +149,12 @@ Route::middleware('auth:sanctum')->group(function () {
 // projects/sprints — those tables land in Phase 2 (see
 // docs/v2/03-phase-1-plan.md's M6 section).
 Route::middleware('auth:sanctum')->group(function () {
-    // Config (admin)
-    Route::apiResource('task-statuses', TaskStatusController::class);
-    Route::apiResource('task-priorities', TaskPriorityController::class);
-    Route::apiResource('task-tags', TaskTagController::class);
+    // Config (admin) — status/priority/tag catalogs are HR ops config.
+    Route::middleware('permission:manage-workflows')->group(function () {
+        Route::apiResource('task-statuses', TaskStatusController::class);
+        Route::apiResource('task-priorities', TaskPriorityController::class);
+        Route::apiResource('task-tags', TaskTagController::class);
+    });
 
     // Tasks. /tasks/kanban is a static path and must be registered before
     // apiResource's GET /tasks/{task} below it — otherwise Laravel would
@@ -138,7 +162,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // reaching TaskController::kanban().
     Route::get('/tasks/kanban', [TaskController::class, 'kanban']);
     Route::apiResource('tasks', TaskController::class);
-    Route::post('/tasks/{task}/restore', [TaskController::class, 'restore']);
+    Route::post('/tasks/{task}/restore', [TaskController::class, 'restore'])
+        ->middleware('permission:create-tasks');
     Route::post('/tasks/{task}/complete', [TaskController::class, 'complete']);
 
     // Task comments
@@ -167,22 +192,30 @@ Route::middleware('auth:sanctum')->group(function () {
 
 // M5 — Generic Workflow Engine + Request Builder.
 Route::middleware('auth:sanctum')->group(function () {
-    // Admin: workflow management
-    Route::apiResource('workflows', WorkflowController::class);
-    Route::prefix('workflows/{workflow}')->group(function () {
-        Route::apiResource('steps', WorkflowStepController::class);
-        Route::post('/steps/reorder', [WorkflowStepController::class, 'reorder']);
+    // Admin: workflow management — gated so an employee can't rewire
+    // approval trees or delete workflow steps.
+    Route::middleware('permission:manage-workflows')->group(function () {
+        Route::apiResource('workflows', WorkflowController::class);
+        Route::prefix('workflows/{workflow}')->group(function () {
+            Route::apiResource('steps', WorkflowStepController::class);
+            Route::post('/steps/reorder', [WorkflowStepController::class, 'reorder']);
+        });
+        Route::apiResource('request-types', RequestTypeController::class);
     });
-    Route::apiResource('request-types', RequestTypeController::class);
 
-    // Admin: requests inbox (all requests)
-    Route::apiResource('requests', RequestController::class)->only(['index', 'show']);
-    Route::post('/requests/{request}/approve', [RequestController::class, 'approve']);
-    Route::post('/requests/{request}/reject', [RequestController::class, 'reject']);
-    Route::post('/requests/{request}/return', [RequestController::class, 'return']);
-    Route::post('/requests/{request}/forward', [RequestController::class, 'forward']);
+    // Admin: requests inbox (all requests). Own-request read + submit is
+    // handled by /me/requests below — every user reaches THEIR requests
+    // there; this admin block is the "see everyone's" version.
+    Route::middleware('permission:manage-workflows')->group(function () {
+        Route::apiResource('requests', RequestController::class)->only(['index', 'show']);
+        Route::post('/requests/{request}/approve', [RequestController::class, 'approve']);
+        Route::post('/requests/{request}/reject', [RequestController::class, 'reject']);
+        Route::post('/requests/{request}/return', [RequestController::class, 'return']);
+        Route::post('/requests/{request}/forward', [RequestController::class, 'forward']);
+    });
 
-    // Approver's inbox
+    // Approver's inbox — anyone assigned as approver on any step reaches
+    // this; the service filters to steps the caller can actually decide.
     Route::get('/approvals/inbox', [ApprovalInboxController::class, 'index']);
 
     // Employee self (uses request()->user()->employee)

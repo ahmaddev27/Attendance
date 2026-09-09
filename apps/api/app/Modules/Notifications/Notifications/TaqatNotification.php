@@ -8,6 +8,7 @@ use App\Modules\Push\Notifications\Channels\PushChannel;
 use App\Modules\Sms\Notifications\Channels\SmsChannel;
 use App\Modules\Whatsapp\Notifications\Channels\WhatsappChannel;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\BroadcastMessage;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -46,9 +47,16 @@ use Illuminate\Support\Str;
  *                 inside the 24h customer-service window, so every send
  *                 is deliberate.
  */
-class TaqatNotification extends Notification
+class TaqatNotification extends Notification implements ShouldQueue
 {
     use Queueable;
+
+    // Route this notification's channel sends onto the queue worker so
+    // the request thread doesn't block on Mail/Broadcast/SMS/WhatsApp/Push
+    // HTTP calls (each up to 10s). Scale audit (2026-09-09) traced a
+    // 5-worker php-fpm cap starving at ~200 concurrent users because
+    // every mutation was firing sync notification I/O inside the request.
+    public $afterCommit = true;
 
     /**
      * @param  array<string, mixed>  $meta  Optional structured payload

@@ -50,6 +50,26 @@ class TaskAttachmentController extends Controller
 
     public function destroy(Media $media): JsonResponse
     {
+        // Ownership check: the Media row must belong to a Task, and the
+        // requester must be able to delete THAT task's attachments.
+        // Without this, any authenticated user could DELETE any Media
+        // row in the system by id (task attachments today, potentially
+        // any other morph relation tomorrow).
+        abort_unless($media->model_type === \App\Models\Task::class, 404);
+
+        /** @var \App\Models\Task|null $task */
+        $task = $media->model()->first();
+        abort_unless($task !== null, 404);
+
+        $user = request()->user();
+        $employeeId = $user?->employee?->id;
+        $canManage = $user && (
+            $user->hasPermissionTo('manage-workflows')
+            || $task->created_by === $employeeId
+            || $task->assigned_to === $employeeId
+        );
+        abort_unless($canManage, 403);
+
         $this->attachments->delete($media);
 
         return response()->json(null, 204);

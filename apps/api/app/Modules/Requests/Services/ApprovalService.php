@@ -62,8 +62,23 @@ class ApprovalService
 
             $fresh = $this->requests->findOrFail($locked->id);
 
-            RequestApproved::dispatch($fresh);
-            $this->notifier->requestDecided($fresh);
+            if ($nextStep === null) {
+                // Terminal approval — tell the requester their request went
+                // through. Kept out of the "intermediate step" branch because
+                // requestDecided()'s "pending" arm sends a confusing
+                // "update: pending" push otherwise.
+                RequestApproved::dispatch($fresh);
+                $this->notifier->requestDecided($fresh);
+            } else {
+                // Non-terminal — ping the newly-active approvers so they can
+                // act on the request without polling the inbox. This dispatch
+                // was missing entirely, so multi-step workflows silently
+                // stalled after the first approval.
+                $approvers = $this->resolver->resolve($nextStep, $fresh);
+                foreach ($approvers as $nextApprover) {
+                    $this->notifier->requestPendingApproval($fresh, $nextApprover);
+                }
+            }
 
             return $fresh;
         });
