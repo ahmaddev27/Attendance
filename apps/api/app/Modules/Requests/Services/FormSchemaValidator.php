@@ -119,7 +119,12 @@ class FormSchemaValidator
     {
         $options = $field['options'] ?? [];
 
-        if (! in_array($value, $options, false)) {
+        // Strict, string-normalized comparison. Loose in_array() treated
+        // e.g. "yes" == 0 as true — an admin who defined numeric options
+        // would accept arbitrary text as a valid selection.
+        $normalizedOptions = array_map(fn ($option) => (string) $option, $options);
+
+        if (! in_array((string) $value, $normalizedOptions, true)) {
             return "The {$field['label']} field must be one of: ".implode(', ', $options).'.';
         }
 

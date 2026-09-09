@@ -7,6 +7,7 @@ namespace App\Modules\Employees\Services;
 use App\Models\Employee;
 use App\Models\User;
 use App\Modules\Employees\Repositories\EmployeeRepository;
+use App\Modules\Leaves\Services\LeaveBalanceService;
 use App\Modules\Sms\Services\SmsService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +22,7 @@ class EmployeeService
     public function __construct(
         private readonly EmployeeRepository $employees,
         private readonly SmsService $sms,
+        private readonly LeaveBalanceService $leaveBalances,
     ) {}
 
     /**
@@ -71,6 +73,20 @@ class EmployeeService
             // an employees row that can't sign in.
             $password = $this->generateReadablePassword();
             $this->provisionUser($employee, $password);
+
+            // Seed the current-year leave balances so the new hire can
+            // submit leave requests immediately. Wrapped in try/catch —
+            // a leave-type-seeding gap or a stray accrual bug should NOT
+            // roll back the whole employee create; ops can re-run the
+            // accrual manually afterwards.
+            try {
+                $this->leaveBalances->accrueForYear($employee, now()->year);
+            } catch (Throwable $e) {
+                Log::warning('[EmployeeService::create] leave-balance accrual failed', [
+                    'employee_id' => $employee->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
             return ['employee' => $employee, 'password' => $password];
         });

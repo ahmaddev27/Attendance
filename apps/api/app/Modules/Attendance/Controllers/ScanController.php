@@ -15,6 +15,7 @@ use App\Modules\Attendance\Requests\ScanRequest;
 use App\Modules\Attendance\Resources\AttendanceResource;
 use App\Modules\Attendance\Services\AttendanceService;
 use App\Modules\Attendance\Services\QrTokenService;
+use App\Shared\Enums\EmployeeStatus;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -87,12 +88,25 @@ class ScanController extends Controller
         try {
             $device = $this->qrTokens->resolveDevice($request->qrToken());
 
+            // Only ACTIVE employees may scan. A terminated/inactive/on-leave
+            // employee whose card is still floating around should NOT be
+            // able to stamp attendance rows. The status filter is applied
+            // in-query so we don't leak "this number exists but isn't
+            // active" via a distinguishable second error.
             $employee = Employee::query()
                 ->where('employee_number', $request->employeeNumber())
+                ->where('status', EmployeeStatus::Active)
                 ->first();
 
             if (! $employee) {
                 throw new InvalidScanCredentialsException('Unknown employee number.');
+            }
+
+            // Separate check so a disabled User (revoked at off-boarding
+            // via EmployeeService::softDelete) gets a distinct signal
+            // rather than being lumped in with "unknown number".
+            if ($employee->user && ! $employee->user->is_active) {
+                abort(403, 'Account not active.');
             }
 
             $attendance = $action($employee, $device);

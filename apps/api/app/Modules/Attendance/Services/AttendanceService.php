@@ -38,8 +38,16 @@ class AttendanceService
         $this->fraudGuard->assertAllowed($device, $latitude, $longitude, $ip);
 
         return DB::transaction(function () use ($employee, $device, $latitude, $longitude, $ip) {
+            $today = Carbon::today();
+
+            // Scoped to TODAY only — an unclosed session from weeks ago
+            // (employee who forgot to check out) must never permanently
+            // block a new check-in. Anything older is treated as orphaned
+            // and left for the admin correction flow; today's open row
+            // still blocks so a double-tap can't create two sessions.
             $openAttendance = Attendance::query()
                 ->where('employee_id', $employee->id)
+                ->where('date', $today->toDateString())
                 ->whereNotNull('check_in_at')
                 ->whereNull('check_out_at')
                 ->lockForUpdate()
@@ -48,8 +56,6 @@ class AttendanceService
             if ($openAttendance) {
                 throw new AttendanceException('You already checked in and have not checked out yet.');
             }
-
-            $today = Carbon::today();
 
             // Bare where() on the DATE column — keeps the
             // UNIQUE(employee_id, date) index in play (DATE() wrappers
@@ -94,15 +100,33 @@ class AttendanceService
         return DB::transaction(function () use ($employee, $device, $latitude, $longitude, $ip) {
             // Matched by "open session" rather than "today's row" so a shift
             // that started before midnight can still be closed afterwards.
+            // A stale session older than 18 hours is treated as orphaned:
+            // refuse the check-out and force an admin correction, so an
+            // employee who forgot to check out days ago can't retroactively
+            // stamp a weeks-old session with today's time.
             $attendance = Attendance::query()
                 ->where('employee_id', $employee->id)
                 ->whereNotNull('check_in_at')
                 ->whereNull('check_out_at')
+                ->where('check_in_at', '>=', now()->subHours(18))
                 ->lockForUpdate()
                 ->latest('date')
                 ->first();
 
             if (! $attendance) {
+                // If there IS a stale open session, surface a distinct
+                // message so ops know to intervene (auto-closing here would
+                // silently rewrite historical timesheets — not our call).
+                $hasStale = Attendance::query()
+                    ->where('employee_id', $employee->id)
+                    ->whereNotNull('check_in_at')
+                    ->whereNull('check_out_at')
+                    ->exists();
+
+                if ($hasStale) {
+                    throw new AttendanceException('You have an unclosed session older than 18 hours. Please ask an administrator to correct it before checking out again.');
+                }
+
                 throw new AttendanceException('You must check in before checking out.');
             }
 

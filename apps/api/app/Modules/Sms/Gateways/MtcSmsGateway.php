@@ -22,6 +22,14 @@ use Throwable;
  * Every failure path (non-2xx response, non-zero provider code, thrown
  * exception) is caught and returned as `SmsResult::failure()` — see the
  * SmsGateway contract for why we never throw.
+ *
+ * MTC's `type` param encodes the message encoding: 0 = GSM-7 (plain
+ * ASCII/Latin). The Unicode/Arabic code can differ per account — some
+ * accounts use `1`, others `2`. Override via the MTC_SMS_UNICODE_TYPE
+ * env var when the default (1) is wrong for a given tenant. Arabic
+ * (or any non-ASCII) body is detected automatically and routed through
+ * the Unicode `type` value; the previous hardcoded `0` garbled the
+ * welcome SMS on every non-Latin body.
  */
 final class MtcSmsGateway implements SmsGateway
 {
@@ -54,10 +62,10 @@ final class MtcSmsGateway implements SmsGateway
                 'from' => $this->sender,
                 'to' => $to,
                 'msg' => $body,
-                // MTC's `type` param: 0 = GSM-7 (plain ASCII/Latin), preserved
-                // from V1. Unicode/Arabic bodies require a different `type`
-                // value that MTC will document per account.
-                'type' => 0,
+                // 0 = GSM-7 (plain ASCII/Latin); non-ASCII bodies (Arabic,
+                // emoji, …) are auto-routed to the Unicode `type` value,
+                // env-tunable via MTC_SMS_UNICODE_TYPE per account.
+                'type' => $this->detectSmsType($body),
             ]);
         } catch (Throwable $e) {
             return SmsResult::failure('exception: '.$e->getMessage());
@@ -81,5 +89,22 @@ final class MtcSmsGateway implements SmsGateway
         }
 
         return SmsResult::failure('provider_'.$code, $raw);
+    }
+
+    /**
+     * Return the correct MTC `type` value for the given body: 0 when the
+     * body is pure GSM-7 (ASCII), otherwise the account's Unicode code
+     * (env-tunable, default 1). Arabic and other non-Latin scripts MUST
+     * be sent as Unicode or the receiving handset shows garbage.
+     */
+    private function detectSmsType(string $body): int
+    {
+        $isUnicode = preg_match('/[^\x00-\x7F]/', $body) === 1;
+
+        if (! $isUnicode) {
+            return 0;
+        }
+
+        return (int) (env('MTC_SMS_UNICODE_TYPE', 1));
     }
 }

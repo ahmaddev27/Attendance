@@ -6,6 +6,7 @@ namespace App\Modules\Requests\Services;
 
 use App\Models\Employee;
 use App\Models\Request as RequestModel;
+use App\Models\User;
 use App\Models\WorkflowStep;
 use App\Modules\Notifications\Services\NotificationService;
 use App\Modules\Requests\Events\RequestApproved;
@@ -165,7 +166,16 @@ class ApprovalService
      */
     public function forward(RequestModel $request, Employee $approver, Employee $forwardTo, string $comment): RequestModel
     {
-        return DB::transaction(function () use ($request, $approver, $forwardTo, $comment) {
+        // Cycle guard: forwarding to yourself is a no-op that would still
+        // record an approval row and re-notify — reject before touching
+        // state or opening a transaction.
+        if ($forwardTo->id === $approver->id) {
+            throw ValidationException::withMessages([
+                'forwarded_to_id' => 'لا يمكن تحويل الطلب لنفسك.',
+            ]);
+        }
+
+        $fresh = DB::transaction(function () use ($request, $approver, $forwardTo, $comment) {
             $locked = $this->requests->findForUpdate($request->id);
             $step = $this->guardActionable($locked, $approver);
 
@@ -185,8 +195,21 @@ class ApprovalService
                 'decided_at' => now(),
             ]);
 
+            // TODO: scopePendingForApprover should exclude requests
+            // forwarded-away by this approver so the original approver's
+            // inbox no longer surfaces items they handed off.
+
             return $this->requests->findOrFail($locked->id);
         });
+
+        // Notification dispatched AFTER commit (same pattern as approve())
+        // so a broadcast/notifier failure can't roll back the forward. Only
+        // notify when the target employee has a provisioned login user.
+        if ($forwardTo->user instanceof User) {
+            $this->notifier->requestPendingApproval($fresh, collect([$forwardTo->user]));
+        }
+
+        return $fresh;
     }
 
     /**
@@ -207,6 +230,17 @@ class ApprovalService
 
         if (! $this->resolver->isAuthorized($request, $approver)) {
             abort(403, 'You are not authorized to act on this request.');
+        }
+
+        // Self-approval guard: even if the approver resolver would grant
+        // permission (e.g. the approver's role also covers this step),
+        // the requester must never be the one who decides their own
+        // request. This runs AFTER isAuthorized so a legitimate approver
+        // still 403s on the wrong request instead of 422ing.
+        if ($approver->id === $request->employee_id) {
+            throw ValidationException::withMessages([
+                'approver' => 'لا يمكنك الموافقة على طلبك الخاص.',
+            ]);
         }
 
         return $request->currentStep;

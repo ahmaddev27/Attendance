@@ -85,6 +85,7 @@ class LeaveRequestService
 
         $this->assertMinNotice($leaveType, $startDate);
         $this->assertEndNotBeforeStart($startDate, $endDate);
+        $this->assertSameCalendarYear($startDate, $endDate);
 
         $days = $this->calculator->compute($employee, $startDate, $endDate);
 
@@ -215,6 +216,16 @@ class LeaveRequestService
                 ]);
             }
 
+            // Refunding balance on an already-taken past leave would let
+            // the employee re-spend days they've already used. Admins who
+            // genuinely need to correct the record can adjust the balance
+            // directly via /admin/leave-balances/adjust.
+            if ($locked->status === LeaveStatus::Approved && $locked->end_date->isPast()) {
+                throw ValidationException::withMessages([
+                    'status' => 'لا يمكن إلغاء إجازة موافقة انتهت.',
+                ]);
+            }
+
             if (! $isAdmin && $locked->status === LeaveStatus::Approved) {
                 $this->assertMinNotice($locked->leaveType, $locked->start_date, field: 'start_date', action: 'cancelled');
             }
@@ -283,6 +294,22 @@ class LeaveRequestService
         if ($endDate->lt($startDate)) {
             throw ValidationException::withMessages([
                 'end_date' => 'The end date cannot be before the start date.',
+            ]);
+        }
+    }
+
+    /**
+     * Leave balance rows are keyed by (employee, leave_type, year); a
+     * single request that straddles a year boundary would charge the
+     * whole span to the start-year bucket, understating the following
+     * year's usage. Until the balance model tracks per-year splits,
+     * force the caller to submit two separate requests.
+     */
+    private function assertSameCalendarYear(Carbon $startDate, Carbon $endDate): void
+    {
+        if ($startDate->year !== $endDate->year) {
+            throw ValidationException::withMessages([
+                'start_date' => 'لا يمكن أن تمتد الإجازة على أكثر من سنة تقويمية واحدة — أرسل طلبين منفصلين.',
             ]);
         }
     }

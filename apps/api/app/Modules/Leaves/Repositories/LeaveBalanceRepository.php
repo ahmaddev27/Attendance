@@ -9,6 +9,7 @@ use App\Models\LeaveType;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\QueryException;
 
 class LeaveBalanceRepository
 {
@@ -63,6 +64,48 @@ class LeaveBalanceRepository
         ?float $entitlement = null,
         float $carryOver = 0.0,
     ): LeaveBalance {
+        // SELECT ... FOR UPDATE does NOT gap-lock a missing row on MySQL's
+        // default REPEATABLE READ, so two concurrent first-time submissions
+        // used to both fall through to the create() branch — one won, the
+        // other blew up with a 23000 duplicate-key error → 500. The retry
+        // loop below handles that race: on the second pass the losing
+        // thread finds the row the winner just committed and returns it.
+        $attempt = 0;
+
+        while (true) {
+            $balance = $this->firstForUpdate($employeeId, $leaveTypeId, $year, $lockForUpdate);
+
+            if ($balance !== null) {
+                return $balance;
+            }
+
+            try {
+                return LeaveBalance::query()->firstOrCreate(
+                    [
+                        'employee_id' => $employeeId,
+                        'leave_type_id' => $leaveTypeId,
+                        'year' => $year,
+                    ],
+                    [
+                        'entitlement' => $entitlement ?? (float) (LeaveType::query()->whereKey($leaveTypeId)->value('default_annual_entitlement') ?? 0),
+                        'carry_over_from_previous' => $carryOver,
+                    ],
+                );
+            } catch (QueryException $exception) {
+                // Integrity constraint violation — someone else won the race
+                // between our SELECT and our INSERT. Retry once so we pick
+                // up the row they just committed. Second failure escalates.
+                if ($attempt >= 1 || $exception->getCode() !== '23000') {
+                    throw $exception;
+                }
+
+                $attempt++;
+            }
+        }
+    }
+
+    private function firstForUpdate(int $employeeId, int $leaveTypeId, int $year, bool $lockForUpdate): ?LeaveBalance
+    {
         $query = LeaveBalance::query()
             ->where('employee_id', $employeeId)
             ->where('leave_type_id', $leaveTypeId)
@@ -72,18 +115,6 @@ class LeaveBalanceRepository
             $query->lockForUpdate();
         }
 
-        $balance = $query->first();
-
-        if ($balance !== null) {
-            return $balance;
-        }
-
-        return LeaveBalance::query()->create([
-            'employee_id' => $employeeId,
-            'leave_type_id' => $leaveTypeId,
-            'year' => $year,
-            'entitlement' => $entitlement ?? (float) (LeaveType::query()->whereKey($leaveTypeId)->value('default_annual_entitlement') ?? 0),
-            'carry_over_from_previous' => $carryOver,
-        ]);
+        return $query->first();
     }
 }
