@@ -17,9 +17,21 @@ class AttendanceFactory extends Factory
 {
     protected $model = Attendance::class;
 
+    /**
+     * Monotonic per-factory-instance counter so ->count(N)->create([...])
+     * hands out N distinct dates. Faker's random dateTimeBetween('-30d')
+     * has ~31 possible values, which collides against the
+     * (employee_id, date) unique constraint the moment two rows share
+     * an employee (e.g. `Attendance::factory()->count(2)->create(['employee_id' => $x])`).
+     * Explicit sequence eliminates the flake without changing what
+     * consumers see — dates still cluster in the last ~30 days.
+     */
+    private static int $dateOffset = 0;
+
     public function definition(): array
     {
-        $date = Carbon::instance($this->faker->dateTimeBetween('-30 days', 'now'))->startOfDay();
+        $offset = self::$dateOffset++ % 30;
+        $date = Carbon::now()->subDays($offset)->startOfDay();
         $checkIn = $date->copy()->setTime(8, 0);
         $checkOut = $date->copy()->setTime(16, 0);
 
