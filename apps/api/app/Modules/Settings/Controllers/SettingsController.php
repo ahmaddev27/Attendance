@@ -6,8 +6,13 @@ namespace App\Modules\Settings\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Settings\Services\SettingsService;
+use App\Modules\Sms\Services\SmsService;
+use App\Modules\Whatsapp\Services\WhatsappService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Throwable;
 
 /**
  * Admin-facing key/value settings — everything that shouldn't require a
@@ -139,5 +144,134 @@ class SettingsController extends Controller
         }
 
         return $this->index();
+    }
+
+    /**
+     * `POST /api/admin/settings/test/mail`
+     * Body: { to: "email@example.com" }
+     *
+     * Fires a one-liner mail through the currently-configured transport
+     * (Resend in prod, log in dev). Runs sync — this is a manual smoke
+     * test, we WANT the caller to wait and see the outcome.
+     */
+    public function testMail(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'to' => ['required', 'email', 'max:200'],
+        ]);
+
+        try {
+            Mail::raw(
+                "هذه رسالة اختبارية من منصة TAQAT. إذا وصلتك، فالإعدادات صحيحة.\n\n— TAQAT",
+                function ($message) use ($data) {
+                    $message->to($data['to'])
+                        ->subject('اختبار إعدادات البريد — TAQAT');
+                },
+            );
+            return response()->json(['data' => ['ok' => true, 'message' => "تم إرسال بريد الاختبار إلى {$data['to']}"]]);
+        } catch (Throwable $e) {
+            Log::warning('[settings:test-mail] failed', ['error' => $e->getMessage(), 'to' => $data['to']]);
+            return response()->json([
+                'data' => ['ok' => false, 'error' => $e->getMessage()],
+                'message' => 'تعذر إرسال البريد. تحقق من مفتاح Resend والعنوان.',
+            ], 422);
+        }
+    }
+
+    /**
+     * `POST /api/admin/settings/test/sms`
+     * Body: { to: "+9627XXXXXXXX" }
+     *
+     * Uses SmsService::sendNow so the send runs inline (not queued) —
+     * the admin can immediately see success/failure. Reads config through
+     * SettingsService via the container-resolved SmsGateway, so a fresh
+     * cred change is respected without a restart.
+     */
+    public function testSms(Request $request, SmsService $sms): JsonResponse
+    {
+        $data = $request->validate([
+            'to' => ['required', 'string', 'max:32'],
+        ]);
+
+        try {
+            $result = $sms->sendNow(
+                to: $data['to'],
+                body: 'رسالة اختبارية من TAQAT — الإعدادات تعمل بشكل صحيح.',
+            );
+
+            if (! $result->success) {
+                return response()->json([
+                    'data' => [
+                        'ok' => false,
+                        'error' => $result->error,
+                        'provider_message_id' => $result->provider_message_id,
+                        'raw_response' => $result->raw_response,
+                    ],
+                    'message' => $result->error ?: 'تعذر إرسال الرسالة. تحقق من إعدادات MTC.',
+                ], 422);
+            }
+
+            return response()->json(['data' => [
+                'ok' => true,
+                'message' => "تم إرسال رسالة الاختبار إلى {$data['to']}",
+                'provider_message_id' => $result->provider_message_id,
+                'raw_response' => $result->raw_response,
+            ]]);
+        } catch (Throwable $e) {
+            Log::warning('[settings:test-sms] failed', ['error' => $e->getMessage(), 'to' => $data['to']]);
+            return response()->json([
+                'data' => ['ok' => false, 'error' => $e->getMessage()],
+                'message' => 'تعذر إرسال الرسالة. تحقق من إعدادات MTC.',
+            ], 422);
+        }
+    }
+
+    /**
+     * `POST /api/admin/settings/test/whatsapp`
+     * Body: { to: "+9627XXXXXXXX" }
+     *
+     * Same shape as testSms above but through the Meta Cloud gateway.
+     * The recipient must have messaged the business within the last 24h
+     * (WhatsApp's "customer service window") for a free-form message
+     * like this one to be delivered — otherwise Meta rejects it and the
+     * error surfaces in the response.
+     */
+    public function testWhatsapp(Request $request, WhatsappService $wa): JsonResponse
+    {
+        $data = $request->validate([
+            'to' => ['required', 'string', 'max:32'],
+        ]);
+
+        try {
+            $result = $wa->sendNow(
+                to: $data['to'],
+                body: 'رسالة اختبارية من TAQAT عبر واتساب — الإعدادات تعمل بشكل صحيح.',
+            );
+
+            if (! $result->success) {
+                return response()->json([
+                    'data' => [
+                        'ok' => false,
+                        'error' => $result->error,
+                        'provider_message_id' => $result->provider_message_id,
+                        'raw_response' => $result->raw_response,
+                    ],
+                    'message' => $result->error ?: 'تعذر إرسال الرسالة. تحقق من إعدادات واتساب.',
+                ], 422);
+            }
+
+            return response()->json(['data' => [
+                'ok' => true,
+                'message' => "تم إرسال رسالة واتساب اختبارية إلى {$data['to']}",
+                'provider_message_id' => $result->provider_message_id,
+                'raw_response' => $result->raw_response,
+            ]]);
+        } catch (Throwable $e) {
+            Log::warning('[settings:test-whatsapp] failed', ['error' => $e->getMessage(), 'to' => $data['to']]);
+            return response()->json([
+                'data' => ['ok' => false, 'error' => $e->getMessage()],
+                'message' => 'تعذر إرسال الرسالة. تحقق من إعدادات واتساب.',
+            ], 422);
+        }
     }
 }

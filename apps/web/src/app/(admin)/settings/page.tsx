@@ -2,7 +2,17 @@
 
 import * as React from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AtSign, Bot, Loader2, MessageSquareText, Save, Settings } from 'lucide-react';
+import {
+  AtSign,
+  Bell,
+  Bot,
+  Loader2,
+  MessageCircle,
+  MessageSquareText,
+  Save,
+  Send,
+  Settings,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -13,18 +23,24 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   settingsApi,
   type SettingField,
-  type SettingsPayload,
   type SettingsUpdatePayload,
 } from '@/lib/api/endpoints/settings';
 
+type TestKind = 'mail' | 'sms' | 'whatsapp';
+
 /**
  * Runtime-editable system settings. Backend groups the fields for us
- * (mail / sms / ai) so this page is a straight render of whatever the
- * API returns — no hardcoded field list.
+ * (mail / sms / whatsapp / ai / push) so this page is a straight render
+ * of whatever the API returns — no hardcoded field list.
  *
  * Secrets (encrypted fields) never come back to the client as plaintext.
  * The form shows a "•••" placeholder + a "set new value" empty input;
  * leaving it blank keeps the stored value untouched.
+ *
+ * Each communication group (mail / sms / whatsapp) also renders a
+ * "test send" inline form so an admin can smoke-test the credentials
+ * immediately after editing them — the endpoints run inline (not queued)
+ * so the response reflects the real send outcome.
  */
 export default function SettingsPage() {
   const queryClient = useQueryClient();
@@ -36,9 +52,6 @@ export default function SettingsPage() {
     queryFn: async () => (await settingsApi.get()).data.data,
   });
 
-  // Seed form state whenever the server payload changes — but only for
-  // plaintext fields. Encrypted fields stay blank so the admin has to
-  // type them fresh to rotate.
   React.useEffect(() => {
     if (!data) return;
     const initial: Record<string, Record<string, string>> = {};
@@ -86,7 +99,7 @@ export default function SettingsPage() {
             <Settings className="h-6 w-6 text-brand" /> إعدادات النظام
           </h1>
           <p className="mt-1 text-sm text-muted">
-            اربط خدمات البريد و SMS و AI. الحقول الحساسة مشفّرة قبل التخزين.
+            اربط خدمات البريد و SMS و واتساب و AI. الحقول الحساسة مشفّرة قبل التخزين.
           </p>
         </div>
         <Button
@@ -125,6 +138,13 @@ export default function SettingsPage() {
               fields={data.mail}
               values={formState.mail ?? {}}
               onChange={(k, v) => setValue('mail', k, v)}
+              test={{
+                kind: 'mail',
+                label: 'أرسل بريد اختبار',
+                inputLabel: 'عنوان البريد المستقبِل',
+                inputPlaceholder: 'name@example.com',
+                inputType: 'email',
+              }}
             />
           )}
           {'sms' in data && (
@@ -135,6 +155,30 @@ export default function SettingsPage() {
               fields={data.sms}
               values={formState.sms ?? {}}
               onChange={(k, v) => setValue('sms', k, v)}
+              test={{
+                kind: 'sms',
+                label: 'أرسل SMS اختبار',
+                inputLabel: 'رقم الجوّال (مثال: 962791234567)',
+                inputPlaceholder: '9627XXXXXXXX',
+                inputType: 'tel',
+              }}
+            />
+          )}
+          {'whatsapp' in data && (
+            <SettingsGroup
+              title="واتساب (Meta Cloud API)"
+              description="إعدادات إرسال رسائل واتساب من الحساب التجاري."
+              icon={<MessageCircle className="h-4 w-4 text-brand" />}
+              fields={data.whatsapp}
+              values={formState.whatsapp ?? {}}
+              onChange={(k, v) => setValue('whatsapp', k, v)}
+              test={{
+                kind: 'whatsapp',
+                label: 'أرسل رسالة واتساب اختبار',
+                inputLabel: 'رقم الواتساب (مثال: 962791234567)',
+                inputPlaceholder: '9627XXXXXXXX',
+                inputType: 'tel',
+              }}
             />
           )}
           {'ai' in data && (
@@ -147,6 +191,16 @@ export default function SettingsPage() {
               onChange={(k, v) => setValue('ai', k, v)}
             />
           )}
+          {'push' in data && (
+            <SettingsGroup
+              title="إشعارات Push (Expo)"
+              description="Access token اختياري لإشعارات تطبيق الجوّال."
+              icon={<Bell className="h-4 w-4 text-brand" />}
+              fields={data.push}
+              values={formState.push ?? {}}
+              onChange={(k, v) => setValue('push', k, v)}
+            />
+          )}
         </div>
       )}
     </div>
@@ -155,6 +209,14 @@ export default function SettingsPage() {
 
 // ---- Sub-components ----
 
+type TestConfig = {
+  kind: TestKind;
+  label: string;
+  inputLabel: string;
+  inputPlaceholder: string;
+  inputType: 'email' | 'tel';
+};
+
 function SettingsGroup({
   title,
   description,
@@ -162,6 +224,7 @@ function SettingsGroup({
   fields,
   values,
   onChange,
+  test,
 }: {
   title: string;
   description: string;
@@ -169,6 +232,7 @@ function SettingsGroup({
   fields: SettingField[];
   values: Record<string, string>;
   onChange: (key: string, value: string) => void;
+  test?: TestConfig;
 }) {
   return (
     <Card className="border-hairline bg-surface p-5">
@@ -189,7 +253,82 @@ function SettingsGroup({
           />
         ))}
       </div>
+      {test && <TestSender test={test} />}
     </Card>
+  );
+}
+
+/**
+ * Inline test-send form rendered under each communications group.
+ * Calls the sync `/admin/settings/test/{kind}` endpoint so an admin
+ * gets immediate success/failure feedback for a live send.
+ *
+ * Uses the values currently stored on the server, NOT the unsaved
+ * form draft — this is intentional: admins should save first, then
+ * test what will actually go out in production.
+ */
+function TestSender({ test }: { test: TestConfig }) {
+  const [to, setTo] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+
+  const handleSend = async () => {
+    if (!to.trim()) {
+      toast.error(test.inputLabel + ' مطلوب');
+      return;
+    }
+    setBusy(true);
+    try {
+      const api =
+        test.kind === 'mail'
+          ? settingsApi.testMail
+          : test.kind === 'sms'
+            ? settingsApi.testSms
+            : settingsApi.testWhatsapp;
+      const res = await api(to.trim());
+      toast.success(res.data.data.message ?? 'تم إرسال الاختبار');
+    } catch (e: unknown) {
+      const message =
+        (e as { response?: { data?: { message?: string; data?: { error?: string } } } })
+          ?.response?.data?.message
+        ?? (e as { response?: { data?: { data?: { error?: string } } } })
+          ?.response?.data?.data?.error
+        ?? 'تعذّر إرسال الاختبار';
+      toast.error(message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-5 rounded-lg border border-hairline bg-surface-2 p-3">
+      <Label className="mb-1.5 block text-xs font-semibold text-ink-2">
+        {test.inputLabel}
+      </Label>
+      <div className="flex flex-wrap items-stretch gap-2">
+        <Input
+          type={test.inputType === 'email' ? 'email' : 'tel'}
+          inputMode={test.inputType === 'email' ? 'email' : 'tel'}
+          value={to}
+          onChange={(e) => setTo(e.target.value)}
+          placeholder={test.inputPlaceholder}
+          dir="ltr"
+          className="flex-1 min-w-[180px] text-start"
+        />
+        <Button
+          type="button"
+          onClick={handleSend}
+          disabled={busy}
+          variant="outline"
+          className="gap-1"
+        >
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          {test.label}
+        </Button>
+      </div>
+      <p className="mt-2 text-[11px] text-muted">
+        الاختبار يستخدم الإعدادات المحفوظة حالياً — احفظ التغييرات أوّلاً ثم اختبر.
+      </p>
+    </div>
   );
 }
 

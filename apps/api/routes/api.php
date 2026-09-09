@@ -264,6 +264,17 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::middleware('permission:manage-users')->group(function () {
             Route::get('/settings', [SettingsController::class, 'index']);
             Route::put('/settings', [SettingsController::class, 'update']);
+
+            // Manual smoke-test endpoints — send a real message through the
+            // currently-configured transport so an admin can verify creds
+            // right after editing them. Run inline (not queued) so the
+            // response reflects the actual send outcome. Rate-limited to
+            // discourage using them to spam a phone number.
+            Route::middleware('throttle:10,1')->group(function () {
+                Route::post('/settings/test/mail', [SettingsController::class, 'testMail']);
+                Route::post('/settings/test/sms', [SettingsController::class, 'testSms']);
+                Route::post('/settings/test/whatsapp', [SettingsController::class, 'testWhatsapp']);
+            });
         });
     });
 
