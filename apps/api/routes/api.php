@@ -203,16 +203,26 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('request-types', RequestTypeController::class);
     });
 
-    // Admin: requests inbox (all requests). Own-request read + submit is
-    // handled by /me/requests below — every user reaches THEIR requests
-    // there; this admin block is the "see everyone's" version.
+    // Admin oversight: see every request in the org. Own-request read +
+    // submit is handled by /me/requests below.
     Route::middleware('permission:manage-workflows')->group(function () {
         Route::apiResource('requests', RequestController::class)->only(['index', 'show']);
-        Route::post('/requests/{request}/approve', [RequestController::class, 'approve']);
-        Route::post('/requests/{request}/reject', [RequestController::class, 'reject']);
-        Route::post('/requests/{request}/return', [RequestController::class, 'return']);
-        Route::post('/requests/{request}/forward', [RequestController::class, 'forward']);
     });
+
+    // Approver actions — auth:sanctum only. Authorization for each action
+    // is enforced service-side by ApprovalService::guardActionable, which
+    // checks that (a) the target step is the current active one and (b)
+    // the caller is an authorized approver on that specific step
+    // (assigned directly, forwarded to, or resolves via role/manager).
+    // Putting a role-based permission gate here would break the whole
+    // workflow engine — regular employees who happen to be on a step's
+    // approver list would 403 before the service could grant them
+    // access. Vertical escalation is still blocked: anyone hitting
+    // /approve on a request they can't decide gets 403 from the service.
+    Route::post('/requests/{request}/approve', [RequestController::class, 'approve']);
+    Route::post('/requests/{request}/reject', [RequestController::class, 'reject']);
+    Route::post('/requests/{request}/return', [RequestController::class, 'return']);
+    Route::post('/requests/{request}/forward', [RequestController::class, 'forward']);
 
     // Approver's inbox — anyone assigned as approver on any step reaches
     // this; the service filters to steps the caller can actually decide.
