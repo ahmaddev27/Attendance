@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -385,7 +386,7 @@ export function TaskDetailDialog({ taskId, onOpenChange, onNavigate }: TaskDetai
                       <Label className="text-xs font-semibold text-ink-2">تاريخ البدء</Label>
                       <DatePicker
                         value={task.start_date ?? ''}
-                        onChange={(v) => {
+                        onChange={(v: string) => {
                           if (v !== (task.start_date ?? '')) {
                             updateMutation.mutate({ taskId: task.id, payload: { start_date: v || null } });
                           }
@@ -397,7 +398,7 @@ export function TaskDetailDialog({ taskId, onOpenChange, onNavigate }: TaskDetai
                       <Label className="text-xs font-semibold text-ink-2">تاريخ الاستحقاق</Label>
                       <DatePicker
                         value={task.due_date ?? ''}
-                        onChange={(v) => {
+                        onChange={(v: string) => {
                           if (v !== (task.due_date ?? '')) {
                             updateMutation.mutate({ taskId: task.id, payload: { due_date: v || null } });
                           }

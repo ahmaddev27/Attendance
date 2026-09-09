@@ -48,6 +48,11 @@ class EmployeeResource extends JsonResource
                 'id' => $this->team->id,
                 'name' => $this->team->name,
             ]),
+            'work_schedule_id' => $this->work_schedule_id,
+            'work_schedule' => $this->whenLoaded('workSchedule', fn () => $this->workSchedule === null ? null : [
+                'id' => $this->workSchedule->id,
+                'name' => $this->workSchedule->name,
+            ]),
             'direct_manager' => $this->whenLoaded('directManager', fn () => $this->directManager === null ? null : [
                 'id' => $this->directManager->id,
                 'full_name' => $this->directManager->full_name,

@@ -235,6 +235,8 @@ export type Employee = {
   position: Position | null;
   department: Department | null;
   team: Team | null;
+  work_schedule_id: number | null;
+  work_schedule: { id: number; name: string } | null;
   direct_manager: EmployeeMini | null;
   // Only ever set on the create response — the plaintext password the
   // server just minted for the new user. It's also enqueued as a welcome
@@ -251,6 +253,7 @@ export type EmployeeInput = {
   department_id: number | null;
   team_id?: number | null;
   position_id?: number | null;
+  work_schedule_id?: number | null;
   employment_type: EmploymentType;
   joining_date: string;
   gender?: Gender | null;

@@ -38,21 +38,21 @@ class EmployeeController extends Controller
     {
         $employee = $this->employeeService->create($request->validated());
 
-        return (new EmployeeResource($employee->load(['position', 'department', 'team', 'directManager'])))
+        return (new EmployeeResource($employee->load(['position', 'department', 'team', 'directManager', 'workSchedule'])))
             ->response()
             ->setStatusCode(201);
     }
 
     public function show(Employee $employee): EmployeeResource
     {
-        return new EmployeeResource($employee->load(['position', 'department', 'team', 'directManager']));
+        return new EmployeeResource($employee->load(['position', 'department', 'team', 'directManager', 'workSchedule']));
     }
 
     public function update(UpdateEmployeeRequest $request, Employee $employee): EmployeeResource
     {
         $employee = $this->employeeService->update($employee, $request->validated());
 
-        return new EmployeeResource($employee->load(['position', 'department', 'team', 'directManager']));
+        return new EmployeeResource($employee->load(['position', 'department', 'team', 'directManager', 'workSchedule']));
     }
 
     public function destroy(Employee $employee): JsonResponse
@@ -72,7 +72,7 @@ class EmployeeController extends Controller
     {
         $restored = $this->employeeService->restore($employee);
 
-        return new EmployeeResource($restored->load(['position', 'department', 'team', 'directManager']));
+        return new EmployeeResource($restored->load(['position', 'department', 'team', 'directManager', 'workSchedule']));
     }
 
     /**

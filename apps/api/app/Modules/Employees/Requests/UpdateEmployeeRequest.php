@@ -35,6 +35,7 @@ class UpdateEmployeeRequest extends FormRequest
             'position_id' => ['nullable', 'integer', 'exists:positions,id'],
             'department_id' => ['nullable', 'integer', 'exists:departments,id'],
             'team_id' => ['nullable', 'integer', 'exists:teams,id'],
+            'work_schedule_id' => ['nullable', 'integer', 'exists:work_schedules,id'],
             'direct_manager_id' => ['nullable', 'integer', 'exists:employees,id'],
             'employment_type' => ['sometimes', new Enum(EmploymentType::class)],
             'joining_date' => ['sometimes', 'date'],

@@ -44,6 +44,7 @@ import { EmployeePicker } from '@/components/employees/employee-picker';
 import { departmentsApi } from '@/lib/api/endpoints/departments';
 import { employeesApi } from '@/lib/api/endpoints/employees';
 import { positionsApi } from '@/lib/api/endpoints/positions';
+import { schedulesApi } from '@/lib/api/endpoints/schedules';
 import { teamsApi } from '@/lib/api/endpoints/teams';
 import type { Employee, EmployeeInput, EmployeeMini } from '@/lib/api/types';
 import { EMPLOYMENT_TYPE_LABELS, GENDER_LABELS } from '@/lib/constants/employee-options';
@@ -64,6 +65,7 @@ const employeeFormSchema = z
     department_id: z.number().nullable(),
     team_id: z.number().nullable(),
     position_id: z.number().nullable(),
+    work_schedule_id: z.number({ required_error: 'جدول الدوام مطلوب' }).nullable(),
     employment_type: z.enum(['full_time', 'part_time', 'contractor', 'intern'], {
       required_error: 'نوع التوظيف مطلوب',
     }),
@@ -73,6 +75,10 @@ const employeeFormSchema = z
   .refine((data) => data.department_id !== null, {
     message: 'القسم مطلوب',
     path: ['department_id'],
+  })
+  .refine((data) => data.work_schedule_id !== null, {
+    message: 'جدول الدوام مطلوب — بدونه لن يُحسب الحضور',
+    path: ['work_schedule_id'],
   });
 
 type EmployeeFormValues = z.infer<typeof employeeFormSchema>;
@@ -87,6 +93,7 @@ function buildDefaultValues(employee?: Employee | null): EmployeeFormValues {
       department_id: null,
       team_id: null,
       position_id: null,
+      work_schedule_id: null,
       employment_type: 'full_time',
       joining_date: new Date(),
       gender: null,
@@ -101,6 +108,7 @@ function buildDefaultValues(employee?: Employee | null): EmployeeFormValues {
     department_id: employee.department?.id ?? null,
     team_id: employee.team?.id ?? null,
     position_id: employee.position?.id ?? null,
+    work_schedule_id: employee.work_schedule_id ?? null,
     employment_type: employee.employment_type,
     joining_date: parseISO(employee.joining_date),
     gender: employee.gender,
@@ -168,6 +176,14 @@ export function EmployeeFormDialog({ open, onOpenChange, employee }: EmployeeFor
     staleTime: 60_000,
   });
 
+  const { data: schedules } = useQuery({
+    queryKey: ['schedules', 'picker'],
+    // schedulesApi.list() already unwraps to WorkSchedule[] — no .data.data.
+    queryFn: () => schedulesApi.list(),
+    enabled: open,
+    staleTime: 60_000,
+  });
+
   const mutation = useMutation({
     mutationFn: async (values: EmployeeFormValues) => {
       const payload: EmployeeInput = {
@@ -178,6 +194,7 @@ export function EmployeeFormDialog({ open, onOpenChange, employee }: EmployeeFor
         department_id: values.department_id,
         team_id: values.team_id,
         position_id: values.position_id,
+        work_schedule_id: values.work_schedule_id,
         employment_type: values.employment_type,
         joining_date: format(values.joining_date, 'yyyy-MM-dd'),
         gender: values.gender,
@@ -389,6 +406,37 @@ export function EmployeeFormDialog({ open, onOpenChange, employee }: EmployeeFor
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name="work_schedule_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>جدول الدوام</FormLabel>
+                  <Select
+                    value={field.value != null ? String(field.value) : undefined}
+                    onValueChange={(v) => field.onChange(v ? Number(v) : null)}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="اختر جدول الدوام" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {(schedules ?? []).map((schedule) => (
+                        <SelectItem key={schedule.id} value={String(schedule.id)}>
+                          {schedule.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted">
+                    مطلوب لحساب الحضور والملخص الشهري. إذا لم يكن مضبوطاً، لن تظهر تقارير الملخص.
+                  </p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}
