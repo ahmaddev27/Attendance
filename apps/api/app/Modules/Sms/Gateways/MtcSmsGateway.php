@@ -53,7 +53,14 @@ final class MtcSmsGateway implements SmsGateway
 
     public function send(string $to, string $body): SmsResult
     {
-        $endpoint = $this->endpoint ?? 'http://int.mtcsms.com/sendsms.aspx';
+        // `?? default` isn't enough: AppServiceProvider casts the settings
+        // lookup to (string), so a missing/blank setting arrives here as
+        // "" — which is NOT null, so ?? leaves the empty string in place
+        // and Guzzle throws "URI must include a scheme and host". Empty
+        // OR null → fallback to the pinned V1 URL.
+        $endpoint = ($this->endpoint !== null && $this->endpoint !== '')
+            ? $this->endpoint
+            : 'http://int.mtcsms.com/sendsms.aspx';
 
         try {
             $response = Http::timeout($this->timeout)->get($endpoint, [
