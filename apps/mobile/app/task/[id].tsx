@@ -33,6 +33,9 @@ import { colors, radius, spacing, typography } from '../../lib/theme';
 
 interface Author {
   id?: number;
+  /** Backend `TaskResource` returns `full_name` for creator/assignee. */
+  full_name?: string | null;
+  /** Comment author on some endpoints ships a plain `name`. */
   name?: string | null;
 }
 
@@ -90,6 +93,10 @@ export default function TaskDetailScreen() {
   });
 
   function onSend() {
+    // Guard rapid double-taps at the source — the button's disabled
+    // state doesn't always re-render between two quick presses, and
+    // firing twice would post the comment twice.
+    if (addComment.isPending) return;
     const body = draft.trim();
     if (!body) return;
     addComment.mutate(body);
@@ -201,8 +208,8 @@ function TaskHeader({ task }: { task: TaskDetail }) {
         </View>
       </View>
 
-      {task.assignee?.name ? (
-        <Text style={styles.metaText}>المسند إليه: {task.assignee.name}</Text>
+      {task.assignee?.full_name ? (
+        <Text style={styles.metaText}>المسند إليه: {task.assignee.full_name}</Text>
       ) : null}
 
       <Text style={styles.commentsTitle}>التعليقات</Text>

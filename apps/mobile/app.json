@@ -1,4 +1,8 @@
 {
+  "_todos": [
+    "Icon assets under ./assets/ (icon.png, splash.png, adaptive-icon.png, notification-icon.png, favicon.png) are placeholders — replace with real PNGs before shipping.",
+    "expo.extra.eas.projectId is a placeholder — run `eas init` and paste the returned projectId here. lib/push-notifications.ts throws at runtime while the placeholder is in place, so pushes will fail loudly until then."
+  ],
   "expo": {
     "name": "TAQAT",
     "slug": "taqat-mobile",

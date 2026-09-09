@@ -89,6 +89,18 @@ export async function registerPushToken(): Promise<string | null> {
     Constants?.easConfig?.projectId ??
     undefined;
 
+  // Hard-stop if the placeholder projectId from app.json is still in
+  // place. Without a real projectId `getExpoPushTokenAsync` returns a
+  // token Expo's /send rejects, so pushes silently disappear — much
+  // better to surface the misconfig immediately during development.
+  // Run `eas init` and paste the returned id into app.json to clear.
+  if (typeof projectId === 'string' && projectId.startsWith('REPLACE_')) {
+    throw new Error(
+      'expo.extra.eas.projectId is still the placeholder (REPLACE_...). ' +
+        'Run `eas init` and paste the returned projectId into apps/mobile/app.json.',
+    );
+  }
+
   const tokenResponse = await Notifications.getExpoPushTokenAsync(
     projectId ? { projectId } : undefined,
   );

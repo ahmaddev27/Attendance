@@ -41,6 +41,13 @@ interface LeaveType {
   color?: string | null;
 }
 
+/** Shape returned by `GET /me/leaves/balances` — only the fields we use. */
+interface LeaveBalanceRow {
+  id: number;
+  leave_type_id: number;
+  leave_type?: LeaveType | null;
+}
+
 interface Paginated<T> {
   data: T[];
 }
@@ -67,11 +74,28 @@ export default function LeaveRequestScreen() {
   const [form, setForm] = useState<FormState>(INITIAL);
   const [error, setError] = useState<string | null>(null);
 
+  // `/leave-types` requires the `approve-leaves` permission (admin-only),
+  // so a regular employee 403's there. `/me/leaves/balances` is scoped to
+  // the caller's own balances and embeds the leave type — we distill the
+  // distinct types out of it for the picker.
   const types = useQuery({
-    queryKey: ['leave-types'],
+    queryKey: ['me', 'leaves', 'balances', 'types'],
     queryFn: async (): Promise<LeaveType[]> => {
-      const res = await api.get<Paginated<LeaveType> | LeaveType[]>('/leave-types');
-      return Array.isArray(res.data) ? res.data : res.data.data;
+      const res = await api.get<Paginated<LeaveBalanceRow> | LeaveBalanceRow[]>(
+        '/me/leaves/balances',
+      );
+      const rows = Array.isArray(res.data) ? res.data : res.data.data;
+
+      // Dedupe by leave_type_id — an employee usually has one balance
+      // per type per year, but guard against a duplicate slipping through
+      // (e.g. multi-year history if the endpoint ever widens).
+      const seen = new Map<number, LeaveType>();
+      for (const row of rows) {
+        const type = row.leave_type;
+        if (!type) continue;
+        if (!seen.has(type.id)) seen.set(type.id, type);
+      }
+      return Array.from(seen.values());
     },
     staleTime: 5 * 60_000,
   });
@@ -105,6 +129,10 @@ export default function LeaveRequestScreen() {
   }
 
   function onSubmit() {
+    // Guard rapid double-taps at the source — the button's disabled
+    // state doesn't always re-render before the second press lands,
+    // and firing the mutation twice would create two pending requests.
+    if (submit.isPending) return;
     setError(null);
     if (!canSubmit) {
       setError('يرجى تعبئة الحقول المطلوبة بصيغة صحيحة (YYYY-MM-DD).');
