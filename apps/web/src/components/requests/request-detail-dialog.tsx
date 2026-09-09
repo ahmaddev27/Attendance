@@ -26,19 +26,21 @@ import { formatDateTime } from '@/lib/request-format';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import type { RequestDetail } from '@/lib/api/types';
 
-/** Roles treated as having override authority to act from the admin requests panel on manager-type steps. */
-const OVERRIDE_ROLES = ['super-admin', 'management', 'department-manager', 'team-leader'];
-
-function canCurrentUserAct(detail: RequestDetail, user: { id: number; roles: string[] } | null): boolean {
+function canCurrentUserAct(detail: RequestDetail, user: { id: number; roles?: string[]; permissions?: string[] } | null): boolean {
   if (!user || !detail.current_step) return false;
   if (!ACTIONABLE_REQUEST_STATUSES.includes(detail.status)) return false;
+
+  // A persisted zustand session from before spatie/permission was wired up
+  // rehydrates with `roles`/`permissions` undefined — dereferencing them
+  // crashes the dialog. Guard with local arrays instead of trusting the type.
+  const roles = Array.isArray(user.roles) ? user.roles : [];
 
   const step = detail.current_step;
   switch (step.approver_type) {
     case 'specific_employee':
       return step.approver_ref === String(user.id);
     case 'specific_role':
-      return !!step.approver_ref && user.roles.includes(step.approver_ref);
+      return !!step.approver_ref && roles.includes(step.approver_ref);
     case 'form_field': {
       if (!step.approver_ref) return false;
       return String(detail.form_data[step.approver_ref]) === String(user.id);
@@ -46,10 +48,12 @@ function canCurrentUserAct(detail: RequestDetail, user: { id: number; roles: str
     case 'direct_manager':
     case 'department_manager':
     default:
-      // Not verifiable client-side without the employee's org chart — the
-      // admin panel grants override authority to management-tier roles here;
-      // the real guard is still enforced server-side on the action endpoints.
-      return user.roles.some((role) => OVERRIDE_ROLES.includes(role));
+      // Not verifiable client-side without the employee's org chart. We used
+      // to grant every management-tier role a green light here, but the audit
+      // found the resulting 403s on the action endpoints were worse UX than
+      // simply hiding the buttons. The approvals inbox, whose items are
+      // pre-vetted server-side, passes `forceActionable` explicitly.
+      return false;
   }
 }
 

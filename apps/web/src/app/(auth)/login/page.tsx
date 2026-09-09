@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api/client';
-import { useAuthStore, isAdminUser } from '@/lib/stores/auth-store';
+import { useAuthStore, isAdminUser, emitAuthReset } from '@/lib/stores/auth-store';
 import { Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
@@ -30,6 +30,9 @@ export default function LoginPage() {
         password,
       });
       setAuth(data.user, data.token);
+      // Nuke any leftover React-Query cache from a previous session on the
+      // same tab before we route into the new user's pages. See fix #6.
+      emitAuthReset();
       toast.success('مرحباً بك مجدداً في TAQAT');
       // Role-based landing: administrative roles go to the admin dashboard,
       // regular employees go to their personal home page.

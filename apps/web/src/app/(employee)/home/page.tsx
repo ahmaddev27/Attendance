@@ -20,6 +20,7 @@ import {
 
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { formatDate } from '@/lib/attendance-format';
 import { meDashboardApi, type EmployeeDashboardKpis } from '@/lib/api/endpoints/me-dashboard';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { cn } from '@/lib/utils';
@@ -196,7 +197,7 @@ export default function EmployeeHomePage() {
               <div className="text-sm">
                 <p className="font-semibold">إجازتك القادمة: {data.leaves.upcoming.type}</p>
                 <p className="num text-xs opacity-80" dir="ltr">
-                  {data.leaves.upcoming.start_date} → {data.leaves.upcoming.end_date}
+                  {formatDate(data.leaves.upcoming.start_date)} → {formatDate(data.leaves.upcoming.end_date)}
                 </p>
               </div>
             </div>

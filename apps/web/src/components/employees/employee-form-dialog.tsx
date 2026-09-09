@@ -45,7 +45,7 @@ import { departmentsApi } from '@/lib/api/endpoints/departments';
 import { employeesApi } from '@/lib/api/endpoints/employees';
 import { positionsApi } from '@/lib/api/endpoints/positions';
 import { teamsApi } from '@/lib/api/endpoints/teams';
-import type { Employee, EmployeeInput, EmployeeSummary } from '@/lib/api/types';
+import type { Employee, EmployeeInput, EmployeeMini } from '@/lib/api/types';
 import { EMPLOYMENT_TYPE_LABELS, GENDER_LABELS } from '@/lib/constants/employee-options';
 import { cn } from '@/lib/utils';
 
@@ -117,7 +117,11 @@ type EmployeeFormDialogProps = {
 export function EmployeeFormDialog({ open, onOpenChange, employee }: EmployeeFormDialogProps) {
   const isEdit = !!employee;
   const queryClient = useQueryClient();
-  const [directManager, setDirectManager] = React.useState<EmployeeSummary | null>(
+  // Held as EmployeeMini because the initial seed from the Employee resource
+  // only ships {id, full_name}; the picker itself also only reads those two
+  // fields off the current value. A fresh selection from the picker is a
+  // full EmployeeSummary (assignable to EmployeeMini).
+  const [directManager, setDirectManager] = React.useState<EmployeeMini | null>(
     employee?.direct_manager ?? null
   );
 

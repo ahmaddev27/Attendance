@@ -45,6 +45,10 @@ export function RejectLeaveDialog({ leaveRequest, open, onOpenChange }: RejectLe
     onSuccess: () => {
       toast.success('تم رفض طلب الإجازة');
       queryClient.invalidateQueries({ queryKey: ['leave-requests'] });
+      // A rejection can also release balance that was tentatively reserved,
+      // and the employee's "my leaves" list needs to reflect the new status.
+      queryClient.invalidateQueries({ queryKey: ['leave-balances'] });
+      queryClient.invalidateQueries({ queryKey: ['my-leaves'] });
       onOpenChange(false);
     },
     onError: (err: unknown) => {

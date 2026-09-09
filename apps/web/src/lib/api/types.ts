@@ -50,6 +50,14 @@ export type EmployeeSummary = {
   avatar_url: string | null;
 };
 
+/**
+ * Trimmed embed the backend uses for cheap manager/creator lookups where
+ * only the id and display name are needed (e.g. `direct_manager` on the
+ * Employee resource — no employee_number or avatar_url sent). Kept
+ * separate so consumers don't index into fields that will be undefined.
+ */
+export type EmployeeMini = Pick<EmployeeSummary, 'id' | 'full_name'>;
+
 // ---------------------------------------------------------------------------
 // Attendance
 // ---------------------------------------------------------------------------
@@ -227,7 +235,7 @@ export type Employee = {
   position: Position | null;
   department: Department | null;
   team: Team | null;
-  direct_manager: EmployeeSummary | null;
+  direct_manager: EmployeeMini | null;
   // Only ever set on the create response — the plaintext password the
   // server just minted for the new user. It's also enqueued as a welcome
   // SMS (see EmployeeService::sendWelcomeSms on the API), so this is a

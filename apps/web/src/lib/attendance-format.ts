@@ -33,10 +33,15 @@ export function formatTime(isoDateTime: string | null | undefined): string {
   return date.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
 }
 
-/** Formats an ISO date ("2026-09-07") for display without timezone drift. */
+/** Formats an ISO date ("2026-09-07") for display without timezone drift.
+ *  Also accepts full ISO datetime strings ("2026-09-07T08:03:00+00:00") — the
+ *  date portion is sliced off first so the year/month/day parse cleanly. */
 export function formatDate(isoDate: string | null | undefined): string {
   if (!isoDate) return '—';
-  const [year, month, day] = isoDate.split('-').map(Number);
+  // Full datetime strings ("2026-09-07T..." or "2026-09-07 08:03:00") would
+  // otherwise put the time zone junk into the `day` field and NaN it out.
+  const dateOnly = isoDate.length > 10 ? isoDate.slice(0, 10) : isoDate;
+  const [year, month, day] = dateOnly.split('-').map(Number);
   if (!year || !month || !day) return isoDate;
   const date = new Date(Date.UTC(year, month - 1, day));
   return date.toLocaleDateString('ar-SA', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });

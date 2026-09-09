@@ -28,6 +28,11 @@ export default function EmployeesPage() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const canManageUsers = hasPermission(user, 'manage-users');
+  // Same story as reset-password below: the leaves detail route is gated by
+  // `permission:approve-leaves` on the API side and its three queries would
+  // all 403 for a user who lacks it. Hide the row action instead of letting
+  // them navigate into a broken page.
+  const canApproveLeaves = hasPermission(user, 'approve-leaves');
   const [page, setPage] = React.useState(1);
   const [search, setSearch] = React.useState('');
   const [departmentId, setDepartmentId] = React.useState<string | undefined>();
@@ -188,6 +193,7 @@ export default function EmployeesPage() {
             label: 'عرض الإجازات',
             icon: CalendarDays,
             onClick: (employee) => router.push(`/employees/${employee.id}/leaves`),
+            hidden: () => !canApproveLeaves,
           },
           { label: 'تعديل', icon: Pencil, onClick: openEditDialog },
           // The reset-password endpoint is gated by `permission:manage-users`

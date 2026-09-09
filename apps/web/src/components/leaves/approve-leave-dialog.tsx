@@ -33,6 +33,11 @@ export function ApproveLeaveDialog({ leaveRequest, open, onOpenChange }: Approve
     onSuccess: () => {
       toast.success('تمت الموافقة على طلب الإجازة');
       queryClient.invalidateQueries({ queryKey: ['leave-requests'] });
+      // Approval consumes / releases the employee's leave balance, so the
+      // employee-detail balances view must refetch. The employee-side
+      // "my leaves" list also needs to reflect the new status.
+      queryClient.invalidateQueries({ queryKey: ['leave-balances'] });
+      queryClient.invalidateQueries({ queryKey: ['my-leaves'] });
       onOpenChange(false);
     },
     onError: (err: unknown) => {

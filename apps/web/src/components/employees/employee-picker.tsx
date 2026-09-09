@@ -17,11 +17,14 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Spinner } from '@/components/ui/spinner';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { employeesApi } from '@/lib/api/endpoints/employees';
-import type { EmployeeSummary } from '@/lib/api/types';
+import type { EmployeeMini, EmployeeSummary } from '@/lib/api/types';
 import { cn } from '@/lib/utils';
 
 type EmployeePickerProps = {
-  value: EmployeeSummary | null;
+  // The picker only reads id + full_name off of the selected value, so it
+  // accepts the trimmed EmployeeMini shape too — some resources (like
+  // Employee.direct_manager) only ship those two fields from the API.
+  value: EmployeeMini | null;
   onChange: (employee: EmployeeSummary | null) => void;
   placeholder?: string;
   /** Excludes an employee from the results — e.g. an employee can't manage themself. */

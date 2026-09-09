@@ -69,11 +69,28 @@ export const useAuthStore = create<AuthState>()(
           // from before the mirror was removed.
           localStorage.removeItem('taqat_token');
         }
+        // The QueryClient lives inside the provider tree and can't be
+        // reached from this zustand store directly. Broadcast an event
+        // that the top-level QueryProvider listens for and clears its
+        // cache on — otherwise signing in as a different user on the
+        // same tab would show user A's cached data until it turned
+        // stale. See fix #6 in the Wave D audit.
+        emitAuthReset();
       },
     }),
     { name: 'taqat-auth' }
   )
 );
+
+/**
+ * Broadcasts an auth-boundary event on both login and logout so the
+ * top-level QueryProvider can react by clearing its cache. Guarded
+ * for SSR since window isn't available during React server render.
+ */
+export function emitAuthReset(): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new Event('taqat:auth-reset'));
+}
 
 /** Any of the "administrative" roles that route through /dashboard, not /home. */
 const ADMIN_ROLES = new Set(['super-admin', 'management', 'department-manager', 'team-leader']);

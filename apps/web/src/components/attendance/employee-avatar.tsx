@@ -1,3 +1,6 @@
+'use client';
+
+import * as React from 'react';
 import Image from 'next/image';
 
 import { cn } from '@/lib/utils';
@@ -17,16 +20,24 @@ export function EmployeeAvatar({
   size?: number;
   className?: string;
 }) {
+  const [failed, setFailed] = React.useState(false);
+
+  const avatarUrl = employee?.avatar_url ?? null;
+  React.useEffect(() => {
+    setFailed(false);
+  }, [avatarUrl]);
+
   const initial = employee?.full_name?.trim()?.charAt(0)?.toUpperCase() || '؟';
 
-  if (employee?.avatar_url) {
+  if (avatarUrl && !failed) {
     return (
       <Image
-        src={employee.avatar_url}
-        alt={employee.full_name ?? ''}
+        src={avatarUrl}
+        alt={employee?.full_name ?? ''}
         width={size}
         height={size}
         unoptimized
+        onError={() => setFailed(true)}
         className={cn('shrink-0 rounded-full object-cover', className)}
         style={{ width: size, height: size }}
       />

@@ -114,6 +114,10 @@ export function TaskDetailDialog({ taskId, onOpenChange, onNavigate }: TaskDetai
       queryClient.setQueryData(['tasks', 'detail', vars.taskId], response.data.data);
       queryClient.invalidateQueries({ queryKey: ['tasks', 'kanban'] });
       queryClient.invalidateQueries({ queryKey: ['tasks', 'list'] });
+      // The employee-side task board reads from a different key — invalidate it
+      // too so a status/assignee change made from the admin dialog reflects
+      // immediately in the assignee's own view.
+      queryClient.invalidateQueries({ queryKey: ['my-tasks'] });
     },
     onError: (err: unknown) => toast.error(extractErrorMessage(err, 'تعذر تحديث المهمة')),
   });
@@ -125,6 +129,7 @@ export function TaskDetailDialog({ taskId, onOpenChange, onNavigate }: TaskDetai
       queryClient.setQueryData(['tasks', 'detail', id], response.data.data);
       queryClient.invalidateQueries({ queryKey: ['tasks', 'kanban'] });
       queryClient.invalidateQueries({ queryKey: ['tasks', 'list'] });
+      queryClient.invalidateQueries({ queryKey: ['my-tasks'] });
     },
     onError: (err: unknown) => toast.error(extractErrorMessage(err, 'تعذر إكمال المهمة')),
   });
@@ -135,6 +140,7 @@ export function TaskDetailDialog({ taskId, onOpenChange, onNavigate }: TaskDetai
       toast.success('تم حذف المهمة');
       queryClient.invalidateQueries({ queryKey: ['tasks', 'kanban'] });
       queryClient.invalidateQueries({ queryKey: ['tasks', 'list'] });
+      queryClient.invalidateQueries({ queryKey: ['my-tasks'] });
       setDeleteConfirmOpen(false);
       onOpenChange(false);
     },
