@@ -115,7 +115,7 @@ test('check-in rejects a scan outside the allowed geofence radius', function () 
     ]);
 
     $response->assertStatus(403)
-        ->assertJsonPath('message', 'You are outside the allowed check-in area for this device.');
+        ->assertJsonPath('message', 'أنت خارج النطاق المسموح لتسجيل الحضور على هذا الجهاز.');
 });
 
 test('check-in rejects a request from an ip outside the device whitelist', function () {
