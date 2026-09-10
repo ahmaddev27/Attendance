@@ -114,16 +114,17 @@ class TaskService
         $isAdmin = $this->actorHasManageWorkflows($actor);
 
         if (! $isAdmin || empty($data['created_by'])) {
-            // Prefer the actor's own employee_id. Fall back to the
-            // assignee (meaningful: "admin assigned this to X, so X
-            // owns it"). If neither is set AND the actor is NOT admin,
-            // that's a bug — every real employee has an employee_id.
-            // If the actor IS admin, allow created_by to be null
-            // (tasks.created_by column is nullable — see migration
-            // 2026_09_20_100003) — the task is authored on behalf of
-            // the org and renders as "النظام / الأدمن" in the UI.
-            $fallback = $actor->employee_id
-                ?? (! empty($data['assigned_to']) ? (int) $data['assigned_to'] : null);
+            // Author = the actor's employee, full stop. Falling back to
+            // the ASSIGNEE (as the previous version did) was actively
+            // wrong: it flipped "admin created this and assigned it to
+            // Ahmed" into "Ahmed created this and assigned it to himself",
+            // which made Ahmed's "Created by me" tab and audit trail lie.
+            //
+            // Admin actors without a linked employee are allowed to
+            // create tasks with created_by = null (nullable column via
+            // migration 2026_09_20_100003) — the UI renders that as
+            // "النظام / الإدارة" so the true authorship is preserved.
+            $fallback = $actor->employee_id;
 
             if ($fallback === null && ! $isAdmin) {
                 throw ValidationException::withMessages([
