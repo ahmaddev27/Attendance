@@ -29,15 +29,18 @@ export function MonthlyCalendarGrid({
   ];
 
   return (
-    <div>
-      <div className="grid grid-cols-7 gap-1.5 text-center text-xs font-semibold text-muted">
+    // Capped at ~640px so on a wide desktop each day cell reads as a
+    // calendar square (~80px), not the giant sofa-sized tiles it drifted
+    // into on 1400px+ screens. Grid stays fluid below that width.
+    <div className="mx-auto max-w-2xl">
+      <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold text-muted">
         {ARABIC_WEEKDAYS_SHORT.map((label) => (
-          <div key={label} className="py-1">
+          <div key={label} className="py-0.5">
             {label}
           </div>
         ))}
       </div>
-      <div className="mt-1 grid grid-cols-7 gap-1.5">
+      <div className="mt-1 grid grid-cols-7 gap-1">
         {cells.map((cell, idx) => {
           if (!cell) return <div key={`blank-${idx}`} />;
           const status = statusByDate[cell.iso];
@@ -47,7 +50,7 @@ export function MonthlyCalendarGrid({
               key={cell.iso}
               title={meta?.label}
               className={cn(
-                'flex aspect-square flex-col items-center justify-center rounded-lg border text-sm font-medium',
+                'flex aspect-square flex-col items-center justify-center rounded-md border text-xs font-medium',
                 meta ? meta.className : 'border-hairline bg-surface text-ink-2'
               )}
             >

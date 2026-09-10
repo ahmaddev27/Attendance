@@ -84,6 +84,17 @@ class AttendanceService
                 'status' => AttendanceStatus::Present,
             ])->save();
 
+            // Stamp late_minutes + Late status right now — the previous
+            // code deferred every calculation to check-out, so a 3pm
+            // arrival against an 8am shift showed as "present, 0 late"
+            // in the admin table until the employee eventually scanned
+            // out. Compute on check-in so the row reflects reality
+            // immediately. Skip silently for employees without a
+            // schedule (already asserted upstream in production paths).
+            if ($schedule = $employee->workSchedule) {
+                $this->calculator->stampCheckInStatus($attendance, $schedule);
+            }
+
             // Load employee — the kiosk `AttendanceResource` needs it for
             // the success card (name + number). `whenLoaded` in the resource
             // hides the key otherwise, and the FE crashes on `.employee`.

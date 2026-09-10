@@ -283,9 +283,15 @@ export default function KioskScanPage() {
               type="button"
               onClick={submitScan}
               className={
+                // Both buttons are solid, high-contrast, same shape —
+                // only the color differs so the kiosk operator sees at a
+                // glance which action they're about to take. Warning
+                // (yellow) faded into the surface on the previous look
+                // and read as disabled; a deep amber holds contrast on
+                // the light kiosk ground.
                 ready.action === 'check-in'
-                  ? 'min-h-[64px] w-full bg-brand text-xl font-bold text-white hover:bg-brand-hover'
-                  : 'min-h-[64px] w-full bg-warning text-xl font-bold text-white hover:bg-warning/90'
+                  ? 'min-h-[64px] w-full bg-brand text-xl font-bold text-white shadow-sm hover:bg-brand-hover'
+                  : 'min-h-[64px] w-full bg-amber-600 text-xl font-bold text-white shadow-sm hover:bg-amber-700'
               }
             >
               {ready.action === 'check-in' ? <LogIn className="h-6 w-6" /> : <LogOut className="h-6 w-6" />}

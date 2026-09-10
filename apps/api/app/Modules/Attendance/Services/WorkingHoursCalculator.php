@@ -26,6 +26,29 @@ class WorkingHoursCalculator
     ) {}
 
     /**
+     * Compute and persist late minutes + status the moment an employee
+     * scans in, so the row reflects "متأخر" immediately — not only after
+     * they eventually scan out. The full compute (total/early/overtime)
+     * still runs on check-out via computeForAttendance().
+     *
+     * Called from AttendanceService::checkIn right after the row is
+     * saved with check_in_at.
+     */
+    public function stampCheckInStatus(Attendance $attendance, WorkSchedule $schedule): void
+    {
+        if (! $attendance->check_in_at) {
+            return;
+        }
+
+        $lateMinutes = $this->lateMinutes($attendance->check_in_at, $schedule);
+
+        $attendance->forceFill([
+            'late_minutes' => $lateMinutes,
+            'status' => $lateMinutes > 0 ? AttendanceStatus::Late : AttendanceStatus::Present,
+        ])->save();
+    }
+
+    /**
      * Compute and persist total/late/early/overtime minutes and the final
      * status for a completed (checked-in and checked-out) attendance row.
      */
