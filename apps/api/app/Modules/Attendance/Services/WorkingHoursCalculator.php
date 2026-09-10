@@ -139,7 +139,23 @@ class WorkingHoursCalculator
                 };
 
                 if (! in_array($attendance->status, [AttendanceStatus::OnLeave, AttendanceStatus::Absent], true)) {
-                    $totalMinutes += $attendance->total_minutes ?? 0;
+                    // For a closed session `total_minutes` was stamped
+                    // at check-out and we use it verbatim. For an OPEN
+                    // session on today, compute elapsed since check-in
+                    // — otherwise the report reads '0 hours' for an
+                    // employee who has been at their desk since 8 am.
+                    // Only today's open session gets the fallback: an
+                    // old row with check_in but no check_out is
+                    // orphaned data that ops must correct manually.
+                    if ($attendance->total_minutes !== null) {
+                        $totalMinutes += $attendance->total_minutes;
+                    } elseif (
+                        $attendance->check_in_at
+                        && $attendance->check_out_at === null
+                        && $date->isSameDay($today)
+                    ) {
+                        $totalMinutes += (int) $attendance->check_in_at->diffInMinutes(now());
+                    }
                     $overtimeMinutes += $attendance->overtime_minutes ?? 0;
                     $lateMinutes += $attendance->late_minutes ?? 0;
                     $earlyLeaveMinutes += $attendance->early_leave_minutes ?? 0;
