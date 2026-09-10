@@ -115,3 +115,25 @@ Schedule::command('taqat:prune-old-rows')
     ->onOneServer()
     ->withoutOverlapping()
     ->name('taqat:prune-old-rows');
+
+/*
+|--------------------------------------------------------------------------
+| Auto-close forgotten attendance
+|--------------------------------------------------------------------------
+|
+| Runs every 15 minutes. For every open attendance session (check_in_at
+| set, check_out_at null), looks up the employee's WorkSchedule and, if
+| the schedule's declared shift-end for that date has already passed,
+| stamps check_out_at at the shift-end (not now()) — the employee was
+| expected to leave then, so that's the honest closing time. Flexible
+| schedules and employees without a schedule are skipped.
+|
+| 15-minute cadence catches "forgot to scan out on my way out the door"
+| within the same day; anything older than 48h stays untouched (admin
+| correction path).
+*/
+Schedule::command('taqat:auto-close-attendance')
+    ->everyFifteenMinutes()
+    ->onOneServer()
+    ->withoutOverlapping()
+    ->name('taqat:auto-close-attendance');

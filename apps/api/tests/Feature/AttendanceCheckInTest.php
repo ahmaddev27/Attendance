@@ -131,5 +131,5 @@ test('check-in rejects a request from an ip outside the device whitelist', funct
     ]);
 
     $response->assertStatus(403)
-        ->assertJsonPath('message', 'Your network is not permitted to check in on this device.');
+        ->assertJsonPath('message', 'عنوان الشبكة (IP) الحالي غير مدرج ضمن القائمة المسموح بها لهذا الجهاز.');
 });
