@@ -22,16 +22,18 @@ class AdminDashboardController extends Controller
      * to match every other endpoint in the API (see EmployeeResource et
      * al) so the frontend's response envelope is one shape.
      *
-     * Cached org-wide for 60s. The payload is the same for every admin
-     * viewing the dashboard at the same moment, so a single shared entry
-     * absorbs the concurrent traffic without staling the numbers noticeably.
+     * Cached org-wide for 15s — short enough that a task change or a
+     * check-in reflects in the numbers on the next dashboard refresh
+     * (users noticed a 60s window was surprising when a task they just
+     * marked complete still showed as open). The shared entry still
+     * absorbs the concurrent-admin refresh burst inside each window.
      */
     public function kpis(): JsonResponse
     {
         return response()->json([
             'data' => Cache::remember(
                 'admin.kpis',
-                60,
+                15,
                 fn () => $this->dashboard->kpis(),
             ),
         ]);

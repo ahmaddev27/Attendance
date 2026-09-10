@@ -174,27 +174,32 @@ class EmployeeDashboardService
     {
         $todayDate = $today->toDateString();
 
-        // Collapse the previous 3 whereHas('status') subquery counts into
-        // one JOIN + SUM(CASE WHEN...) row. Each of the old counts issued
-        // its own scan of tasks + a correlated subquery into task_statuses;
-        // the join fires once, and the conditional SUMs classify each row
-        // in-place — three queries become one.
+        // Single-query classification: three counts share the same
+        // scope (assigned to me, status is not done/cancelled, AND
+        // completed_at IS NULL — both guards are needed because
+        // "complete" can stamp completed_at without moving status, and
+        // an admin can move status to a done-state without going
+        // through the complete action; counting either alone leaks
+        // finished tasks into "open").
+        //
+        // in_progress is stricter than before: progress_percent > 0.
+        // A brand-new task with progress 0 whose start_date happens to
+        // be today is "open", not "in progress" — the previous rule
+        // surprised users who filed a task for today and saw it
+        // counted as active work.
         $open = Task::query()
             ->from('tasks')
             ->join('task_statuses', 'task_statuses.id', '=', 'tasks.status_id')
             ->where('tasks.assigned_to', $employee->id)
+            ->whereNull('tasks.completed_at')
             ->where('task_statuses.is_done_state', false)
             ->where('task_statuses.is_cancelled_state', false)
             ->selectRaw(
                 'COUNT(*) as open_count,
-                 SUM(CASE WHEN tasks.completed_at IS NULL
-                          AND (tasks.start_date <= ? OR tasks.progress_percent > 0)
-                          THEN 1 ELSE 0 END) as in_progress_count,
-                 SUM(CASE WHEN tasks.completed_at IS NULL
-                          AND tasks.due_date IS NOT NULL
-                          AND tasks.due_date < ?
+                 SUM(CASE WHEN tasks.progress_percent > 0 THEN 1 ELSE 0 END) as in_progress_count,
+                 SUM(CASE WHEN tasks.due_date IS NOT NULL AND tasks.due_date < ?
                           THEN 1 ELSE 0 END) as overdue_count',
-                [$todayDate, $todayDate]
+                [$todayDate]
             )
             ->first();
 

@@ -24,10 +24,10 @@ class EmployeeDashboardController extends Controller
      * query to $user->employee at the DB layer, so no cross-user leaks
      * are possible even if the caller forgets.
      *
-     * Cached for 30s per-user to keep the KPI card cheap on repeat loads
-     * (SPA route re-entry, tab focus refetches, react-query background
-     * pings). The service issues ~10 queries per call; a 30s TTL keeps the
-     * numbers effectively "live" while collapsing bursty traffic.
+     * Cached for 15s per-user — short enough that a task the user just
+     * completed or a scan they just made reflects on the next KPI
+     * refresh, still long enough to collapse SPA-re-entry / tab-focus
+     * refetch bursts into a single set of queries.
      */
     public function kpis(Request $request): JsonResponse
     {
@@ -36,7 +36,7 @@ class EmployeeDashboardController extends Controller
         return response()->json([
             'data' => Cache::remember(
                 "me.kpis:{$user->id}",
-                30,
+                15,
                 fn () => $this->dashboard->forUser($user),
             ),
         ]);

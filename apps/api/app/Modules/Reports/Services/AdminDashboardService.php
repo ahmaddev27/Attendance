@@ -125,31 +125,33 @@ class AdminDashboardService
      */
     private function taskCounts(CarbonImmutable $today): array
     {
-        // Uses the TaskStatus join to exclude done/cancelled without
-        // hard-coding those code strings — an admin-configurable status
-        // could still be treated as "closed" via its boolean flags.
+        // A task is "open" when:
+        //   • its status is not a done/cancelled state, AND
+        //   • completed_at is null.
+        //
+        // Both guards are needed: an admin can move a task to a done-state
+        // status without necessarily going through the "complete" action,
+        // and the "complete" action can stamp completed_at without moving
+        // the status (rare, but legal). Counting either alone would leak
+        // finished tasks into the "open" number.
         $baseOpen = Task::query()
+            ->whereNull('completed_at')
             ->whereHas('status', function ($q): void {
                 $q->where('is_done_state', false)->where('is_cancelled_state', false);
             });
 
         $open = (clone $baseOpen)->count();
 
-        // "In progress" = started (start_date is on or before today) and
-        // not yet completed. Progress > 0 also counts, since a task can be
-        // worked on before its scheduled start.
+        // "In progress" = actively being worked on — progress > 0. A task
+        // that was just created with progress 0 is technically "open" but
+        // not yet "in progress"; the previous rule counted any task whose
+        // start_date had arrived, which surprised users who filed a task
+        // "for tomorrow's execution" and saw it counted as active today.
         $inProgress = (clone $baseOpen)
-            ->whereNull('completed_at')
-            ->where(function ($q) use ($today): void {
-                // start_date/due_date are DATE columns — bare where()
-                // so the index isn't disqualified by a DATE() wrapper.
-                $q->where('start_date', '<=', $today->toDateString())
-                    ->orWhere('progress_percent', '>', 0);
-            })
+            ->where('progress_percent', '>', 0)
             ->count();
 
         $overdue = (clone $baseOpen)
-            ->whereNull('completed_at')
             ->whereNotNull('due_date')
             ->where('due_date', '<', $today->toDateString())
             ->count();
