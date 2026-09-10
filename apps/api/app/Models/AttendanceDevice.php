@@ -67,26 +67,16 @@ class AttendanceDevice extends Model
 
     /**
      * Whether the current token is older than its allowed rotation window.
-     * A device that has never had a token rotated is treated as expired.
-     *
-     * Setting `qr_rotates_every_seconds = 0` disables expiry entirely —
-     * the token stays valid forever until the admin manually rotates.
-     * Handy for a printed QR poster where you don't want an operator
-     * chasing rotations.
+     * QR rotation was removed as a product feature: tokens are permanent
+     * for the life of the device. The method is preserved so callers
+     * that still ask (QrTokenService::resolveDevice) don't need touching,
+     * but the answer is unconditionally false — old rows on the server
+     * still carrying a non-zero qr_rotates_every_seconds must not throw
+     * "QR expired" against a printed poster the admin never intended
+     * to time out.
      */
     public function isTokenExpired(): bool
     {
-        if ($this->qr_rotates_every_seconds === 0) {
-            return false;
-        }
-
-        if (! $this->last_token_rotated_at) {
-            return true;
-        }
-
-        return $this->last_token_rotated_at
-            ->copy()
-            ->addSeconds($this->qr_rotates_every_seconds)
-            ->isPast();
+        return false;
     }
 }

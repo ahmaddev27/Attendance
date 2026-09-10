@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 
 /**
@@ -20,32 +19,13 @@ export function QrDisplay({
   lastRotatedAt: string | null;
   size?: number;
 }) {
-  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
-  const neverRotates = rotatesEverySeconds <= 0;
-
-  useEffect(() => {
-    if (neverRotates) {
-      setSecondsLeft(null);
-      return;
-    }
-
-    // No last-rotated timestamp yet (freshly created device) — start the
-    // countdown from now rather than showing a meaningless value.
-    const baseline = lastRotatedAt ? new Date(lastRotatedAt).getTime() : Date.now();
-
-    const tick = () => {
-      const elapsedSeconds = Math.floor((Date.now() - baseline) / 1000);
-      const remaining = rotatesEverySeconds - (elapsedSeconds % rotatesEverySeconds);
-      setSecondsLeft(remaining);
-    };
-
-    tick();
-    const timer = setInterval(tick, 1000);
-    return () => clearInterval(timer);
-  }, [lastRotatedAt, rotatesEverySeconds, neverRotates]);
-
-  const minutes = secondsLeft !== null ? Math.floor(secondsLeft / 60) : 0;
-  const seconds = secondsLeft !== null ? secondsLeft % 60 : 0;
+  // Rotation was removed as a product feature: QR tokens are now
+  // permanent for the life of the device. `rotatesEverySeconds` and
+  // `lastRotatedAt` are still accepted so old callers don't break,
+  // but they're intentionally unused — the display always reads as
+  // permanent regardless of any stale DB value on a legacy device row.
+  void rotatesEverySeconds;
+  void lastRotatedAt;
 
   return (
     <div className="flex flex-col items-center gap-3">
@@ -55,18 +35,6 @@ export function QrDisplay({
       <p className="num max-w-[260px] break-all text-center text-xs text-muted" dir="ltr">
         {value}
       </p>
-      {neverRotates ? (
-        <p className="text-sm font-medium text-success">
-          رمز دائم — لا ينتهي
-        </p>
-      ) : (
-        <p className="text-sm text-ink-2">
-          التدوير التالي خلال{' '}
-          <span className="num font-semibold text-ink">
-            {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
-          </span>
-        </p>
-      )}
     </div>
   );
 }
