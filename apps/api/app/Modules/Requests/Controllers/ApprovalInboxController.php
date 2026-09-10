@@ -28,19 +28,36 @@ class ApprovalInboxController extends Controller
 
     public function index(Request $request): AnonymousResourceCollection
     {
-        $employee = $request->user()?->employee;
+        $user = $request->user();
+        $employee = $user?->employee;
         $perPage = (int) $request->integer('per_page', self::DEFAULT_PER_PAGE);
 
-        // An account with no linked employee (bootstrap super-admin, an
-        // integration user, an admin seeded before the org tree existed)
-        // isn't a designated approver on any workflow step, so their
-        // inbox is legitimately empty. Return a zero-row paginator
-        // instead of 422'ing — the FE renders "no pending approvals"
-        // exactly the same as an employee whose queue is genuinely empty.
+        // An account without a linked employee (bootstrap super-admin,
+        // an integration user) can still be a designated approver
+        // through SpecificRole steps — after the direct-manager -> super
+        // admin migration, every legacy step routes here. Serve their
+        // inbox from a role-only query instead of the Employee-scoped
+        // scope (which would return zero rows against a NULL employee).
         if (! $employee) {
-            return RequestResource::collection(
-                new \Illuminate\Pagination\LengthAwarePaginator([], 0, $perPage)
-            );
+            $roleNames = $user ? $user->getRoleNames()->all() : [];
+
+            if (empty($roleNames)) {
+                return RequestResource::collection(
+                    new \Illuminate\Pagination\LengthAwarePaginator([], 0, $perPage)
+                );
+            }
+
+            $paginator = \App\Models\Request::query()
+                ->with(['requestType', 'employee', 'currentStep'])
+                ->where('status', \App\Shared\Enums\RequestStatus::Pending)
+                ->whereHas('currentStep', function ($step) use ($roleNames) {
+                    $step->where('approver_type', \App\Shared\Enums\ApproverType::SpecificRole)
+                        ->whereIn('approver_ref', $roleNames);
+                })
+                ->orderByDesc('submitted_at')
+                ->paginate($perPage);
+
+            return RequestResource::collection($paginator);
         }
 
         return RequestResource::collection($this->requests->pendingForApprover($employee, $perPage));
