@@ -36,9 +36,32 @@ class AttendanceDeviceController extends Controller
         return new AttendanceDeviceResource($device);
     }
 
-    public function update(UpdateAttendanceDeviceRequest $request, AttendanceDevice $device): AttendanceDeviceResource
+    public function update(UpdateAttendanceDeviceRequest $request, AttendanceDevice $device)
     {
-        return new AttendanceDeviceResource($this->devices->update($device, $request->validated()));
+        try {
+            return new AttendanceDeviceResource($this->devices->update($device, $request->validated()));
+        } catch (\Throwable $e) {
+            // TEMPORARY debug surface: the deploy pipeline swallows the
+            // usual laravel.log tail and the client only sees generic
+            // 'Server Error'. Return the raw exception message + first
+            // trace frame so an admin editing a device can screenshot
+            // the actual cause. Remove once the current save flow is
+            // confirmed stable.
+            \Illuminate\Support\Facades\Log::error('AttendanceDevice update failed', [
+                'device_id' => $device->id,
+                'payload' => $request->validated(),
+                'exception' => $e->getMessage(),
+                'trace_first' => $e->getTraceAsString() ? explode("\n", $e->getTraceAsString())[0] : null,
+            ]);
+
+            return response()->json([
+                'message' => 'فشل تحديث الجهاز: '.$e->getMessage(),
+                'debug' => [
+                    'exception_class' => get_class($e),
+                    'file' => basename($e->getFile()).':'.$e->getLine(),
+                ],
+            ], 500);
+        }
     }
 
     public function destroy(AttendanceDevice $device): JsonResponse
