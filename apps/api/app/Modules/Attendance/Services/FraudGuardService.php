@@ -32,17 +32,24 @@ class FraudGuardService
             return;
         }
 
-        // enforce_geo=true: refuse to fail-open. If either the incoming
-        // location or the device's configured anchor is missing we throw,
-        // rather than silently accept the scan.
+        // enforce_geo=true, but the DEVICE isn't fully configured
+        // (missing anchor coords or radius). That's an admin misconfig,
+        // not a user permission problem — the previous "Location is
+        // required" message misled users into re-granting GPS access
+        // when the real fix is to open the device settings and either
+        // fill the coords in or toggle enforcement off. Fail loudly
+        // with a message that names the actual problem.
         if (
-            $latitude === null
-            || $longitude === null
-            || $device->allowed_lat === null
+            $device->allowed_lat === null
             || $device->allowed_lng === null
             || ! $device->allowed_radius_meters
         ) {
-            throw new FraudGuardException('Location is required — this device requires geofencing.');
+            throw new FraudGuardException('التقييد الجغرافي مفعّل على هذا الجهاز، لكن لم يتم تحديد إحداثيات المكان المسموح. راجع إعدادات الجهاز من لوحة الإدارة.');
+        }
+
+        // Device is fully configured — now require the user's coords.
+        if ($latitude === null || $longitude === null) {
+            throw new FraudGuardException('يجب تفعيل خدمة الموقع في المتصفح لإتمام تسجيل الحضور على هذا الجهاز.');
         }
 
         $distanceMeters = $this->haversineDistanceMeters(

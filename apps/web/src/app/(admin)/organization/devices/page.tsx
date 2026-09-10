@@ -175,7 +175,14 @@ export default function AttendanceDevicesPage() {
       setDialogOpen(false);
       invalidate();
     },
-    onError: () => toast.error('تعذر حفظ بيانات الجهاز'),
+    onError: (err: unknown) => {
+      // Surface the real server-side reason (validation errors,
+      // permission failures, etc.) so an admin can see what to fix
+      // instead of the generic 'تعذر حفظ' that masks the actual issue.
+      const response = (err as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } })?.response;
+      const firstErrorField = response?.data?.errors ? Object.values(response.data.errors)[0]?.[0] : undefined;
+      toast.error(firstErrorField || response?.data?.message || 'تعذر حفظ بيانات الجهاز');
+    },
   });
 
   const deleteMutation = useMutation({
