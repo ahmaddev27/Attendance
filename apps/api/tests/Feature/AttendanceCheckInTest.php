@@ -5,7 +5,11 @@ use App\Models\AttendanceDevice;
 use App\Shared\Enums\AttendanceStatus;
 
 test('an employee can check in via a valid scan', function () {
-    $employee = makeEmployeeWithSchedule();
+    // Flexible schedule so the on-check-in late computation returns 0
+    // and status stays 'present' — this test asserts the happy path,
+    // not the late-arrival branch (that's the next test).
+    $schedule = makeWorkSchedule(['is_flexible' => true]);
+    $employee = makeEmployeeWithSchedule($schedule);
     $device = AttendanceDevice::factory()->create();
 
     $response = $this->postJson('/api/scan/check-in', [
