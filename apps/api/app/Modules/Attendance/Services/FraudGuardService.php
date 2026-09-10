@@ -25,15 +25,45 @@ class FraudGuardService
 
     private function assertWithinGeofence(AttendanceDevice $device, ?float $latitude, ?float $longitude): void
     {
-        // Geofence enforcement is currently OFF by product policy: legacy
-        // devices may still carry enforce_geo=true in a DB row that a
-        // migration couldn't reach, but the desired behavior is
-        // fail-open — no location prompt, no rejection, no misconfig
-        // error. The distance-check code stays available (via the
-        // haversine helper below) so a future admin flow can re-enable
-        // it deliberately per device once the toggles work end-to-end.
-        //
-        unset($device, $latitude, $longitude);
+        // Admin toggle off → skip the entire check. Location is never
+        // requested nor validated on this device.
+        if (! $device->enforce_geo) {
+            return;
+        }
+
+        // Admin toggle on but the device isn't fully configured (missing
+        // anchor coords or radius) → fail-open. This is a misconfig,
+        // not a user-permission problem, and the previous "location is
+        // required" error trained users to keep re-granting GPS access
+        // when the real fix was for the admin to fill in the coords.
+        // Scan is allowed; ops can spot the half-configured device in
+        // the admin panel (the row visibly says "enforce_geo: on" with
+        // no coordinates) and either finish the config or toggle it back
+        // off. No security risk — enforcement was already misconfigured.
+        if (
+            $device->allowed_lat === null
+            || $device->allowed_lng === null
+            || ! $device->allowed_radius_meters
+        ) {
+            return;
+        }
+
+        // Fully-configured device → the user MUST send a location. This
+        // is the only path that actually rejects a scan.
+        if ($latitude === null || $longitude === null) {
+            throw new FraudGuardException('يجب تفعيل خدمة الموقع في المتصفح لإتمام تسجيل الحضور على هذا الجهاز.');
+        }
+
+        $distanceMeters = $this->haversineDistanceMeters(
+            (float) $device->allowed_lat,
+            (float) $device->allowed_lng,
+            $latitude,
+            $longitude,
+        );
+
+        if ($distanceMeters > $device->allowed_radius_meters) {
+            throw new FraudGuardException('أنت خارج النطاق المسموح لتسجيل الحضور على هذا الجهاز.');
+        }
     }
 
     private function assertIpAllowed(AttendanceDevice $device, string $ip): void
