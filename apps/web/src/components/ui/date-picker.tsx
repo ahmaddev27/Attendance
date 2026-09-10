@@ -70,6 +70,11 @@ export function DatePicker({
           type="button"
           variant="outline"
           disabled={disabled}
+          // The whole app is RTL-only, but Radix's Popover trigger can lose
+          // the parent `dir` context in some portalled compositions — pin it
+          // explicitly so the icon/label span reads right-to-start and the
+          // clear affordance always lands on the visual "end" (left in RTL).
+          dir="rtl"
           className={cn(
             'w-full justify-between font-normal',
             !parsed && 'text-muted',

@@ -96,11 +96,11 @@ type TaskFormDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   task?: Task | TaskDetail | null;
-  /** Pre-selects a parent task when creating a subtask from `<TaskDetailDialog>`. Ignored in edit mode. */
+  /** Pre-selects a parent task when creating a subtask from `<TaskDetailView>`. Ignored in edit mode. */
   defaultParentTask?: TaskPickerOption | null;
 };
 
-/** Create/edit dialog for a task's core fields. Full detail editing (status/assignee/tags/etc. one field at a time, comments, attachments) lives in `<TaskDetailDialog>` instead. */
+/** Create/edit dialog for a task's core fields. Full detail editing (status/assignee/tags/etc. one field at a time, comments, attachments) lives in `<TaskDetailView>` (the dedicated task detail page) instead. */
 export function TaskFormDialog({ open, onOpenChange, task, defaultParentTask }: TaskFormDialogProps) {
   const isEdit = !!task;
   const queryClient = useQueryClient();

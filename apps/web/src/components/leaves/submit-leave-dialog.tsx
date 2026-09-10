@@ -26,6 +26,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { DatePicker } from '@/components/ui/date-picker';
 import {
   Select,
   SelectContent,
@@ -211,7 +212,7 @@ export function SubmitLeaveDialog({ open, onOpenChange }: SubmitLeaveDialogProps
                   <FormItem>
                     <FormLabel>تاريخ البداية</FormLabel>
                     <FormControl>
-                      <Input type="date" dir="ltr" {...field} />
+                      <DatePicker value={field.value ?? ''} onChange={field.onChange} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -224,7 +225,7 @@ export function SubmitLeaveDialog({ open, onOpenChange }: SubmitLeaveDialogProps
                   <FormItem>
                     <FormLabel>تاريخ النهاية</FormLabel>
                     <FormControl>
-                      <Input type="date" dir="ltr" {...field} />
+                      <DatePicker value={field.value ?? ''} onChange={field.onChange} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

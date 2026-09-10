@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 
 import { DataTable, type DataTableColumn } from '@/components/data-table/data-table';
@@ -16,7 +17,6 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EmployeeAvatar } from '@/components/employees/employee-avatar';
-import { TaskDetailDialog } from '@/components/tasks/task-detail-dialog';
 import { TaskPriorityBadge } from '@/components/tasks/task-priority-badge';
 import { TaskProgressBar } from '@/components/tasks/task-progress-bar';
 import { TaskStatusBadge } from '@/components/tasks/task-status-badge';
@@ -38,13 +38,13 @@ function counterpartOf(task: Task, tab: TabKey): EmployeeSummary | null {
 }
 
 export default function MyTasksPage() {
+  const router = useRouter();
   const [tab, setTab] = React.useState<TabKey>('assigned');
   const [page, setPage] = React.useState(1);
   const [search, setSearch] = React.useState('');
   const [statusId, setStatusId] = React.useState<string | undefined>();
   const [dueFrom, setDueFrom] = React.useState('');
   const [dueTo, setDueTo] = React.useState('');
-  const [selectedTaskId, setSelectedTaskId] = React.useState<number | null>(null);
 
   const debouncedSearch = useDebouncedValue(search);
 
@@ -82,7 +82,7 @@ export default function MyTasksPage() {
       cell: (task) => (
         <button
           type="button"
-          onClick={() => setSelectedTaskId(task.id)}
+          onClick={() => router.push(`/my-tasks/${task.id}`)}
           className="max-w-[220px] truncate text-start font-medium text-brand-ink hover:underline"
           title={task.title}
         >
@@ -203,11 +203,6 @@ export default function MyTasksPage() {
         </TabsContent>
       </Tabs>
 
-      <TaskDetailDialog
-        taskId={selectedTaskId}
-        onOpenChange={(open) => !open && setSelectedTaskId(null)}
-        onNavigate={setSelectedTaskId}
-      />
     </div>
   );
 }

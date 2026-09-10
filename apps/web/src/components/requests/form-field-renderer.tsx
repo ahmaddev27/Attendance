@@ -1,6 +1,7 @@
 'use client';
 
 import { Input } from '@/components/ui/input';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -86,7 +87,13 @@ function FieldInput({
       );
 
     case 'date':
-      return <Input type="date" dir="ltr" value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} />;
+      return (
+        <DatePicker
+          value={(value as string) ?? ''}
+          onChange={(iso) => onChange(iso)}
+          placeholder={field.placeholder || 'اختر تاريخاً'}
+        />
+      );
 
     case 'select':
       return (

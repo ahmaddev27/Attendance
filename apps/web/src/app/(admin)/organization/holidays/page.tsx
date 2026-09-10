@@ -7,6 +7,7 @@ import { Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -283,14 +284,13 @@ export default function HolidaysPage() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs font-semibold text-ink-2">التاريخ</Label>
-                <Input
-                  type="date"
-                  value={form.date}
-                  onChange={(e) => setForm({ ...form, date: e.target.value })}
-                  className="mt-1.5"
-                  dir="ltr"
-                  required
-                />
+                <div className="mt-1.5">
+                  <DatePicker
+                    value={form.date}
+                    onChange={(iso) => setForm({ ...form, date: iso })}
+                    clearable={false}
+                  />
+                </div>
               </div>
               <div>
                 <Label className="text-xs font-semibold text-ink-2">اسم العطلة</Label>

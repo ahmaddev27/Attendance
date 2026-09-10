@@ -81,14 +81,18 @@ class TaskController extends Controller
         return new TaskDetailResource($this->taskService->findFor($actor, $task->id));
     }
 
-    public function update(UpdateTaskRequest $request, Task $task): TaskResource
+    public function update(UpdateTaskRequest $request, Task $task): TaskDetailResource
     {
         /** @var User $actor */
         $actor = $request->user();
 
         $updated = $this->taskService->update($task, $request->validated(), $actor);
 
-        return new TaskResource($this->taskService->find($updated->id));
+        // Return the full detail resource — the FE detail view pipes the
+        // mutation response straight into its React Query cache, and a
+        // slim TaskResource would strip subtasks/comments/history off the
+        // cached record and crash the detail view on the next render.
+        return new TaskDetailResource($this->taskService->find($updated->id));
     }
 
     public function destroy(Request $request, Task $task): JsonResponse

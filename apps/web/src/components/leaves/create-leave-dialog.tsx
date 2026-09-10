@@ -24,7 +24,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -187,7 +187,7 @@ export function CreateLeaveDialog({ open, onOpenChange }: CreateLeaveDialogProps
                   <FormItem>
                     <FormLabel>تاريخ البداية</FormLabel>
                     <FormControl>
-                      <Input type="date" dir="ltr" {...field} />
+                      <DatePicker value={field.value ?? ''} onChange={field.onChange} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -200,7 +200,7 @@ export function CreateLeaveDialog({ open, onOpenChange }: CreateLeaveDialogProps
                   <FormItem>
                     <FormLabel>تاريخ النهاية</FormLabel>
                     <FormControl>
-                      <Input type="date" dir="ltr" {...field} />
+                      <DatePicker value={field.value ?? ''} onChange={field.onChange} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Eye, Pencil, Plus, RotateCw, Trash2 } from 'lucide-react';
+import { Eye, Pencil, Plus, Printer, RotateCw, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -245,9 +245,14 @@ export default function AttendanceDevicesPage() {
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-col gap-1">
-                    <span className="num" dir="ltr">
-                      {device.ip_whitelist?.length ?? 0}
-                    </span>
+                    {(device.ip_whitelist?.length ?? 0) > 0 ? (
+                      <span className="text-xs text-muted">
+                        <span className="num" dir="ltr">{device.ip_whitelist!.length}</span>{' '}
+                        عنوان مسموح
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted">لا توجد قائمة</span>
+                    )}
                     <Badge
                       className={
                         device.enforce_ip
@@ -441,25 +446,82 @@ export default function AttendanceDevicesPage() {
           </DialogHeader>
           {qrDevice && (
             <div className="flex flex-col items-center gap-4 py-2">
-              <QrDisplay
-                value={scanUrl(qrDevice.qr_token)}
-                rotatesEverySeconds={qrDevice.qr_rotates_every_seconds}
-                lastRotatedAt={qrDevice.last_token_rotated_at}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full gap-2"
-                disabled={rotateMutation.isPending}
-                onClick={() => rotateMutation.mutate(qrDevice.id)}
-              >
-                {rotateMutation.isPending ? <Spinner /> : <RotateCw className="h-4 w-4" />}
-                تدوير الرمز الآن
-              </Button>
+              {/* Wrapper carries the id the print stylesheet targets so
+                  window.print() renders ONLY the QR + name + URL as a
+                  clean, poster-ready page (see printable-qr CSS below). */}
+              <div id="printable-qr" className="flex flex-col items-center gap-3 w-full">
+                <h2 className="hidden text-2xl font-bold text-ink print:block">
+                  {qrDevice.name}
+                </h2>
+                <QrDisplay
+                  value={scanUrl(qrDevice.qr_token)}
+                  rotatesEverySeconds={qrDevice.qr_rotates_every_seconds}
+                  lastRotatedAt={qrDevice.last_token_rotated_at}
+                />
+                <p className="hidden text-sm text-muted print:block">
+                  امسح الرمز بكاميرا هاتفك لتسجيل الحضور
+                </p>
+              </div>
+              <div className="flex w-full flex-col gap-2 print:hidden">
+                <Button
+                  type="button"
+                  className="w-full gap-2 bg-brand text-white hover:bg-brand-hover"
+                  onClick={() => window.print()}
+                >
+                  <Printer className="h-4 w-4" />
+                  طباعة الرمز (PDF)
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full gap-2"
+                  disabled={rotateMutation.isPending}
+                  onClick={() => rotateMutation.mutate(qrDevice.id)}
+                >
+                  {rotateMutation.isPending ? <Spinner /> : <RotateCw className="h-4 w-4" />}
+                  تدوير الرمز الآن
+                </Button>
+                <p className="text-center text-xs text-muted">
+                  اختر "حفظ كملف PDF" من نافذة الطباعة للحصول على ملف قابل للتوزيع
+                </p>
+              </div>
             </div>
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Print-only stylesheet: hides EVERYTHING except #printable-qr and
+          strips the Dialog overlay + scroll containers so the browser's
+          print/save-to-PDF flow gets a clean single-page render. */}
+      <style jsx global>{`
+        @media print {
+          body * {
+            visibility: hidden !important;
+          }
+          #printable-qr,
+          #printable-qr * {
+            visibility: visible !important;
+          }
+          #printable-qr {
+            position: fixed !important;
+            inset: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
+            padding: 40px !important;
+            background: white !important;
+            z-index: 999999 !important;
+          }
+          [role='dialog'] {
+            box-shadow: none !important;
+            background: transparent !important;
+            border: 0 !important;
+          }
+        }
+      `}</style>
 
       {/* Delete confirmation */}
       <AlertDialog open={Boolean(deletingDevice)} onOpenChange={(open) => !open && setDeletingDevice(null)}>

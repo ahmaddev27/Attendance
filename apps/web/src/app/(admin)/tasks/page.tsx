@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 
@@ -21,7 +22,6 @@ import { EmployeeAvatar } from '@/components/employees/employee-avatar';
 import { EmployeeSearchSelect } from '@/components/attendance/employee-search-select';
 import { DeleteTaskDialog } from '@/components/tasks/delete-task-dialog';
 import { KanbanBoard } from '@/components/tasks/kanban-board';
-import { TaskDetailDialog } from '@/components/tasks/task-detail-dialog';
 import { TaskFormDialog } from '@/components/tasks/task-form-dialog';
 import { TaskPriorityBadge } from '@/components/tasks/task-priority-badge';
 import { TaskProgressBar } from '@/components/tasks/task-progress-bar';
@@ -37,6 +37,7 @@ import { cn } from '@/lib/utils';
 const PER_PAGE = 20;
 
 export default function TasksPage() {
+  const router = useRouter();
   const [view, setView] = React.useState<'kanban' | 'list'>('kanban');
 
   const [page, setPage] = React.useState(1);
@@ -48,10 +49,11 @@ export default function TasksPage() {
   const [dueFrom, setDueFrom] = React.useState('');
   const [dueTo, setDueTo] = React.useState('');
 
-  const [selectedTaskId, setSelectedTaskId] = React.useState<number | null>(null);
   const [formOpen, setFormOpen] = React.useState(false);
   const [editingTask, setEditingTask] = React.useState<Task | null>(null);
   const [deletingTask, setDeletingTask] = React.useState<Task | null>(null);
+
+  const openTaskDetail = (task: Task) => router.push(`/tasks/${task.id}`);
 
   const debouncedSearch = useDebouncedValue(search);
 
@@ -113,7 +115,7 @@ export default function TasksPage() {
       cell: (task) => (
         <button
           type="button"
-          onClick={() => setSelectedTaskId(task.id)}
+          onClick={() => openTaskDetail(task)}
           className="max-w-[220px] truncate text-start font-medium text-brand-ink hover:underline"
           title={task.title}
         >
@@ -192,7 +194,7 @@ export default function TasksPage() {
         </TabsList>
 
         <TabsContent value="kanban">
-          <KanbanBoard onTaskClick={(task) => setSelectedTaskId(task.id)} />
+          <KanbanBoard onTaskClick={openTaskDetail} />
         </TabsContent>
 
         <TabsContent value="list" className="space-y-4">
@@ -291,11 +293,6 @@ export default function TasksPage() {
 
       <TaskFormDialog open={formOpen} onOpenChange={setFormOpen} task={editingTask} />
       <DeleteTaskDialog task={deletingTask} open={!!deletingTask} onOpenChange={(open) => !open && setDeletingTask(null)} />
-      <TaskDetailDialog
-        taskId={selectedTaskId}
-        onOpenChange={(open) => !open && setSelectedTaskId(null)}
-        onNavigate={setSelectedTaskId}
-      />
     </div>
   );
 }
