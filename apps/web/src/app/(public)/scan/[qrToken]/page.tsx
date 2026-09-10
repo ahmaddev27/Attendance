@@ -152,7 +152,14 @@ export default function KioskScanPage() {
   const submitScan = async () => {
     if (!ready) return;
     setView('locating');
-    const position = await getCurrentPosition();
+
+    // Only ask the browser for a location fix when the device actually
+    // enforces geofencing. Prompting every time and then discarding the
+    // answer produced the annoying "enable location" nag the user hit on
+    // devices where geo is off. Also skips the 10-second timeout wait on
+    // OS-level denials.
+    const needsGeo = device?.enforce_geo === true;
+    const position = needsGeo ? await getCurrentPosition() : null;
     const payload: ScanCheckPayload = {
       employee_number: ready.status.employee.employee_number,
       qr_token: qrToken,

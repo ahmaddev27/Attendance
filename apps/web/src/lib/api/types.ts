@@ -228,6 +228,14 @@ export type ScanDeviceInfo = {
   device_name: string;
   server_time: string;
   qr_token: string;
+  /**
+   * Whether the device requires a location coordinate on every scan.
+   * The kiosk uses this to decide whether to invoke the browser's
+   * `navigator.geolocation` prompt — asking every time and discarding
+   * the answer when the device doesn't enforce geo is a noisy UX.
+   */
+  enforce_geo?: boolean;
+  enforce_ip?: boolean;
 };
 
 export type ScanResponse = {

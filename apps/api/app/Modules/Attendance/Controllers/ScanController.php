@@ -131,6 +131,12 @@ class ScanController extends Controller
             'device_name' => $device->name,
             'server_time' => now()->toIso8601String(),
             'token_expires_in' => max(0, $device->qr_rotates_every_seconds - $secondsSinceRotation),
+            // Enforcement flags the FE needs to decide whether to trigger
+            // the browser's geolocation prompt. When enforce_geo is off
+            // we don't ask the browser for GPS at all — asking every time
+            // and then discarding the answer is a noisy UX.
+            'enforce_geo' => (bool) $device->enforce_geo,
+            'enforce_ip' => (bool) $device->enforce_ip,
         ]);
     }
 

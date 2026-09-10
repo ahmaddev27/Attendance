@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Eye, Pencil, Plus, Printer, RotateCw, Trash2 } from 'lucide-react';
+import { Eye, Pencil, Plus, Printer, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -90,9 +90,6 @@ function formToPayload(form: DeviceFormState): AttendanceDevicePayload {
     .map((line) => line.trim())
     .filter(Boolean);
 
-  const rotateRaw = form.qr_rotates_every_seconds.trim();
-  const rotateSeconds = rotateRaw === '' ? 0 : Number(rotateRaw);
-
   return {
     name: form.name.trim(),
     allowed_lat: toNumberOrNull(form.allowed_lat),
@@ -101,9 +98,58 @@ function formToPayload(form: DeviceFormState): AttendanceDevicePayload {
     ip_whitelist: ipList.length > 0 ? ipList : null,
     enforce_geo: form.enforce_geo,
     enforce_ip: form.enforce_ip,
-    qr_rotates_every_seconds: Number.isFinite(rotateSeconds) ? rotateSeconds : 0,
+    // Rotation was removed as a user-facing feature — the QR is now
+    // permanent for the life of the device. Sent as 0 so old rows on the
+    // server that still carry a non-zero window get flipped on the next
+    // edit.
+    qr_rotates_every_seconds: 0,
     is_active: form.is_active,
   };
+}
+
+/**
+ * Opens a fresh, chrome-less browser window containing ONLY the QR SVG
+ * (no headline, no URL, no page furniture) and triggers print. The
+ * `@page` block strips the browser's own header/footer (tab title,
+ * timestamp, URL) so a user who just wants the QR gets exactly that.
+ *
+ * We grab the SVG straight off the already-rendered QRCodeSVG instance
+ * inside `#qr-svg-source` — no re-encoding, no round-trip. The empty
+ * <title> prevents the browser tab from bleeding a name into the top
+ * corner of a printout.
+ */
+function printQrOnly(_deviceName: string): void {
+  const svg = document.querySelector<SVGSVGElement>('#qr-svg-source svg');
+  if (!svg) return;
+  const svgMarkup = svg.outerHTML;
+  const w = window.open('', '_blank');
+  if (!w) return;
+  w.document.open();
+  w.document.write(`<!doctype html>
+<html>
+  <head>
+    <title></title>
+    <style>
+      @page { size: A4; margin: 0; }
+      html, body {
+        margin: 0; padding: 0; height: 100vh; width: 100vw;
+        display: flex; align-items: center; justify-content: center;
+        background: #fff;
+      }
+      svg { width: 80vmin; height: 80vmin; }
+    </style>
+  </head>
+  <body>${svgMarkup}
+  <script>
+    window.addEventListener('load', () => {
+      window.focus();
+      window.print();
+      window.addEventListener('afterprint', () => window.close());
+    });
+  </script>
+  </body>
+</html>`);
+  w.document.close();
 }
 
 export default function AttendanceDevicesPage() {
@@ -140,16 +186,6 @@ export default function AttendanceDevicesPage() {
       invalidate();
     },
     onError: () => toast.error('تعذر حذف الجهاز'),
-  });
-
-  const rotateMutation = useMutation({
-    mutationFn: (id: number) => devicesApi.rotate(id),
-    onSuccess: (updated) => {
-      toast.success('تم تدوير رمز QR');
-      setQrDevice(updated);
-      invalidate();
-    },
-    onError: () => toast.error('تعذر تدوير الرمز'),
   });
 
   const openCreate = () => {
@@ -286,16 +322,6 @@ export default function AttendanceDevicesPage() {
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      title="تدوير الرمز"
-                      disabled={rotateMutation.isPending}
-                      onClick={() => rotateMutation.mutate(device.id)}
-                    >
-                      <RotateCw className="h-4 w-4" />
-                    </Button>
                     <Button type="button" variant="ghost" size="icon" title="تعديل" onClick={() => openEdit(device)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
@@ -407,20 +433,6 @@ export default function AttendanceDevicesPage() {
                 onCheckedChange={(checked) => setForm({ ...form, enforce_ip: checked })}
               />
             </div>
-            <div>
-              <Label className="text-xs font-semibold text-ink-2">
-                مدة تدوير رمز QR (بالثواني) — 0 = لا يدور أبداً
-              </Label>
-              <Input
-                type="number"
-                min={0}
-                value={form.qr_rotates_every_seconds}
-                onChange={(e) => setForm({ ...form, qr_rotates_every_seconds: e.target.value })}
-                className="mt-1.5 num"
-                dir="ltr"
-                placeholder="0"
-              />
-            </div>
             <div className="flex items-center justify-between rounded-lg border border-hairline p-3">
               <Label className="text-sm font-medium text-ink">الجهاز مفعل</Label>
               <Switch
@@ -446,82 +458,30 @@ export default function AttendanceDevicesPage() {
           </DialogHeader>
           {qrDevice && (
             <div className="flex flex-col items-center gap-4 py-2">
-              {/* Wrapper carries the id the print stylesheet targets so
-                  window.print() renders ONLY the QR + name + URL as a
-                  clean, poster-ready page (see printable-qr CSS below). */}
-              <div id="printable-qr" className="flex flex-col items-center gap-3 w-full">
-                <h2 className="hidden text-2xl font-bold text-ink print:block">
-                  {qrDevice.name}
-                </h2>
+              <div id="qr-svg-source">
                 <QrDisplay
                   value={scanUrl(qrDevice.qr_token)}
                   rotatesEverySeconds={qrDevice.qr_rotates_every_seconds}
                   lastRotatedAt={qrDevice.last_token_rotated_at}
                 />
-                <p className="hidden text-sm text-muted print:block">
-                  امسح الرمز بكاميرا هاتفك لتسجيل الحضور
-                </p>
               </div>
-              <div className="flex w-full flex-col gap-2 print:hidden">
+              <div className="flex w-full flex-col gap-2">
                 <Button
                   type="button"
                   className="w-full gap-2 bg-brand text-white hover:bg-brand-hover"
-                  onClick={() => window.print()}
+                  onClick={() => printQrOnly(qrDevice.name)}
                 >
                   <Printer className="h-4 w-4" />
                   طباعة الرمز (PDF)
                 </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full gap-2"
-                  disabled={rotateMutation.isPending}
-                  onClick={() => rotateMutation.mutate(qrDevice.id)}
-                >
-                  {rotateMutation.isPending ? <Spinner /> : <RotateCw className="h-4 w-4" />}
-                  تدوير الرمز الآن
-                </Button>
                 <p className="text-center text-xs text-muted">
-                  اختر "حفظ كملف PDF" من نافذة الطباعة للحصول على ملف قابل للتوزيع
+                  الرمز دائم — لا ينتهي إلا عند حذف الجهاز
                 </p>
               </div>
             </div>
           )}
         </DialogContent>
       </Dialog>
-
-      {/* Print-only stylesheet: hides EVERYTHING except #printable-qr and
-          strips the Dialog overlay + scroll containers so the browser's
-          print/save-to-PDF flow gets a clean single-page render. */}
-      <style jsx global>{`
-        @media print {
-          body * {
-            visibility: hidden !important;
-          }
-          #printable-qr,
-          #printable-qr * {
-            visibility: visible !important;
-          }
-          #printable-qr {
-            position: fixed !important;
-            inset: 0 !important;
-            width: 100% !important;
-            height: 100% !important;
-            display: flex !important;
-            flex-direction: column !important;
-            align-items: center !important;
-            justify-content: center !important;
-            padding: 40px !important;
-            background: white !important;
-            z-index: 999999 !important;
-          }
-          [role='dialog'] {
-            box-shadow: none !important;
-            background: transparent !important;
-            border: 0 !important;
-          }
-        }
-      `}</style>
 
       {/* Delete confirmation */}
       <AlertDialog open={Boolean(deletingDevice)} onOpenChange={(open) => !open && setDeletingDevice(null)}>
