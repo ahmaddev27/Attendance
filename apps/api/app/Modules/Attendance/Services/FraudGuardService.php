@@ -27,6 +27,12 @@ class FraudGuardService
     {
         // Admin toggle off → skip the entire check. Location is never
         // requested nor validated on this device.
+        //
+        // Falsy check (not `=== false`) on purpose: on a tenant where
+        // the enforce_geo column hasn't migrated yet, $device->enforce_geo
+        // reads null and strict === would fall through to the throw
+        // path. `!` catches null / false / 0 alike so the scan keeps
+        // working during migration drift.
         if (! $device->enforce_geo) {
             return;
         }
@@ -68,19 +74,22 @@ class FraudGuardService
 
     private function assertIpAllowed(AttendanceDevice $device, string $ip): void
     {
-        // Same admin-toggle gate as geofence. A stored whitelist without
-        // enforce_ip=true is treated as informational — visible in the
-        // admin UI but not enforced at scan time.
-        if ($device->enforce_ip === false) {
+        // Admin toggle off → skip. Same falsy check as assertWithinGeofence:
+        // on a tenant where enforce_ip hasn't migrated the column reads
+        // null and strict === false would fall through.
+        if (! $device->enforce_ip) {
             return;
         }
 
         $whitelist = $device->ip_whitelist;
 
-        // enforce_ip=true with no whitelist is a misconfiguration — refuse
-        // to fail-open so the admin is forced to configure the allowlist.
+        // enforce_ip=true but the admin never populated the whitelist →
+        // fail-open (mirrors the geo misconfig branch). Half-configured
+        // enforcement shouldn't brick the scan; the admin can spot the
+        // "enforce on / list empty" row in the devices panel and either
+        // finish the config or toggle it off.
         if (empty($whitelist)) {
-            throw new FraudGuardException('IP whitelist not configured for this device.');
+            return;
         }
 
         foreach ($whitelist as $allowedEntry) {
@@ -89,7 +98,7 @@ class FraudGuardService
             }
         }
 
-        throw new FraudGuardException('Your network is not permitted to check in on this device.');
+        throw new FraudGuardException('عنوان الشبكة (IP) الحالي غير مدرج ضمن القائمة المسموح بها لهذا الجهاز.');
     }
 
     private function ipMatchesEntry(string $ip, string $entry): bool
