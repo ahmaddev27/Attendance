@@ -28,8 +28,20 @@ class ApprovalInboxController extends Controller
 
     public function index(Request $request): AnonymousResourceCollection
     {
-        $employee = $this->resolveActingEmployee($request);
+        $employee = $request->user()?->employee;
         $perPage = (int) $request->integer('per_page', self::DEFAULT_PER_PAGE);
+
+        // An account with no linked employee (bootstrap super-admin, an
+        // integration user, an admin seeded before the org tree existed)
+        // isn't a designated approver on any workflow step, so their
+        // inbox is legitimately empty. Return a zero-row paginator
+        // instead of 422'ing — the FE renders "no pending approvals"
+        // exactly the same as an employee whose queue is genuinely empty.
+        if (! $employee) {
+            return RequestResource::collection(
+                new \Illuminate\Pagination\LengthAwarePaginator([], 0, $perPage)
+            );
+        }
 
         return RequestResource::collection($this->requests->pendingForApprover($employee, $perPage));
     }
