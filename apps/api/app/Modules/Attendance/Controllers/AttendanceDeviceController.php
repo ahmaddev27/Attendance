@@ -26,9 +26,24 @@ class AttendanceDeviceController extends Controller
 
     public function store(StoreAttendanceDeviceRequest $request): JsonResponse
     {
-        $device = $this->devices->create($request->validated());
+        try {
+            $device = $this->devices->create($request->validated());
 
-        return (new AttendanceDeviceResource($device))->response()->setStatusCode(201);
+            return (new AttendanceDeviceResource($device))->response()->setStatusCode(201);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('AttendanceDevice create failed', [
+                'payload' => $request->validated(),
+                'exception' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'فشل إنشاء الجهاز: '.$e->getMessage(),
+                'debug' => [
+                    'exception_class' => get_class($e),
+                    'file' => basename($e->getFile()).':'.$e->getLine(),
+                ],
+            ], 500);
+        }
     }
 
     public function show(AttendanceDevice $device): AttendanceDeviceResource
