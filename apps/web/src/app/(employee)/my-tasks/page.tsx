@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 
 import { DataTable, type DataTableColumn } from '@/components/data-table/data-table';
+import { KanbanBoard } from '@/components/tasks/kanban-board';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -40,6 +41,7 @@ function counterpartOf(task: Task, tab: TabKey): EmployeeSummary | null {
 export default function MyTasksPage() {
   const router = useRouter();
   const [tab, setTab] = React.useState<TabKey>('assigned');
+  const [view, setView] = React.useState<'list' | 'kanban'>('list');
   const [page, setPage] = React.useState(1);
   const [search, setSearch] = React.useState('');
   const [statusId, setStatusId] = React.useState<string | undefined>();
@@ -143,15 +145,33 @@ export default function MyTasksPage() {
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)}>
-        <TabsList>
-          <TabsTrigger value="assigned">المسندة إليّ</TabsTrigger>
-          <TabsTrigger value="created">التي أنشأتها</TabsTrigger>
-        </TabsList>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <TabsList>
+            <TabsTrigger value="assigned">المسندة إليّ</TabsTrigger>
+            <TabsTrigger value="created">التي أنشأتها</TabsTrigger>
+          </TabsList>
+          {/* View toggle — same visual as admin /tasks. Kanban aggregates
+              ALL tasks the employee touches (assigned + created), which
+              matches the admin behaviour of a single unified board. The
+              backend already scopes /tasks/kanban to the actor's own
+              tasks for non-admin callers (wave-h IDOR fix), so there's no
+              extra guard to add here. */}
+          <Tabs value={view} onValueChange={(v) => setView(v as 'list' | 'kanban')}>
+            <TabsList>
+              <TabsTrigger value="list">قائمة</TabsTrigger>
+              <TabsTrigger value="kanban">Kanban</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
 
         {/* One content pane, driven by `tab` — both tabs share the same
             table shape and only the data source/column labels differ, so a
             single dynamic panel avoids duplicating that markup. */}
         <TabsContent value={tab} className="space-y-4">
+          {view === 'kanban' ? (
+            <KanbanBoard onTaskClick={(task) => router.push('/my-tasks/' + task.id)} />
+          ) : (
+          <>
           <div className="grid grid-cols-1 gap-3 rounded-xl border border-hairline bg-surface p-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <Label className="text-xs font-semibold text-ink-2">بحث</Label>
@@ -200,6 +220,8 @@ export default function MyTasksPage() {
             emptyMessage={tab === 'assigned' ? 'لا توجد مهام مسندة إليك' : 'لم تنشئ أي مهام بعد'}
             pagination={data ? { meta: data.meta, onPageChange: setPage } : undefined}
           />
+          </>
+          )}
         </TabsContent>
       </Tabs>
 
