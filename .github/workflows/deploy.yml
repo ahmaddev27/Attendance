@@ -379,7 +379,20 @@ jobs:
             echo "════════════════════════════════════════"
             echo "▶ 6/8  Running migrations (additive only)"
             echo "════════════════════════════════════════"
-            $DC exec -T api php artisan migrate --force
+            # Show what's pending before running so the action log
+            # reveals whether a migration got skipped.
+            echo "→ Pending migrations before run:"
+            $DC exec -T api php artisan migrate:status 2>&1 | tail -40 || true
+            echo ""
+            echo "→ Running migrate --force"
+            $DC exec -T api php artisan migrate --force 2>&1 || {
+              echo "✗ migrate --force failed — surfacing full status for diagnostics"
+              $DC exec -T api php artisan migrate:status 2>&1 | tail -60 || true
+              exit 1
+            }
+            echo ""
+            echo "→ Status after run:"
+            $DC exec -T api php artisan migrate:status 2>&1 | tail -15 || true
 
             echo ""
             echo "════════════════════════════════════════"
