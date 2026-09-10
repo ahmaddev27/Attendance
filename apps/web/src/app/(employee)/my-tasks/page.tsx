@@ -3,9 +3,12 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { Plus } from 'lucide-react';
 
 import { DataTable, type DataTableColumn } from '@/components/data-table/data-table';
 import { KanbanBoard } from '@/components/tasks/kanban-board';
+import { TaskFormDialog } from '@/components/tasks/task-form-dialog';
+import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -47,6 +50,7 @@ export default function MyTasksPage() {
   const [statusId, setStatusId] = React.useState<string | undefined>();
   const [dueFrom, setDueFrom] = React.useState('');
   const [dueTo, setDueTo] = React.useState('');
+  const [createOpen, setCreateOpen] = React.useState(false);
 
   const debouncedSearch = useDebouncedValue(search);
 
@@ -139,9 +143,19 @@ export default function MyTasksPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-xs font-medium text-muted">مهامي</p>
-        <h1 className="mt-1 text-2xl font-bold text-ink">المهام</h1>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium text-muted">مهامي</p>
+          <h1 className="mt-1 text-2xl font-bold text-ink">المهام</h1>
+        </div>
+        <Button
+          type="button"
+          onClick={() => setCreateOpen(true)}
+          className="gap-2 bg-brand text-white hover:bg-brand-hover"
+        >
+          <Plus className="h-4 w-4" />
+          مهمة جديدة
+        </Button>
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)}>
@@ -225,6 +239,12 @@ export default function MyTasksPage() {
         </TabsContent>
       </Tabs>
 
+      {/* Non-admin creator flow: TaskFormDialog auto-detects the caller's
+          admin flag via `useAuthStore` and swaps the assignee picker to
+          the /me/team endpoint, so an employee sees only their teammates.
+          The backend TaskService::create guard enforces the same scope
+          server-side — a bypass on the FE still 422s. */}
+      <TaskFormDialog open={createOpen} onOpenChange={setCreateOpen} />
     </div>
   );
 }
