@@ -47,7 +47,12 @@ test('check-in rejects an unknown qr token', function () {
         ->assertJsonPath('message', 'Invalid or unknown QR token.');
 });
 
-test('check-in rejects an expired qr token', function () {
+test('check-in accepts a legacy device whose rotation window would have expired', function () {
+    // Rotation was removed as a product feature — QR tokens are now
+    // permanent for the life of the device (see AttendanceDevice::
+    // isTokenExpired). A legacy row still carrying a non-zero rotation
+    // window and an old last_token_rotated_at must NOT be treated as
+    // expired: the printed poster in the wild has to keep working.
     $employee = makeEmployeeWithSchedule();
     $device = AttendanceDevice::factory()->create([
         'qr_rotates_every_seconds' => 60,
@@ -59,8 +64,7 @@ test('check-in rejects an expired qr token', function () {
         'qr_token' => $device->qr_token,
     ]);
 
-    $response->assertUnauthorized()
-        ->assertJsonPath('message', 'This QR code has expired. Please rescan.');
+    $response->assertOk();
 });
 
 test('an employee cannot check in twice without checking out', function () {
