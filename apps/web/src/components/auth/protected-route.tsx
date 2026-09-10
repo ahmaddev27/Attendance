@@ -8,15 +8,16 @@ import { useAuthStore } from '@/lib/stores/auth-store';
 /**
  * Guards a route group behind an authenticated session.
  *
- * The auth store persists the token to localStorage, which is only
- * readable client-side and rehydrates asynchronously after mount. We wait
- * for that rehydration to finish before deciding there is no token —
- * otherwise every hard refresh would flash a redirect to /login before the
- * persisted token has a chance to load.
+ * The auth store persists a user profile snapshot to localStorage
+ * (the credential itself is an httpOnly session cookie the JS can't
+ * touch). Zustand rehydrates that snapshot asynchronously after
+ * mount, so we wait for it before deciding the tab is signed out —
+ * otherwise every hard refresh would flash a redirect to /login
+ * before the persisted profile had a chance to load.
  */
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const token = useAuthStore((s) => s.token);
+  const user = useAuthStore((s) => s.user);
   // Start false unconditionally: reading store.persist during render (rather
   // than inside an effect) executes on the server too, where zustand's
   // persist internals aren't safe to touch and break static prerendering.
@@ -31,12 +32,12 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (hasHydrated && !token) {
+    if (hasHydrated && !user) {
       router.replace('/login');
     }
-  }, [hasHydrated, token, router]);
+  }, [hasHydrated, user, router]);
 
-  if (!hasHydrated || !token) {
+  if (!hasHydrated || !user) {
     return (
       <div className="min-h-screen grid place-items-center bg-ground">
         <Loader2 className="w-6 h-6 animate-spin text-brand" />

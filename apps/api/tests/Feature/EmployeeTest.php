@@ -3,14 +3,22 @@
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Team;
+use App\Models\WorkSchedule;
 use App\Shared\Enums\EmployeeStatus;
 use Illuminate\Database\QueryException;
+use Spatie\Permission\Models\Role;
 use Tests\Feature\Concerns\CreatesSuperAdmin;
 
 uses(CreatesSuperAdmin::class);
 
 beforeEach(function () {
     $this->actingAsSuperAdmin();
+
+    // EmployeeService::create() auto-provisions a User for the new hire
+    // and assigns the 'employee' role, throwing a RuntimeException if the
+    // role row is missing. Tests run against RefreshDatabase, so the seeder
+    // does not run — surface the role here so create-employee tests pass.
+    Role::findOrCreate('employee', 'web');
 });
 
 test('lists employees paginated', function () {
@@ -104,12 +112,15 @@ test('searches employees by phone', function () {
 });
 
 test('creates an employee and auto-assigns the next employee number', function () {
+    $schedule = WorkSchedule::factory()->create();
+
     $payload = [
         'first_name' => 'Layla',
         'last_name' => 'Nassar',
         'email' => 'layla.nassar@taqat.local',
         'employment_type' => 'full_time',
         'joining_date' => '2026-01-15',
+        'work_schedule_id' => $schedule->id,
     ];
 
     $response = $this->postJson('/api/employees', $payload);
@@ -122,12 +133,15 @@ test('creates an employee and auto-assigns the next employee number', function (
 });
 
 test('an attempt to submit a client-supplied employee_number is ignored', function () {
+    $schedule = WorkSchedule::factory()->create();
+
     $response = $this->postJson('/api/employees', [
         'employee_number' => 999999,
         'first_name' => 'Sami',
         'last_name' => 'Kanaan',
         'employment_type' => 'full_time',
         'joining_date' => '2026-01-15',
+        'work_schedule_id' => $schedule->id,
     ]);
 
     $response->assertCreated();
@@ -135,6 +149,7 @@ test('an attempt to submit a client-supplied employee_number is ignored', functi
 });
 
 test('sequential creates each get the next employee number with no gaps or duplicates', function () {
+    $schedule = WorkSchedule::factory()->create();
     $numbers = [];
 
     for ($i = 0; $i < 5; $i++) {
@@ -143,6 +158,7 @@ test('sequential creates each get the next employee number with no gaps or dupli
             'last_name' => 'Test',
             'employment_type' => 'full_time',
             'joining_date' => '2026-01-15',
+            'work_schedule_id' => $schedule->id,
         ]);
 
         $response->assertCreated();

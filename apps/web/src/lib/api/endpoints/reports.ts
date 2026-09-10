@@ -33,8 +33,9 @@ export const reportsApi = {
     }),
   /**
    * Downloads the CSV directly — returns a Blob the caller pipes to a
-   * temporary <a download>. Kept in the api-client layer so the Bearer
-   * token is attached the same way as every other request.
+   * temporary <a download>. Kept on apiClient so the session cookie +
+   * X-XSRF-TOKEN pair rides on the request the same way as every other
+   * authenticated call.
    */
   attendanceMonthlyCsv: (params: AttendanceMonthlyParams) =>
     apiClient.get<Blob>('/admin/reports/attendance/monthly', {

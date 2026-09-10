@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { apiClient } from '@/lib/api/client';
+import { apiClient, primeCsrfCookie } from '@/lib/api/client';
 import { useAuthStore, isAdminUser, emitAuthReset } from '@/lib/stores/auth-store';
 import { Loader2 } from 'lucide-react';
 
@@ -23,13 +23,20 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      // Backend accepts either an email or an employee_number under the
-      // 'identifier' field. Auto-detects by looking for '@'.
+      // Sanctum SPA flow: prime the XSRF-TOKEN cookie FIRST, so axios
+      // has it to mirror as X-XSRF-TOKEN on the login POST. Without
+      // this step the CSRF middleware 419s the login itself.
+      await primeCsrfCookie();
+
+      // Backend accepts either an email or an employee_number under
+      // the 'identifier' field. Auto-detects by looking for '@'. The
+      // response now returns ONLY the user — the session id lives in
+      // an httpOnly cookie the browser handles automatically.
       const { data } = await apiClient.post('/auth/login', {
         identifier: identifier.trim(),
         password,
       });
-      setAuth(data.user, data.token);
+      setAuth(data.user);
       // Nuke any leftover React-Query cache from a previous session on the
       // same tab before we route into the new user's pages. See fix #6.
       emitAuthReset();

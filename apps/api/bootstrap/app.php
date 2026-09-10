@@ -13,11 +13,25 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // Pure Bearer-token auth via Sanctum PersonalAccessTokens.
-        // We intentionally do NOT enable EnsureFrontendRequestsAreStateful:
-        // the SPA lives on the same origin as the API, so Sanctum would
-        // upgrade every request to a session-based (CSRF-required) request.
-        // Bearer tokens in Authorization headers work correctly without it.
+        // DUAL AUTH MODE.
+        //
+        // Web SPA → Sanctum SPA stateful mode. A request whose Origin
+        // matches SANCTUM_STATEFUL_DOMAINS gets the session + CSRF
+        // middleware appended, so the browser stores the session in an
+        // httpOnly cookie the JS cannot read. Login on this path returns
+        // ONLY the user (no bearer token in the response body), which
+        // closes the "XSS steals the bearer from localStorage" class of
+        // attack.
+        //
+        // Mobile → Bearer tokens. The RN app has no cookie jar shared
+        // with a browser, so EnsureFrontendRequestsAreStateful is a
+        // no-op for it — the request falls through to the standard
+        // PersonalAccessToken guard. Nothing changes for mobile.
+        //
+        // Both flows resolve through `auth:sanctum`, which happily
+        // accepts either a session cookie OR an Authorization bearer,
+        // so downstream controllers don't need branching.
+        $middleware->statefulApi();
 
         // spatie/laravel-permission ships three middleware but doesn't
         // auto-register them in Laravel 11's slim bootstrap — we do it here

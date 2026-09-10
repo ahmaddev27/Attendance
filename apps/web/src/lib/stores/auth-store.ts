@@ -26,8 +26,14 @@ export type User = {
 
 type AuthState = {
   user: User | null;
-  token: string | null;
-  setAuth: (user: User, token: string) => void;
+  /**
+   * Auth is now cookie-based (Sanctum SPA stateful mode). The session
+   * lives in an httpOnly cookie the JS layer CANNOT read — that closes
+   * the "XSS steals the bearer" attack. The only thing we persist is
+   * the user's profile snapshot for UI hydration; the credential
+   * itself never touches JavaScript.
+   */
+  setAuth: (user: User) => void;
   logout: () => Promise<void>;
 };
 
@@ -35,18 +41,14 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
       user: null,
-      token: null,
-      // Token lives in the zustand-persisted `taqat-auth` key only —
-      // we used to also mirror it to a duplicate `taqat_token`
-      // localStorage entry, which was easy to leave stale on logout.
-      setAuth: (user, token) => set({ user, token }),
+      setAuth: (user) => set({ user }),
       logout: async () => {
-        // Revoke the Sanctum token on the server so it can't be replayed;
-        // do this BEFORE we clear local state, since the axios request
-        // interceptor reads the token straight from this store. Any
+        // Session logout on the server invalidates the session record
+        // AND rotates the CSRF token. Do this BEFORE clearing local
+        // state so a stale axios call can't race a re-init. Any
         // network/500 error is swallowed — we still want to clear the
         // client-side session even if the server round-trip failed.
-        if (get().token && !logoutInFlight) {
+        if (get().user && !logoutInFlight) {
           logoutInFlight = true;
           try {
             await apiClient.post('/auth/logout');
@@ -57,22 +59,20 @@ export const useAuthStore = create<AuthState>()(
           }
         }
 
-        // Tear down the Echo singleton first so its captured bearer
-        // (and any open websocket subscribed as user A) is closed
+        // Tear down the Echo singleton first so its open websocket
+        // (authorized as user A via the old session cookie) is closed
         // BEFORE we clear state — otherwise a re-init after user B
-        // signs in on the same tab would already be racing against a
-        // still-open channel authorized as A.
+        // signs in on the same tab would race a still-open channel.
         disconnectEcho();
-        set({ user: null, token: null });
+        set({ user: null });
         if (typeof localStorage !== 'undefined') {
           // Belt-and-braces: the persist middleware's own write above
-          // leaves `{ user: null, token: null }` in the key, but
-          // removing the key entirely also cleans up any leftover
-          // fields from older schema versions on the client.
+          // leaves `{ user: null }` in the key, but removing the key
+          // entirely also cleans up any leftover fields from older
+          // schema versions on the client — including the legacy
+          // `token` field from before the SPA-cookie migration.
           localStorage.removeItem('taqat-auth');
-          // Clean up the legacy duplicate key for users upgrading
-          // from before the mirror was removed.
-          localStorage.removeItem('taqat_token');
+          localStorage.removeItem('taqat_token'); // legacy
         }
         // The QueryClient lives inside the provider tree and can't be
         // reached from this zustand store directly. Broadcast an event

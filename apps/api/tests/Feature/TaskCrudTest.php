@@ -6,6 +6,9 @@ use App\Models\TaskHistory;
 use App\Models\TaskPriority;
 use App\Models\TaskStatus;
 use App\Models\TaskTag;
+use App\Models\Team;
+use App\Models\User;
+use Laravel\Sanctum\Sanctum;
 use Tests\Feature\Concerns\ActsAsEmployeeUser;
 use Tests\Feature\Concerns\CreatesSuperAdmin;
 
@@ -47,7 +50,12 @@ test('an employee can create a task for themselves without passing created_by', 
 });
 
 test('creating a task without an employee profile and without created_by fails validation', function () {
-    $this->actingAsSuperAdmin();
+    // A plain authenticated user with no linked employee and no
+    // manage-workflows role — admins can create task-on-behalf-of, so
+    // the "must be linked to an employee" guard only fires for
+    // non-admin actors without an employee_id.
+    Sanctum::actingAs(User::factory()->create(['employee_id' => null]));
+    makeTaskStatus();
     $priority = makeTaskPriority();
 
     $response = $this->postJson('/api/tasks', [
@@ -74,9 +82,14 @@ test('an admin can create a task on behalf of an employee via created_by', funct
 });
 
 test('creating a task with an assignee logs an assigned history entry', function () {
-    $employee = Employee::factory()->create();
+    // Non-admin actors can only assign to same-team employees (see
+    // TaskService::create team-scope guard). Anchor both employees to
+    // the same team so this test exercises the assign-history path
+    // rather than tripping the guard.
+    $team = Team::factory()->create();
+    $employee = Employee::factory()->create(['team_id' => $team->id]);
     $this->actingAsEmployeeUser($employee);
-    $assignee = Employee::factory()->create();
+    $assignee = Employee::factory()->create(['team_id' => $team->id]);
     makeTaskStatus();
     $priority = makeTaskPriority();
 
@@ -133,9 +146,12 @@ test('updating a task status logs a status_changed history entry', function () {
 });
 
 test('assigning a task via update logs an assigned history entry, unassigning logs unassigned', function () {
-    $employee = Employee::factory()->create();
+    // Same team-scope guard as create — put both employees on the same
+    // team so the update-assign path is what's under test.
+    $team = Team::factory()->create();
+    $employee = Employee::factory()->create(['team_id' => $team->id]);
     $this->actingAsEmployeeUser($employee);
-    $assignee = Employee::factory()->create();
+    $assignee = Employee::factory()->create(['team_id' => $team->id]);
     $status = makeTaskStatus();
     $priority = makeTaskPriority();
 

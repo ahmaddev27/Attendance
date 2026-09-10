@@ -3,7 +3,7 @@
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
 
-import { useAuthStore } from '@/lib/stores/auth-store';
+import { apiClient } from '@/lib/api/client';
 
 /**
  * Laravel Echo instance wired to our Reverb server.
@@ -60,25 +60,29 @@ export function getEcho(): Echo<'reverb'> | null {
     wssPort: port,
     forceTLS: scheme === 'https',
     enabledTransports: ['ws', 'wss'],
-    // Auth endpoint sends our bearer token so Sanctum-guarded
-    // Broadcast::routes() can identify the user for private channels.
-    //
-    // Authorization is a getter (not a captured string) so pusher-js
-    // reads the CURRENT token on every /broadcasting/auth request. A
-    // static value would freeze the token from the first getEcho()
-    // call — after a sign-out/sign-in on the same tab (or any token
-    // rotation without a full page reload), private channel auth
-    // would keep sending the previous user's bearer.
-    authEndpoint: '/api/broadcasting/auth',
-    auth: {
-      headers: {
-        Accept: 'application/json',
-        get Authorization() {
-          const token = useAuthStore.getState().token;
-          return token ? `Bearer ${token}` : '';
-        },
+    // Custom authorizer so channel auth goes through the shared
+    // apiClient — that gets us `withCredentials: true` and the
+    // X-XSRF-TOKEN header for free, which is what Sanctum's stateful
+    // (session-cookie) mode needs. The previous bearer-header path is
+    // gone: XSS can no longer read the credential, so channel auth
+    // relies on the same httpOnly cookie the rest of the app uses.
+    authorizer: (channel) => ({
+      authorize: (
+        socketId: string,
+        callback: (error: Error | null, data: { auth: string; channel_data?: string; shared_secret?: string } | null) => void,
+      ) => {
+        apiClient
+          .post<{ auth: string; channel_data?: string; shared_secret?: string }>(
+            '/broadcasting/auth',
+            {
+              socket_id: socketId,
+              channel_name: channel.name,
+            },
+          )
+          .then((r) => callback(null, r.data))
+          .catch((err) => callback(err instanceof Error ? err : new Error(String(err)), null));
       },
-    },
+    }),
   });
 
   // Expose on window for quick devtools inspection — safe: the instance

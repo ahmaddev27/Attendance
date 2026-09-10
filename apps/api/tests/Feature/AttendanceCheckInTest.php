@@ -14,9 +14,9 @@ test('an employee can check in via a valid scan', function () {
     ]);
 
     $response->assertOk()
-        ->assertJsonPath('data.employee_id', $employee->id)
-        ->assertJsonPath('data.status', AttendanceStatus::Present->value)
-        ->assertJsonPath('data.check_out_at', null);
+        ->assertJsonPath('attendance.employee_id', $employee->id)
+        ->assertJsonPath('attendance.status', AttendanceStatus::Present->value)
+        ->assertJsonPath('attendance.check_out_at', null);
 
     expect(Attendance::query()->where('employee_id', $employee->id)->first())
         ->not->toBeNull()
@@ -98,7 +98,9 @@ test('check-in passes the geofence when the scan is within the allowed radius', 
 
 test('check-in rejects a scan outside the allowed geofence radius', function () {
     $employee = makeEmployeeWithSchedule();
-    $device = AttendanceDevice::factory()->withGeofence(31.9539, 35.9106, 100)->create();
+    $device = AttendanceDevice::factory()
+        ->withGeofence(31.9539, 35.9106, 100)
+        ->create(['enforce_geo' => true]);
 
     $response = $this->postJson('/api/scan/check-in', [
         'employee_number' => $employee->employee_number,
@@ -114,7 +116,9 @@ test('check-in rejects a scan outside the allowed geofence radius', function () 
 
 test('check-in rejects a request from an ip outside the device whitelist', function () {
     $employee = makeEmployeeWithSchedule();
-    $device = AttendanceDevice::factory()->withIpWhitelist(['203.0.113.5'])->create();
+    $device = AttendanceDevice::factory()
+        ->withIpWhitelist(['203.0.113.5'])
+        ->create(['enforce_ip' => true]);
 
     // The test client's default request IP (127.0.0.1) is not in the list.
     $response = $this->postJson('/api/scan/check-in', [

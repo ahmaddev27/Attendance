@@ -29,7 +29,7 @@ function extractErrorMessage(err: unknown, fallback: string): string {
   return message || fallback;
 }
 
-/** Triggers a browser download for an authenticated file — a plain `<a href>` can't carry the Bearer token the API requires. */
+/** Triggers a browser download for an authenticated file — a plain `<a href>` can't attach the CSRF header the API requires. */
 async function downloadAttachment(attachment: TaskAttachment) {
   try {
     const response = await apiClient.get<Blob>(attachment.download_url, { responseType: 'blob' });

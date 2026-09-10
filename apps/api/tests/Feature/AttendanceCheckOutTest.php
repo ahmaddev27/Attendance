@@ -52,7 +52,7 @@ test('an employee can check out after checking in', function () {
     ]);
 
     $response->assertOk()
-        ->assertJsonPath('data.employee_id', $employee->id);
+        ->assertJsonPath('attendance.employee_id', $employee->id);
 
     $attendance = Attendance::query()->where('employee_id', $employee->id)->first();
     expect($attendance->check_out_at)->not->toBeNull();

@@ -31,9 +31,21 @@ function resolveApiBaseUrl(): string {
   return 'http://localhost:8000/api';
 }
 
+/**
+ * withCredentials is REQUIRED for Sanctum SPA (stateful) mode: the
+ * browser must attach the session cookie + XSRF-TOKEN cookie on every
+ * request, and axios reads XSRF-TOKEN off the cookie jar and mirrors
+ * it into the X-XSRF-TOKEN header automatically — that's the CSRF
+ * pair Laravel's ValidateCsrfToken middleware checks. Without this
+ * flag, the browser sends no cookies and every state-changing call
+ * 419s.
+ */
 export const apiClient = axios.create({
   baseURL: resolveApiBaseUrl(),
   headers: { Accept: 'application/json' },
+  withCredentials: true,
+  xsrfCookieName: 'XSRF-TOKEN',
+  xsrfHeaderName: 'X-XSRF-TOKEN',
 });
 
 if (typeof window !== 'undefined') {
@@ -43,15 +55,6 @@ if (typeof window !== 'undefined') {
   // eslint-disable-next-line no-console
   console.info('[taqat] apiClient baseURL =', apiClient.defaults.baseURL);
 }
-
-apiClient.interceptors.request.use((config) => {
-  // Read the token straight from the zustand-persisted auth store so
-  // there's a single source of truth and no chance of it lagging
-  // behind after logout / user switch.
-  const token = useAuthStore.getState().token;
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
 
 apiClient.interceptors.response.use(
   (r) => r,
@@ -66,3 +69,19 @@ apiClient.interceptors.response.use(
     return Promise.reject(err);
   }
 );
+
+/**
+ * Sanctum's CSRF primer. Call this ONCE before the first state-changing
+ * request in a session (login, form submit, anything that ships a
+ * X-XSRF-TOKEN header). The response sets an `XSRF-TOKEN` cookie that
+ * axios then echoes back on every subsequent request as
+ * `X-XSRF-TOKEN` — the pair Laravel's ValidateCsrfToken middleware
+ * checks. Safe to call repeatedly; each call rotates the token.
+ *
+ * The route is registered by Sanctum at `/sanctum/csrf-cookie` and
+ * lives OUTSIDE the `/api` prefix, so we hit the site origin directly.
+ */
+export async function primeCsrfCookie(): Promise<void> {
+  if (typeof window === 'undefined') return;
+  await axios.get('/sanctum/csrf-cookie', { withCredentials: true });
+}

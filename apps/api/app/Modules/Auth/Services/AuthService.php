@@ -6,6 +6,7 @@ namespace App\Modules\Auth\Services;
 
 use App\Models\User;
 use App\Modules\Auth\Repositories\UserRepository;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
@@ -92,10 +93,59 @@ class AuthService
     }
 
     /**
+     * SPA login: verify credentials and open a Laravel SESSION for the
+     * user — no bearer token issued, nothing exposed to the JS layer.
+     * The session id lives in an httpOnly cookie the browser attaches
+     * automatically; XSS cannot read it. Used by the web app via the
+     * stateful (`EnsureFrontendRequestsAreStateful`) middleware chain.
+     *
+     * @throws ValidationException on bad credentials or inactive user.
+     */
+    public function loginStateful(int|string $identifier, string $password): User
+    {
+        $identifier = trim((string) $identifier);
+
+        $user = str_contains($identifier, '@')
+            ? $this->users->findActiveByEmail($identifier)
+            : $this->users->findActiveByEmployeeNumber((int) $identifier);
+
+        if (! $user) {
+            Hash::check($password, self::DUMMY_BCRYPT_HASH);
+
+            throw ValidationException::withMessages([
+                'identifier' => __('auth.failed'),
+            ]);
+        }
+
+        if (! Hash::check($password, $user->password)) {
+            throw ValidationException::withMessages([
+                'identifier' => __('auth.failed'),
+            ]);
+        }
+
+        // Bind the user to Laravel's session guard. The controller will
+        // then regenerate the session id (session-fixation defense).
+        Auth::guard('web')->login($user);
+
+        $user->forceFill(['last_login_at' => now()])->save();
+
+        return $user;
+    }
+
+    /**
      * Revoke the access token that authenticated the current request.
+     * SPA sessions are torn down separately by the controller (session
+     * invalidate + regenerateToken).
      */
     public function logout(User $user): void
     {
-        $user->currentAccessToken()?->delete();
+        // currentAccessToken() returns a TransientToken for session
+        // logins — nothing to delete there, the controller handles
+        // that path. This delete only fires on real bearer tokens.
+        $token = $user->currentAccessToken();
+
+        if ($token && method_exists($token, 'delete')) {
+            $token->delete();
+        }
     }
 }
