@@ -25,43 +25,15 @@ class FraudGuardService
 
     private function assertWithinGeofence(AttendanceDevice $device, ?float $latitude, ?float $longitude): void
     {
-        // The admin toggle is the primary gate. When enforcement is off we
-        // do not touch the geo columns at all — ops can stage the location
-        // settings on the device row before flipping the toggle.
-        if ($device->enforce_geo === false) {
-            return;
-        }
-
-        // enforce_geo=true, but the DEVICE isn't fully configured
-        // (missing anchor coords or radius). That's an admin misconfig,
-        // not a user permission problem — the previous "Location is
-        // required" message misled users into re-granting GPS access
-        // when the real fix is to open the device settings and either
-        // fill the coords in or toggle enforcement off. Fail loudly
-        // with a message that names the actual problem.
-        if (
-            $device->allowed_lat === null
-            || $device->allowed_lng === null
-            || ! $device->allowed_radius_meters
-        ) {
-            throw new FraudGuardException('التقييد الجغرافي مفعّل على هذا الجهاز، لكن لم يتم تحديد إحداثيات المكان المسموح. راجع إعدادات الجهاز من لوحة الإدارة.');
-        }
-
-        // Device is fully configured — now require the user's coords.
-        if ($latitude === null || $longitude === null) {
-            throw new FraudGuardException('يجب تفعيل خدمة الموقع في المتصفح لإتمام تسجيل الحضور على هذا الجهاز.');
-        }
-
-        $distanceMeters = $this->haversineDistanceMeters(
-            (float) $device->allowed_lat,
-            (float) $device->allowed_lng,
-            $latitude,
-            $longitude,
-        );
-
-        if ($distanceMeters > $device->allowed_radius_meters) {
-            throw new FraudGuardException('You are outside the allowed check-in area for this device.');
-        }
+        // Geofence enforcement is currently OFF by product policy: legacy
+        // devices may still carry enforce_geo=true in a DB row that a
+        // migration couldn't reach, but the desired behavior is
+        // fail-open — no location prompt, no rejection, no misconfig
+        // error. The distance-check code stays available (via the
+        // haversine helper below) so a future admin flow can re-enable
+        // it deliberately per device once the toggles work end-to-end.
+        //
+        unset($device, $latitude, $longitude);
     }
 
     private function assertIpAllowed(AttendanceDevice $device, string $ip): void
