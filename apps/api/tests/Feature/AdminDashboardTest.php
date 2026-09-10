@@ -91,11 +91,22 @@ test('task counts respect status flags and overdue date', function () {
 
     // 3 "not started" open tasks (no start_date, 0% progress).
     Task::factory()->count(3)->create(['status_id' => $openStatus->id, 'start_date' => null, 'progress_percent' => 0]);
-    // 2 in-progress open tasks (started yesterday, still open).
-    Task::factory()->count(2)->create(['status_id' => $openStatus->id, 'start_date' => now()->subDay()->toDateString()]);
-    // 1 overdue open task (past due, no completed_at).
-    Task::factory()->create(['status_id' => $openStatus->id, 'due_date' => now()->subDays(3)->toDateString()]);
-    // A done task should NOT count in any bucket.
+    // 2 in-progress open tasks (started yesterday, progress > 0).
+    // The dashboard now requires actual progress to count as
+    // "in_progress" — a scheduled but untouched task is "open" only.
+    Task::factory()->count(2)->create([
+        'status_id' => $openStatus->id,
+        'start_date' => now()->subDay()->toDateString(),
+        'progress_percent' => 40,
+    ]);
+    // 1 overdue open task (past due, no completed_at, 0% progress).
+    Task::factory()->create([
+        'status_id' => $openStatus->id,
+        'progress_percent' => 0,
+        'due_date' => now()->subDays(3)->toDateString(),
+    ]);
+    // A done task should NOT count in any bucket (both signals set —
+    // status is done AND completed_at is stamped).
     Task::factory()->create([
         'status_id' => $doneStatus->id,
         'start_date' => now()->subDay()->toDateString(),
@@ -105,6 +116,6 @@ test('task counts respect status flags and overdue date', function () {
 
     $this->getJson('/api/admin/dashboard/kpis')
         ->assertJsonPath('data.tasks.open', 6)          // 3 + 2 + 1 open
-        ->assertJsonPath('data.tasks.in_progress', 2)   // 2 with start_date <= today
+        ->assertJsonPath('data.tasks.in_progress', 2)   // 2 with progress > 0
         ->assertJsonPath('data.tasks.overdue', 1);
 });
