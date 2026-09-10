@@ -74,14 +74,12 @@ export function TaskDetailDialog({ taskId, onOpenChange, onNavigate }: TaskDetai
     queryKey: ['task-statuses'],
     queryFn: async () => (await taskStatusesApi.list()).data.data,
     enabled: open,
-    staleTime: 60_000,
   });
 
   const { data: priorities } = useQuery({
     queryKey: ['task-priorities'],
     queryFn: async () => (await taskPrioritiesApi.list()).data.data,
     enabled: open,
-    staleTime: 60_000,
   });
 
   const [editingTitle, setEditingTitle] = React.useState(false);

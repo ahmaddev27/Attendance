@@ -70,6 +70,23 @@ class DepartmentService
 
     public function delete(Department $department): bool
     {
+        // Refuse to delete a non-empty department. Without this guard the
+        // repo call either cascades (silently orphaning employees / teams
+        // / children) or bubbles a raw SQLSTATE[23000]/1451 FK error up
+        // to the admin. Either outcome leaves the org tree inconsistent
+        // and confuses the caller. Force the operator to reassign or
+        // remove the dependents first.
+        if (
+            $department->employees()->count() > 0
+            || $department->teams()->count() > 0
+            || $department->positions()->count() > 0
+            || $department->children()->count() > 0
+        ) {
+            throw ValidationException::withMessages([
+                'id' => 'لا يمكن حذف القسم بينما يحتوي على موظفين أو فرق أو مسميات وظيفية أو أقسام فرعية.',
+            ]);
+        }
+
         return $this->departments->delete($department);
     }
 

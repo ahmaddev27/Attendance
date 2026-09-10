@@ -155,7 +155,6 @@ export function EmployeeFormDialog({ open, onOpenChange, employee }: EmployeeFor
     queryKey: ['departments', 'picker'],
     queryFn: async () => (await departmentsApi.list({ per_page: 100, is_active: true })).data.data,
     enabled: open,
-    staleTime: 60_000,
   });
 
   const { data: teams } = useQuery({
@@ -164,7 +163,6 @@ export function EmployeeFormDialog({ open, onOpenChange, employee }: EmployeeFor
       (await teamsApi.list({ department_id: departmentId ?? undefined, per_page: 100, is_active: true })).data
         .data,
     enabled: open && departmentId != null,
-    staleTime: 60_000,
   });
 
   const { data: positions } = useQuery({
@@ -173,7 +171,6 @@ export function EmployeeFormDialog({ open, onOpenChange, employee }: EmployeeFor
       (await positionsApi.list({ department_id: departmentId ?? undefined, per_page: 100, is_active: true }))
         .data.data,
     enabled: open && departmentId != null,
-    staleTime: 60_000,
   });
 
   const { data: schedules } = useQuery({
@@ -181,7 +178,6 @@ export function EmployeeFormDialog({ open, onOpenChange, employee }: EmployeeFor
     // schedulesApi.list() already unwraps to WorkSchedule[] — no .data.data.
     queryFn: () => schedulesApi.list(),
     enabled: open,
-    staleTime: 60_000,
   });
 
   const mutation = useMutation({

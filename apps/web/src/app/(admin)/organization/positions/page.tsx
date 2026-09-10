@@ -38,7 +38,6 @@ export default function PositionsPage() {
   const { data: departments } = useQuery({
     queryKey: ['departments', 'filter-options'],
     queryFn: async () => (await departmentsApi.list({ per_page: 100, is_active: true })).data.data,
-    staleTime: 60_000,
   });
 
   const { data, isLoading } = useQuery({

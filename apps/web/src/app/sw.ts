@@ -22,11 +22,41 @@
  *   Next's runtime chunks with NetworkFirst (small timeout, offline
  *   fallback intact) so a fresh deploy is visible on the very next
  *   navigation instead of after a stale-then-revalidate cycle.
+ *
+ * PRIVACY (2026-09, wave-g):
+ *   Serwist's `defaultCache` includes a StaleWhileRevalidate on `/api/**`
+ *   GETs plus NetworkFirst caches for HTML + RSC payloads. On a shared
+ *   browser (kiosk, reception laptop) that means user B could be served
+ *   user A's cached authenticated response for up to `maxAgeSeconds`.
+ *   SWs cannot scope caches per-user safely (the cache is bucketed by
+ *   origin, not by cookie), so we strip every runtime cache that holds
+ *   authenticated content and let those requests hit the network fresh.
+ *   Static-asset caches (fonts, images, `_next/static/**`) are unaffected.
  */
 
 import { defaultCache } from '@serwist/next/worker';
-import type { PrecacheEntry, SerwistGlobalConfig } from 'serwist';
+import type { PrecacheEntry, RuntimeCaching, SerwistGlobalConfig, Strategy } from 'serwist';
 import { NetworkFirst, Serwist, StaleWhileRevalidate } from 'serwist';
+
+/**
+ * Names of Serwist's `defaultCache` runtime entries that hold responses
+ * bound to the signed-in user's session. `serwist` transforms cacheName
+ * at construction time (prefix + suffix), so we match by substring.
+ */
+const AUTHED_CACHE_NAME_TAGS = ['apis', 'pages', 'pages-rsc', 'pages-rsc-prefetch', 'others'];
+
+const isAuthedRuntimeCache = (entry: RuntimeCaching): boolean => {
+  const cacheName = (entry.handler as Partial<Strategy>).cacheName;
+  if (!cacheName) return false;
+  return AUTHED_CACHE_NAME_TAGS.some(
+    (tag) =>
+      cacheName === tag ||
+      cacheName.endsWith(`-${tag}`) ||
+      cacheName.includes(`-${tag}-`),
+  );
+};
+
+const safeDefaultCache = defaultCache.filter((entry) => !isAuthedRuntimeCache(entry));
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -96,7 +126,11 @@ const serwist = new Serwist({
     // Everything else — use Serwist's sensible defaults (images,
     // static assets, fonts). The overrides above land first because
     // Serwist runs the runtimeCaching entries in order.
-    ...defaultCache,
+    // NOTE: `safeDefaultCache` is `defaultCache` with the authenticated
+    // caches (apis, pages, pages-rsc*, others) removed — see the header
+    // comment. Anything not matched by the remaining entries falls
+    // through to the built-in NetworkOnly catch-all Serwist ships.
+    ...safeDefaultCache,
   ],
   fallbacks: {
     entries: [

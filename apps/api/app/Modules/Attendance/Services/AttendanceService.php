@@ -139,6 +139,35 @@ class AttendanceService
                 throw new AttendanceException('Check-out time cannot be before check-in time.');
             }
 
+            // Belt-and-braces guard against "yesterday's forgotten
+            // check-in gets stamped with today's time": if the open
+            // session is >12h old AND falls on an earlier calendar day,
+            // refuse the auto-close and force an admin correction so
+            // the historical timesheet reflects reality. The outer
+            // query already excludes sessions older than 18h, so this
+            // catches the awkward 12-18h cross-midnight window.
+            if (
+                $attendance->check_in_at !== null
+                && $attendance->check_in_at->diffInHours(now()) > 12
+                && $attendance->check_in_at->toDateString() !== now()->toDateString()
+            ) {
+                throw new AttendanceException('لا يمكن تسجيل خروج عن يوم سابق تلقائياً — الرجاء التواصل مع الإدارة لتصحيح البصمة.');
+            }
+
+            // Legitimate use case: employee scans in at one entrance and
+            // out at another, so we don't reject cross-device check-outs.
+            // We do append an anomaly note so ops can audit if a scanning
+            // pattern later looks off (e.g. a coworker punching someone
+            // else out from a shared kiosk).
+            if (
+                $attendance->check_in_device_id !== null
+                && (int) $attendance->check_in_device_id !== (int) $device->id
+            ) {
+                $attendance->notes = trim(
+                    ($attendance->notes ?? '')."\n[نظام] تسجيل الخروج من جهاز مختلف عن جهاز الحضور."
+                );
+            }
+
             $attendance->fill([
                 'check_out_at' => $checkOutAt,
                 'check_out_ip' => $ip,

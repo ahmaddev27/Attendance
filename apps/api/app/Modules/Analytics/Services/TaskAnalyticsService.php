@@ -110,12 +110,12 @@ class TaskAnalyticsService
             ->join('employees as e', 'e.id', '=', 't.assigned_to')
             ->where('ts.is_done_state', true)
             ->whereNotNull('t.completed_at')
-            ->selectRaw('
-                e.full_name as name,
+            ->selectRaw("
+                CONCAT(e.first_name, ' ', e.last_name) as name,
                 COUNT(*) as done,
                 AVG(TIMESTAMPDIFF(SECOND, t.created_at, t.completed_at)) as avg_sec
-            ')
-            ->groupBy('e.id', 'e.full_name')
+            ")
+            ->groupBy('e.id', 'e.first_name', 'e.last_name')
             ->orderByDesc('done')
             ->limit(5)
             ->get()

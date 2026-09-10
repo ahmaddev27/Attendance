@@ -65,9 +65,9 @@ class TaskService
      * @param  array<string, mixed>  $filters
      * @return Collection<string, array{status: TaskStatus, tasks: Collection<int, Task>, count_total: int}>
      */
-    public function kanban(array $filters = []): Collection
+    public function kanban(array $filters = [], ?User $actor = null): Collection
     {
-        $grouped = $this->tasks->groupByStatus($filters);
+        $grouped = $this->tasks->groupByStatus($filters, $this->authorizedScopeFor($actor));
 
         return $this->statuses->all()
             ->keyBy(fn (TaskStatus $status) => $status->code)
@@ -85,6 +85,20 @@ class TaskService
     public function find(int $id): Task
     {
         return $this->tasks->findOrFail($id);
+    }
+
+    /**
+     * Authorized single-task read. Applies the same access rule as
+     * assertCanActOnTask (admin OR creator/assignee) — used by the
+     * show endpoint to block cross-employee reads by id.
+     */
+    public function findFor(User $actor, int $id): Task
+    {
+        $task = $this->tasks->findOrFail($id);
+
+        $this->assertCanActOnTask($task, $actor);
+
+        return $task;
     }
 
     /**
@@ -137,6 +151,21 @@ class TaskService
             if (! $selfAssign && ! $sameTeam) {
                 throw ValidationException::withMessages([
                     'assigned_to' => 'يمكنك إسناد المهمة لأعضاء فريقك فقط.',
+                ]);
+            }
+        }
+
+        // Subtask attachment IDOR guard: `exists:tasks,id` in the request
+        // rule proves the parent exists but not that the caller may reach
+        // it. Reuse the update/delete access rule (admin OR creator/assignee
+        // of the PARENT task) so an employee can't graft a subtask onto
+        // someone else's work.
+        if (! empty($data['parent_task_id'])) {
+            $parent = $this->tasks->findOrFail((int) $data['parent_task_id']);
+
+            if (! $this->canActOnTask($parent, $actor)) {
+                throw ValidationException::withMessages([
+                    'parent_task_id' => 'لا تملك صلاحية إضافة مهمة فرعية إلى هذه المهمة الأم.',
                 ]);
             }
         }
@@ -367,20 +396,29 @@ class TaskService
      */
     private function assertCanActOnTask(Task $task, User $actor): void
     {
-        if ($this->actorHasManageWorkflows($actor)) {
-            return;
-        }
-
-        $employeeId = $actor->employee_id;
-
-        if ($employeeId !== null
-            && ((int) $task->created_by === (int) $employeeId
-                || (int) $task->assigned_to === (int) $employeeId)
-        ) {
+        if ($this->canActOnTask($task, $actor)) {
             return;
         }
 
         abort(403, 'You do not have permission to act on this task.');
+    }
+
+    /**
+     * Boolean form of the access rule enforced by assertCanActOnTask —
+     * used where the caller needs to translate a denial into something
+     * other than a 403 (e.g. a ValidationException for parent_task_id).
+     */
+    private function canActOnTask(Task $task, User $actor): bool
+    {
+        if ($this->actorHasManageWorkflows($actor)) {
+            return true;
+        }
+
+        $employeeId = $actor->employee_id;
+
+        return $employeeId !== null
+            && ((int) $task->created_by === (int) $employeeId
+                || (int) $task->assigned_to === (int) $employeeId);
     }
 
     /**

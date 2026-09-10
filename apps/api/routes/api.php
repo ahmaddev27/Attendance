@@ -165,11 +165,19 @@ Route::middleware('auth:sanctum')->group(function () {
 // projects/sprints — those tables land in Phase 2 (see
 // docs/v2/03-phase-1-plan.md's M6 section).
 Route::middleware('auth:sanctum')->group(function () {
-    // Config (admin) — status/priority/tag catalogs are HR ops config.
+    // Config catalogs — reads (index/show) are open to any authenticated
+    // user because the /my-tasks filters and TaskFormDialog need the
+    // status/priority/tag dropdowns populated. Writes stay behind
+    // manage-workflows (HR ops only). Mirrors the leave-types /
+    // request-types read-vs-write split.
+    Route::apiResource('task-statuses', TaskStatusController::class)->only(['index', 'show']);
+    Route::apiResource('task-priorities', TaskPriorityController::class)->only(['index', 'show']);
+    Route::apiResource('task-tags', TaskTagController::class)->only(['index', 'show']);
+
     Route::middleware('permission:manage-workflows')->group(function () {
-        Route::apiResource('task-statuses', TaskStatusController::class);
-        Route::apiResource('task-priorities', TaskPriorityController::class);
-        Route::apiResource('task-tags', TaskTagController::class);
+        Route::apiResource('task-statuses', TaskStatusController::class)->except(['index', 'show']);
+        Route::apiResource('task-priorities', TaskPriorityController::class)->except(['index', 'show']);
+        Route::apiResource('task-tags', TaskTagController::class)->except(['index', 'show']);
     });
 
     // Tasks. /tasks/kanban is a static path and must be registered before
@@ -290,10 +298,11 @@ Route::middleware('auth:sanctum')->group(function () {
             ->get('/audit-log', [AuditLogController::class, 'index']);
 
         // System settings (mail + sms credentials, editable at runtime).
-        // Only super-admins should touch these — permission gate + spatie
-        // role check (super-admin implicitly gets every permission via
-        // RolePermissionSeeder).
-        Route::middleware('permission:manage-users')->group(function () {
+        // Rotating third-party credentials (Anthropic, Resend, MTC,
+        // WhatsApp) is a strictly higher-blast-radius action than
+        // onboarding a user — gate on its own `manage-settings`
+        // permission, granted only to super-admin in RolePermissionSeeder.
+        Route::middleware('permission:manage-settings')->group(function () {
             Route::get('/settings', [SettingsController::class, 'index']);
             Route::put('/settings', [SettingsController::class, 'update']);
 

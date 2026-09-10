@@ -26,7 +26,10 @@ import { formatDateTime } from '@/lib/request-format';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import type { RequestDetail } from '@/lib/api/types';
 
-function canCurrentUserAct(detail: RequestDetail, user: { id: number; roles?: string[]; permissions?: string[] } | null): boolean {
+function canCurrentUserAct(
+  detail: RequestDetail,
+  user: { id: number; employee_id?: number | null; roles?: string[]; permissions?: string[] } | null,
+): boolean {
   if (!user || !detail.current_step) return false;
   if (!ACTIONABLE_REQUEST_STATUSES.includes(detail.status)) return false;
 
@@ -38,12 +41,18 @@ function canCurrentUserAct(detail: RequestDetail, user: { id: number; roles?: st
   const step = detail.current_step;
   switch (step.approver_type) {
     case 'specific_employee':
-      return step.approver_ref === String(user.id);
+      // `approver_ref` stores an EMPLOYEE id, not a USER id — these
+      // are separate sequences on the backend. Compare against
+      // `user.employee_id` (surfaced by UserResource) so admins whose
+      // login user is the resolved approver can actually act.
+      return user.employee_id != null && step.approver_ref === String(user.employee_id);
     case 'specific_role':
       return !!step.approver_ref && roles.includes(step.approver_ref);
     case 'form_field': {
       if (!step.approver_ref) return false;
-      return String(detail.form_data[step.approver_ref]) === String(user.id);
+      // Same employee/user id distinction as `specific_employee` above —
+      // `form_data[<key>]` holds the referenced EMPLOYEE id.
+      return user.employee_id != null && String(detail.form_data[step.approver_ref]) === String(user.employee_id);
     }
     case 'direct_manager':
     case 'department_manager':
@@ -106,7 +115,6 @@ export function RequestDetailDialog({ requestId, open, onOpenChange, mode, force
     queryKey: ['request-types', detail?.request_type.id],
     queryFn: async () => (await requestTypesApi.get(detail!.request_type.id)).data.data,
     enabled: open && !!detail,
-    staleTime: 60_000,
   });
 
   const canAct = mode === 'admin' && !!detail && (forceActionable || canCurrentUserAct(detail, user));

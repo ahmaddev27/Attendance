@@ -21,7 +21,6 @@ export function ApproverRefDisplay({ approver_type, approver_ref, className }: A
     queryKey: ['employees', 'hydrate', employeeId],
     queryFn: async () => (await employeesApi.get(employeeId as number)).data.data,
     enabled: !!employeeId && !Number.isNaN(employeeId),
-    staleTime: 60_000,
   });
 
   if (approver_type === 'specific_employee') {

@@ -8,6 +8,7 @@ use App\Models\Team;
 use App\Modules\Organization\Repositories\TeamRepository;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Validation\ValidationException;
 
 class TeamService
 {
@@ -55,6 +56,17 @@ class TeamService
 
     public function delete(Team $team): bool
     {
+        // Guard against silent orphaning: if the team still has employees
+        // assigned, either the delete cascades and their `team_id` goes
+        // NULL without an audit trail, or the FK constraint returns a
+        // raw 1451 error to the client. Neither is acceptable — force
+        // the operator to move the members first.
+        if ($team->employees()->count() > 0) {
+            throw ValidationException::withMessages([
+                'id' => 'لا يمكن حذف الفريق بينما يحتوي على موظفين. يرجى نقلهم أولاً.',
+            ]);
+        }
+
         return $this->teams->delete($team);
     }
 }

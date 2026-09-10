@@ -73,15 +73,40 @@ export default function AttendancePage() {
     setter(v);
   };
 
+  // The report endpoint aggregates by (year, month), so a filter range that
+  // straddles two calendar months cannot be represented as a single export.
+  // We surface that upstream by disabling the button instead of silently
+  // truncating the request to the "from" month.
+  const rangeSpansMultipleMonths = (() => {
+    if (!from || !to) return false;
+    const start = new Date(`${from}T00:00:00`);
+    const end = new Date(`${to}T00:00:00`);
+    return (
+      start.getFullYear() !== end.getFullYear() ||
+      start.getMonth() !== end.getMonth()
+    );
+  })();
+
+  const exportDisabledReason = rangeSpansMultipleMonths
+    ? 'التصدير يعمل على شهر واحد فقط — قلّص نطاق التاريخ إلى شهر واحد'
+    : undefined;
+
   const handleExport = async () => {
+    if (rangeSpansMultipleMonths) return;
     setExporting(true);
     try {
-      // The report endpoint aggregates by (year, month). Derive them from
-      // the "from" filter when set, otherwise fall back to the current month.
-      const anchor = from ? new Date(`${from}T00:00:00`) : new Date();
+      // Derive year/month from the "from" filter (or "to" if only "to" is
+      // set), falling back to the current month. Pass employee_id through
+      // so the CSV honors the same employee filter as the table.
+      const anchorSource = from || to || '';
+      const anchor = anchorSource ? new Date(`${anchorSource}T00:00:00`) : new Date();
       const year = anchor.getFullYear();
       const month = anchor.getMonth() + 1;
-      const blob = await attendanceApi.exportCsv({ year, month });
+      const blob = await attendanceApi.exportCsv({
+        year,
+        month,
+        employee_id: filters.employee_id,
+      });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -156,7 +181,8 @@ export default function AttendancePage() {
             variant="outline"
             className="w-full gap-2"
             onClick={handleExport}
-            disabled={exporting}
+            disabled={exporting || rangeSpansMultipleMonths}
+            title={exportDisabledReason}
           >
             {exporting ? <Spinner /> : <Download className="h-4 w-4" />}
             تصدير CSV

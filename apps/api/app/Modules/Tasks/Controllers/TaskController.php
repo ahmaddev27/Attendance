@@ -49,7 +49,10 @@ class TaskController extends Controller
     {
         $filters = $request->only(['assigned_to', 'created_by', 'priority_id', 'tag_id', 'search']);
 
-        $columns = $this->taskService->kanban($filters)->map(fn (array $entry) => [
+        /** @var User $actor */
+        $actor = $request->user();
+
+        $columns = $this->taskService->kanban($filters, $actor)->map(fn (array $entry) => [
             'status' => new TaskStatusResource($entry['status']),
             'tasks' => TaskResource::collection($entry['tasks']),
             // count_total > tasks.length signals the column was capped —
@@ -70,9 +73,12 @@ class TaskController extends Controller
         return (new TaskResource($this->taskService->find($task->id)))->response()->setStatusCode(201);
     }
 
-    public function show(Task $task): TaskDetailResource
+    public function show(Request $request, Task $task): TaskDetailResource
     {
-        return new TaskDetailResource($this->taskService->find($task->id));
+        /** @var User $actor */
+        $actor = $request->user();
+
+        return new TaskDetailResource($this->taskService->findFor($actor, $task->id));
     }
 
     public function update(UpdateTaskRequest $request, Task $task): TaskResource

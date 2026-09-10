@@ -92,7 +92,6 @@ export function CreateLeaveDialog({ open, onOpenChange }: CreateLeaveDialogProps
     queryKey: ['leave-types', 'picker'],
     queryFn: async () => (await leaveTypesApi.list()).data.data,
     enabled: open,
-    staleTime: 60_000,
   });
 
   const activeLeaveTypes = (leaveTypes ?? []).filter((type) => type.is_active);

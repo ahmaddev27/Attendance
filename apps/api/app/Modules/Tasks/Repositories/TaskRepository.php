@@ -73,21 +73,41 @@ class TaskRepository
      * more" affordance.
      *
      * @param  array<string, mixed>  $filters
+     * @param  int|null              $ownedByEmployeeId  When non-null, force-scopes
+     *                                                    both the count and the tasks
+     *                                                    query to rows the employee
+     *                                                    created or is assigned to
+     *                                                    (Tasks kanban IDOR fix — the
+     *                                                    board used to leak every task
+     *                                                    in the org to any employee).
      * @return Collection<string, array{tasks: Collection<int, Task>, count_total: int}>
      */
-    public function groupByStatus(array $filters = []): Collection
+    public function groupByStatus(array $filters = [], ?int $ownedByEmployeeId = null): Collection
     {
         $statuses = TaskStatus::query()->orderBy('sort_order')->get();
         $result = new Collection();
+
+        $applyOwnership = static function (Builder $query) use ($ownedByEmployeeId): void {
+            if ($ownedByEmployeeId === null) {
+                return;
+            }
+
+            $query->where(function (Builder $w) use ($ownedByEmployeeId): void {
+                $w->where('created_by', $ownedByEmployeeId)
+                    ->orWhere('assigned_to', $ownedByEmployeeId);
+            });
+        };
 
         foreach ($statuses as $status) {
             // Lean count query — no eager loads, no withCount subqueries —
             // so the total lookup stays a single COUNT(*) per column.
             $countQuery = Task::query()->where('status_id', $status->id);
             $this->applyFilters($countQuery, $filters);
+            $applyOwnership($countQuery);
             $total = $countQuery->count();
 
             $tasksQuery = $this->baseQuery($filters)->where('status_id', $status->id);
+            $applyOwnership($tasksQuery);
             $tasks = $tasksQuery
                 ->orderByDesc('updated_at')
                 ->limit(self::KANBAN_COLUMN_LIMIT)
@@ -104,11 +124,14 @@ class TaskRepository
 
     /**
      * Full detail view for a single task. `comments` is constrained to
-     * top-level rows (parent_id null) with one level of replies nested
-     * underneath — the depth a task's own detail payload renders inline;
-     * TaskCommentController::index() goes through
-     * TaskCommentRepository::threadForTask() instead when a caller needs
-     * the fully reconstructed (arbitrarily deep) thread on its own.
+     * top-level rows (parent_id null), capped at the 50 most recent, so
+     * a task with hundreds of comments never ships a multi-MB payload on
+     * initial load. Nested replies are NOT eager-loaded here — the FE
+     * fetches the fully reconstructed thread lazily via
+     * `TaskCommentController::index` (GET /tasks/{task}/comments), which
+     * goes through TaskCommentRepository::threadForTask() and returns
+     * every level of nesting on demand. `history` is likewise capped at
+     * the 30 most recent entries to keep the audit payload bounded.
      */
     public function findOrFail(int $id): Task
     {
@@ -118,12 +141,15 @@ class TaskRepository
                 'parent',
                 'subtasks.status',
                 'subtasks.priority',
-                // Not type-hinted as Builder: Eloquent invokes this
-                // constraint closure with the Relation instance itself
+                // Not type-hinted as Builder: Eloquent invokes these
+                // constraint closures with the Relation instance itself
                 // (HasMany here), not a plain query builder.
-                'comments' => fn ($query) => $query->whereNull('parent_id'),
+                'comments' => fn ($query) => $query
+                    ->whereNull('parent_id')
+                    ->latest()
+                    ->limit(50),
                 'comments.user',
-                'comments.replies.user',
+                'history' => fn ($query) => $query->latest()->limit(30),
                 'history.user',
                 'media',
             ])

@@ -25,19 +25,24 @@ class FraudGuardService
 
     private function assertWithinGeofence(AttendanceDevice $device, ?float $latitude, ?float $longitude): void
     {
-        // The admin toggle is the primary gate. Even if lat/lng/radius are
-        // configured, we skip the check unless enforce_geo is on — lets
-        // ops stage the location settings before turning enforcement on.
-        if (! $device->enforce_geo) {
+        // The admin toggle is the primary gate. When enforcement is off we
+        // do not touch the geo columns at all — ops can stage the location
+        // settings on the device row before flipping the toggle.
+        if ($device->enforce_geo === false) {
             return;
         }
 
-        if ($device->allowed_lat === null || $device->allowed_lng === null || ! $device->allowed_radius_meters) {
-            return;
-        }
-
-        if ($latitude === null || $longitude === null) {
-            throw new FraudGuardException('Location is required to check in on this device.');
+        // enforce_geo=true: refuse to fail-open. If either the incoming
+        // location or the device's configured anchor is missing we throw,
+        // rather than silently accept the scan.
+        if (
+            $latitude === null
+            || $longitude === null
+            || $device->allowed_lat === null
+            || $device->allowed_lng === null
+            || ! $device->allowed_radius_meters
+        ) {
+            throw new FraudGuardException('Location is required — this device requires geofencing.');
         }
 
         $distanceMeters = $this->haversineDistanceMeters(
@@ -57,14 +62,16 @@ class FraudGuardService
         // Same admin-toggle gate as geofence. A stored whitelist without
         // enforce_ip=true is treated as informational — visible in the
         // admin UI but not enforced at scan time.
-        if (! $device->enforce_ip) {
+        if ($device->enforce_ip === false) {
             return;
         }
 
         $whitelist = $device->ip_whitelist;
 
+        // enforce_ip=true with no whitelist is a misconfiguration — refuse
+        // to fail-open so the admin is forced to configure the allowlist.
         if (empty($whitelist)) {
-            return;
+            throw new FraudGuardException('IP whitelist not configured for this device.');
         }
 
         foreach ($whitelist as $allowedEntry) {

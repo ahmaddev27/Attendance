@@ -115,6 +115,20 @@ class TaqatNotification extends Notification implements ShouldQueue
      */
     public function via(mixed $notifiable): array
     {
+        // Defense-in-depth: `via()` runs per recipient, so touching the
+        // pushTokens / employee relations below would trigger a lazy
+        // load per notifiable when the caller forgot to eager-load them
+        // upstream (an easy oversight in bulk-notify code paths).
+        // `loadMissing` is a no-op when the relations are already loaded
+        // and, when they're not, runs a single narrow query per
+        // recipient instead of the full-column lazy fetch.
+        if (is_object($notifiable) && method_exists($notifiable, 'loadMissing')) {
+            $notifiable->loadMissing([
+                'pushTokens:id,user_id',
+                'employee:id,phone',
+            ]);
+        }
+
         $channels = ['database'];
 
         // Broadcast is added when Reverb is configured AND the caller

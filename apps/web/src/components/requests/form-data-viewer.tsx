@@ -85,7 +85,6 @@ function EmployeeFieldValue({ employeeId }: { employeeId: number }) {
     queryKey: ['employees', 'hydrate', employeeId],
     queryFn: async () => (await employeesApi.get(employeeId)).data.data,
     enabled: Number.isFinite(employeeId),
-    staleTime: 60_000,
   });
 
   if (!Number.isFinite(employeeId)) return <span className="text-muted">—</span>;

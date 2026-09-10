@@ -38,6 +38,24 @@ export type PaginatedResponse<T> = {
 // ---------------------------------------------------------------------------
 
 /**
+ * Canonical shape returned by the backend `UserResource` — a login user
+ * plus (when the user is linked to an Employee row) the employee id used
+ * by workflow-step `approver_ref` values. Kept in sync with the auth
+ * store's own `User` type; both include `employee_id` so the frontend
+ * can compare a step's `approver_ref` against the current user without
+ * having to join through a separate employees lookup.
+ */
+export type User = {
+  id: number;
+  employee_id: number | null;
+  employee_number: number;
+  name: string;
+  email: string;
+  roles: string[];
+  permissions: string[];
+};
+
+/**
  * Minimal employee shape embedded in other resources (attendance rows,
  * monthly summaries, department/team managers, direct managers, …). This is
  * the canonical shape from the Employees module — matches the `full_name`

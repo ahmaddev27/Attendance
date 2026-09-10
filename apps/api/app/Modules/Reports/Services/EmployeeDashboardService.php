@@ -172,28 +172,35 @@ class EmployeeDashboardService
      */
     private function tasks(Employee $employee, CarbonImmutable $today): array
     {
-        $baseOpen = Task::query()
-            ->where('assigned_to', $employee->id)
-            ->whereHas('status', function ($q): void {
-                $q->where('is_done_state', false)->where('is_cancelled_state', false);
-            });
+        $todayDate = $today->toDateString();
 
-        $open = (clone $baseOpen)->count();
-        $inProgress = (clone $baseOpen)
-            ->whereNull('completed_at')
-            ->where(function ($q) use ($today): void {
-                // start_date/due_date are DATE columns — bare where()
-                // keeps any future index on them usable.
-                $q->where('start_date', '<=', $today->toDateString())
-                    ->orWhere('progress_percent', '>', 0);
-            })
-            ->count();
-        $overdue = (clone $baseOpen)
-            ->whereNull('completed_at')
-            ->whereNotNull('due_date')
-            ->where('due_date', '<', $today->toDateString())
-            ->count();
+        // Collapse the previous 3 whereHas('status') subquery counts into
+        // one JOIN + SUM(CASE WHEN...) row. Each of the old counts issued
+        // its own scan of tasks + a correlated subquery into task_statuses;
+        // the join fires once, and the conditional SUMs classify each row
+        // in-place — three queries become one.
+        $open = Task::query()
+            ->from('tasks')
+            ->join('task_statuses', 'task_statuses.id', '=', 'tasks.status_id')
+            ->where('tasks.assigned_to', $employee->id)
+            ->where('task_statuses.is_done_state', false)
+            ->where('task_statuses.is_cancelled_state', false)
+            ->selectRaw(
+                'COUNT(*) as open_count,
+                 SUM(CASE WHEN tasks.completed_at IS NULL
+                          AND (tasks.start_date <= ? OR tasks.progress_percent > 0)
+                          THEN 1 ELSE 0 END) as in_progress_count,
+                 SUM(CASE WHEN tasks.completed_at IS NULL
+                          AND tasks.due_date IS NOT NULL
+                          AND tasks.due_date < ?
+                          THEN 1 ELSE 0 END) as overdue_count',
+                [$todayDate, $todayDate]
+            )
+            ->first();
 
+        // "Completed this week" doesn't share the open-scope filters (a
+        // done/cancelled status IS relevant here), so it stays a separate
+        // count against a different index (assigned_to, completed_at).
         $completedThisWeek = Task::query()
             ->where('assigned_to', $employee->id)
             ->whereNotNull('completed_at')
@@ -204,9 +211,9 @@ class EmployeeDashboardService
             ->count();
 
         return [
-            'open' => $open,
-            'in_progress' => $inProgress,
-            'overdue' => $overdue,
+            'open' => (int) ($open->open_count ?? 0),
+            'in_progress' => (int) ($open->in_progress_count ?? 0),
+            'overdue' => (int) ($open->overdue_count ?? 0),
             'completed_this_week' => $completedThisWeek,
         ];
     }

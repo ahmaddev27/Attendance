@@ -62,17 +62,14 @@ export default function TasksPage() {
   const { data: statuses } = useQuery({
     queryKey: ['task-statuses'],
     queryFn: async () => (await taskStatusesApi.list()).data.data,
-    staleTime: 60_000,
   });
   const { data: priorities } = useQuery({
     queryKey: ['task-priorities'],
     queryFn: async () => (await taskPrioritiesApi.list()).data.data,
-    staleTime: 60_000,
   });
   const { data: tags } = useQuery({
     queryKey: ['task-tags'],
     queryFn: async () => (await taskTagsApi.list()).data.data,
-    staleTime: 60_000,
   });
 
   const { data, isLoading } = useQuery({

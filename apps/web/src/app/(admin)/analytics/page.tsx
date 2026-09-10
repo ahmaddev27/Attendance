@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import dynamic from 'next/dynamic';
 import { useQueries } from '@tanstack/react-query';
 import {
   Activity,
@@ -14,27 +15,30 @@ import {
   Timer,
   BarChart3,
 } from 'lucide-react';
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
 
 import { AnalyticsFiltersBar } from '@/components/analytics/analytics-filters';
 import { AttendanceHeatmap } from '@/components/analytics/attendance-heatmap';
 import { KpiCard } from '@/components/analytics/kpi-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { analyticsApi, type AnalyticsFilters } from '@/lib/api/endpoints/analytics';
+
+// Recharts is ~200KB and pulls the whole d3-scale/d3-shape stack; keep it
+// out of the admin shell (and the SW precache) by loading each chart lazily
+// on the client only when this page renders. `ssr: false` prevents Next
+// from trying to render recharts on the server, which would defeat the
+// split.
+const LeavesTrendChart = dynamic(
+  () => import('@/components/analytics/leaves-trend-chart'),
+  { ssr: false, loading: () => <Skeleton className="h-56 rounded-xl" /> },
+);
+const LeavesByTypeChart = dynamic(
+  () => import('@/components/analytics/leaves-by-type-chart'),
+  { ssr: false, loading: () => <Skeleton className="h-56 rounded-xl" /> },
+);
+const EmployeesByDepartmentChart = dynamic(
+  () => import('@/components/analytics/employees-by-department-chart'),
+  { ssr: false, loading: () => <Skeleton className="h-64 rounded-xl" /> },
+);
 
 /**
  * Recharts colour palette — pulled from our brand + status tokens so
@@ -249,37 +253,10 @@ export default function AnalyticsPage() {
             </p>
           </div>
           {leaves && leaves.by_month.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={leaves.by_month} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgb(228 232 239)" />
-                <XAxis dataKey="month" tick={{ fontSize: 10 }} stroke="rgb(91 100 120)" />
-                <YAxis tick={{ fontSize: 10 }} stroke="rgb(91 100 120)" />
-                <Tooltip
-                  contentStyle={{
-                    background: 'rgb(255 255 255)',
-                    border: '1px solid rgb(228 232 239)',
-                    borderRadius: 8,
-                    fontSize: 12,
-                  }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="days"
-                  stroke={CHART_COLORS.brand}
-                  strokeWidth={2}
-                  dot={{ r: 3, fill: CHART_COLORS.brand }}
-                  name="أيام الإجازة"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="requests"
-                  stroke={CHART_COLORS.warn}
-                  strokeWidth={2}
-                  dot={{ r: 3, fill: CHART_COLORS.warn }}
-                  name="عدد الطلبات"
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            <LeavesTrendChart
+              data={leaves.by_month}
+              colors={{ brand: CHART_COLORS.brand, warn: CHART_COLORS.warn }}
+            />
           ) : (
             <p className="grid h-56 place-items-center text-xs text-muted">لا توجد بيانات إجازات في هذه الفترة</p>
           )}
@@ -288,33 +265,7 @@ export default function AnalyticsPage() {
         <div className="rounded-xl border border-hairline bg-surface p-4">
           <h3 className="mb-3 text-sm font-semibold text-ink">حسب النوع</h3>
           {leaves && leaves.by_type.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie
-                  data={leaves.by_type}
-                  dataKey="days"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={70}
-                  label={(entry) => `${entry.name}`}
-                  labelLine={false}
-                  style={{ fontSize: 11 }}
-                >
-                  {leaves.by_type.map((_, i) => (
-                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    background: 'rgb(255 255 255)',
-                    border: '1px solid rgb(228 232 239)',
-                    borderRadius: 8,
-                    fontSize: 12,
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+            <LeavesByTypeChart data={leaves.by_type} colors={PIE_COLORS} />
           ) : (
             <p className="grid h-56 place-items-center text-xs text-muted">—</p>
           )}
@@ -326,22 +277,10 @@ export default function AnalyticsPage() {
         <div className="lg:col-span-2 rounded-xl border border-hairline bg-surface p-4">
           <h3 className="mb-3 text-sm font-semibold text-ink">التوزيع حسب القسم</h3>
           {employees && employees.by_department.length > 0 ? (
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={employees.by_department} margin={{ top: 5, right: 10, left: 10, bottom: 40 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgb(228 232 239)" />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} stroke="rgb(91 100 120)" angle={-30} textAnchor="end" />
-                <YAxis tick={{ fontSize: 10 }} stroke="rgb(91 100 120)" allowDecimals={false} />
-                <Tooltip
-                  contentStyle={{
-                    background: 'rgb(255 255 255)',
-                    border: '1px solid rgb(228 232 239)',
-                    borderRadius: 8,
-                    fontSize: 12,
-                  }}
-                />
-                <Bar dataKey="count" fill={CHART_COLORS.brand} radius={[4, 4, 0, 0]} name="عدد الموظفين" />
-              </BarChart>
-            </ResponsiveContainer>
+            <EmployeesByDepartmentChart
+              data={employees.by_department}
+              color={CHART_COLORS.brand}
+            />
           ) : (
             <p className="grid h-56 place-items-center text-xs text-muted">لا توجد أقسام</p>
           )}

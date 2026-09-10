@@ -6,6 +6,7 @@ namespace App\Modules\Requests\Repositories;
 
 use App\Models\Employee;
 use App\Models\Request as RequestModel;
+use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -102,12 +103,18 @@ class RequestRepository
 
         // `from`/`to` bound the submission window inclusively — matching
         // the admin UI filter labels ("من تاريخ" / "إلى تاريخ").
+        //
+        // Bare where() on the TIMESTAMP column so MySQL can use any index
+        // on submitted_at. whereDate() wraps the column in DATE(...) which
+        // disqualifies every index that covers it. To keep the inclusive
+        // "to" semantics we compare against the start of the next day
+        // exclusively — same set of rows, index-friendly plan.
         if (! empty($filters['from'])) {
-            $query->whereDate('submitted_at', '>=', $filters['from']);
+            $query->where('submitted_at', '>=', $filters['from']);
         }
 
         if (! empty($filters['to'])) {
-            $query->whereDate('submitted_at', '<=', $filters['to']);
+            $query->where('submitted_at', '<', Carbon::parse($filters['to'])->addDay());
         }
     }
 }

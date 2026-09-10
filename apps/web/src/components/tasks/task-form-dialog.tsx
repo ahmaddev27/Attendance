@@ -124,7 +124,6 @@ export function TaskFormDialog({ open, onOpenChange, task, defaultParentTask }: 
     queryKey: ['tasks', 'detail', parentTaskId],
     queryFn: async () => (await tasksApi.get(parentTaskId!)).data.data,
     enabled: open && !!parentTaskId,
-    staleTime: 60_000,
   });
 
   React.useEffect(() => {
@@ -144,14 +143,12 @@ export function TaskFormDialog({ open, onOpenChange, task, defaultParentTask }: 
     queryKey: ['task-statuses'],
     queryFn: async () => (await taskStatusesApi.list()).data.data,
     enabled: open,
-    staleTime: 60_000,
   });
 
   const { data: priorities } = useQuery({
     queryKey: ['task-priorities'],
     queryFn: async () => (await taskPrioritiesApi.list()).data.data,
     enabled: open,
-    staleTime: 60_000,
   });
 
   const sortedStatuses = React.useMemo(

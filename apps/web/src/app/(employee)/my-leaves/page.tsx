@@ -34,7 +34,12 @@ import { myLeavesApi } from '@/lib/api/endpoints/leaves';
 import { formatDate } from '@/lib/attendance-format';
 import type { LeaveRequest } from '@/lib/api/types';
 
-const CANCELLABLE_STATUSES: LeaveRequest['status'][] = ['draft', 'pending'];
+// `approved` is included because the backend `LeaveRequestService::cancel`
+// permits self-cancellation of an already-approved leave as long as
+// `assertMinNotice` still passes (the leave type's `min_notice_days`
+// window hasn't closed). If the notice window has elapsed the backend
+// returns 422 and the toast on the mutation surfaces the reason.
+const CANCELLABLE_STATUSES: LeaveRequest['status'][] = ['draft', 'pending', 'approved'];
 
 export default function MyLeavesPage() {
   const queryClient = useQueryClient();

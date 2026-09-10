@@ -10,14 +10,28 @@ use Illuminate\Support\Facades\Http;
 use Throwable;
 
 /**
- * Jordan Telecom (MTC) HTTP SMS gateway.
+ * Jordan Telecom (MTC) HTTPS SMS gateway.
  *
- * The MTC endpoint is a plain HTTP GET that returns a text body shaped
- * like "<code>@<detail>" — `0@...` means the message was accepted, any
- * other numeric prefix is a provider error. There is no JSON envelope
- * and no bearer token: credentials are query-string params. The endpoint
- * URL, timeout, credentials and sender ID all come from config so ops
- * can rotate them via env without a redeploy of the gateway.
+ * The MTC endpoint returns a text body shaped like "<code>@<detail>" —
+ * `0@...` means the message was accepted, any other numeric prefix is
+ * a provider error. There is no JSON envelope and no bearer token:
+ * credentials are form-encoded body params on the POST request. The
+ * endpoint URL, timeout, credentials and sender ID all come from
+ * config so ops can rotate them via env without a redeploy.
+ *
+ * Transport: we POST to `https://sms.mtcegypt.com.eg/sendsms.aspx`
+ * with the credentials in the request body — never in the URL —
+ * because:
+ *   1. HTTP (the legacy V1 URL) is plaintext on the wire.
+ *   2. GET puts credentials in the query string, which Laravel's
+ *      HTTP client captures verbatim into logs, reverse-proxy access
+ *      logs, and any Http::fake() debug output.
+ *   3. TLS + form body keeps them off both the wire and the log.
+ *
+ * The legacy V1 endpoint (`http://int.mtcsms.com/sendsms.aspx`) still
+ * works for backward-compat if an operator points the setting there,
+ * but new deployments should use the HTTPS V2 host — the endpoint
+ * validator now requires an `https://` URL.
  *
  * Every failure path (non-2xx response, non-zero provider code, thrown
  * exception) is caught and returned as `SmsResult::failure()` — see the
@@ -57,13 +71,20 @@ final class MtcSmsGateway implements SmsGateway
         // lookup to (string), so a missing/blank setting arrives here as
         // "" — which is NOT null, so ?? leaves the empty string in place
         // and Guzzle throws "URI must include a scheme and host". Empty
-        // OR null → fallback to the pinned V1 URL.
+        // OR null → fallback to the pinned HTTPS V2 URL so a fresh
+        // install never sends credentials over plaintext HTTP.
         $endpoint = ($this->endpoint !== null && $this->endpoint !== '')
             ? $this->endpoint
-            : 'http://int.mtcsms.com/sendsms.aspx';
+            : 'https://sms.mtcegypt.com.eg/sendsms.aspx';
 
         try {
-            $response = Http::timeout($this->timeout)->get($endpoint, [
+            // POST with `asForm()` so credentials + message body go in
+            // the request body as application/x-www-form-urlencoded —
+            // NOT in the URL. This keeps them out of the Laravel HTTP
+            // client's default request logging (which captures the URL
+            // verbatim, query string and all) and out of any upstream
+            // reverse-proxy access log. TLS covers the wire itself.
+            $response = Http::timeout($this->timeout)->asForm()->post($endpoint, [
                 'username' => (string) $this->username,
                 'password' => (string) $this->password,
                 'from' => $this->sender,

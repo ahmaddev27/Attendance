@@ -115,8 +115,11 @@ class SettingsController extends Controller
             // internal metadata IP (169.254.169.254, localhost, *.local)
             // in `sms.mtc_endpoint` would turn `POST /settings/test/sms`
             // into an SSRF probe of internal infrastructure. Refuse any
-            // host outside the fixed provider allow-list.
-            'sms.mtc_endpoint' => ['nullable', 'string', 'url:http,https', 'max:500', $this->endpointHostRule()],
+            // host outside the fixed provider allow-list. The scheme
+            // is pinned to HTTPS — the SMS gateway POSTs the account
+            // credentials in the request body, so plaintext HTTP would
+            // leak them on the wire.
+            'sms.mtc_endpoint' => ['nullable', 'string', 'url:https', 'max:500', $this->endpointHostRule()],
             'whatsapp' => 'array',
             'whatsapp.*' => 'nullable|string|max:500',
             // The WhatsApp endpoint isn't in the UI schema today but the
@@ -159,6 +162,22 @@ class SettingsController extends Controller
                     group: $group,
                     encrypt: $encrypted,
                 );
+
+                // Every settings rotation is audit-worthy. Log per-key so
+                // the audit trail lands even when the operator changes
+                // several keys at once. We record only a SHA-256 of the
+                // new value — logging the plaintext would defeat the
+                // encryption-at-rest guarantee that makes the encrypted
+                // column worth having in the first place.
+                activity('settings')
+                    ->causedBy($request->user())
+                    ->withProperties([
+                        'key' => $key,
+                        'group' => $group,
+                        'encrypted' => $encrypted,
+                        'value_hash' => hash('sha256', (string) $value),
+                    ])
+                    ->log('setting_updated');
             }
         }
 
@@ -178,6 +197,18 @@ class SettingsController extends Controller
         $data = $request->validate([
             'to' => ['required', 'email', 'max:200'],
         ]);
+
+        // Audit-log the probe BEFORE dispatching — a failed send is still
+        // an operator action worth recording (someone touched settings).
+        // We log the destination hash and endpoint identifier, never the
+        // recipient plaintext.
+        activity('settings')
+            ->causedBy($request->user())
+            ->withProperties([
+                'endpoint' => 'mail',
+                'to_hash' => hash('sha256', (string) $data['to']),
+            ])
+            ->log('settings_probe_sent');
 
         try {
             Mail::raw(
@@ -211,6 +242,14 @@ class SettingsController extends Controller
         $data = $request->validate([
             'to' => ['required', 'string', 'max:32'],
         ]);
+
+        activity('settings')
+            ->causedBy($request->user())
+            ->withProperties([
+                'endpoint' => 'sms',
+                'to_hash' => hash('sha256', (string) $data['to']),
+            ])
+            ->log('settings_probe_sent');
 
         try {
             $result = $sms->sendNow(
@@ -273,6 +312,14 @@ class SettingsController extends Controller
         $data = $request->validate([
             'to' => ['required', 'string', 'max:32'],
         ]);
+
+        activity('settings')
+            ->causedBy($request->user())
+            ->withProperties([
+                'endpoint' => 'whatsapp',
+                'to_hash' => hash('sha256', (string) $data['to']),
+            ])
+            ->log('settings_probe_sent');
 
         try {
             $result = $wa->sendNow(

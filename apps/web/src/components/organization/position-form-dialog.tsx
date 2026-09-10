@@ -86,7 +86,6 @@ export function PositionFormDialog({ open, onOpenChange, position, defaultDepart
     queryKey: ['departments', 'picker'],
     queryFn: async () => (await departmentsApi.list({ per_page: 200, is_active: true })).data.data,
     enabled: open,
-    staleTime: 60_000,
   });
 
   const mutation = useMutation({

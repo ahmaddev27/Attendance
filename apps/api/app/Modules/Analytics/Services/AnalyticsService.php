@@ -36,7 +36,15 @@ class AnalyticsService
      */
     private const VERSION = 'v1';
 
-    private const CACHE_TTL = 300; // 5 min
+    /**
+     * Two-value TTL for Cache::flexible (stale-while-revalidate). Between
+     * FRESH and STALE the first caller regenerates while everyone else is
+     * served the stale hit — that's what shields us from a stampede when
+     * five heavy grouped queries would otherwise re-run in lockstep the
+     * instant the key expires under concurrent admin load.
+     */
+    private const CACHE_FRESH_TTL = 280; // seconds
+    private const CACHE_STALE_TTL = 300; // seconds
 
     public function __construct(
         private readonly AttendanceAnalyticsService $attendance,
@@ -72,17 +80,22 @@ class AnalyticsService
     }
 
     /**
-     * Wrap a lookup with Cache::remember and attach a `meta.cached_at`
+     * Wrap a lookup with Cache::flexible and attach a `meta.cached_at`
      * timestamp to the response — the frontend renders it as "آخر تحديث"
      * so the user knows how fresh the numbers are without triggering a
      * manual refetch. Timestamp is written on cache-write; a hit returns
      * the original write time.
+     *
+     * `flexible` (Laravel 11.23+) implements stale-while-revalidate on top
+     * of the underlying cache lock, which is what prevents the stampede:
+     * only one worker rebuilds, everyone else keeps reading the stale row
+     * for the last ~20s of the TTL window.
      */
     private function cached(string $endpoint, AnalyticsFiltersRequest $filters, \Closure $compute): array
     {
         $key = sprintf('analytics:%s:%s:%s', self::VERSION, $endpoint, $filters->cacheKey());
 
-        return Cache::remember($key, self::CACHE_TTL, function () use ($compute, $filters) {
+        return Cache::flexible($key, [self::CACHE_FRESH_TTL, self::CACHE_STALE_TTL], function () use ($compute, $filters) {
             return [
                 'data' => $compute(),
                 'meta' => [

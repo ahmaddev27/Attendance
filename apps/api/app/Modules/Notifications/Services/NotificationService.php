@@ -103,6 +103,13 @@ class NotificationService
             return;
         }
 
+        // Prime the two relations TaqatNotification::via() reads on each
+        // recipient (pushTokens for the push-channel gate, employee for
+        // the sms/whatsapp phone lookup). Without this, every approver in
+        // the fanout triggers 2 lazy loads at notification-send time — a
+        // classic N+1 that scales with approver-count per step.
+        $approvers->load(['pushTokens:id,user_id', 'employee:id,phone']);
+
         // Each approver gets their own dedup key so the loop still catches
         // "same request re-forwarded to me twice in 30s" per-approver.
         foreach ($approvers as $approver) {

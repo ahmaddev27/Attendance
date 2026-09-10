@@ -30,6 +30,7 @@ export type AttendanceExportParams = {
   year: number;
   month: number;
   department_id?: number;
+  employee_id?: number;
   format?: 'csv' | 'xlsx' | 'pdf';
 };
 

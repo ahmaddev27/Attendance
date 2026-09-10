@@ -55,6 +55,16 @@ class GlobalSearchService
      */
     private function searchEmployees(string $term, int $limit): array
     {
+        // Non-privileged callers must not be able to enumerate the employee
+        // directory via search — the results would leak full_name +
+        // employee_number of every hit to any authenticated user. Only
+        // privileged readers (view-reports / manage-workflows) see the
+        // full employees index; everyone else gets an empty branch and
+        // must reach their own profile through /auth/me.
+        if ($this->ownEmployeeIdIfScoped() !== null) {
+            return [];
+        }
+
         return Employee::search($term)
             ->take($limit)
             ->get()
@@ -74,7 +84,26 @@ class GlobalSearchService
      */
     private function searchTasks(string $term, int $limit): array
     {
-        return Task::search($term)
+        $query = Task::search($term);
+
+        // Non-privileged callers see ONLY the tasks they created or that
+        // are assigned to them. Before this scoping, `/api/search?q=...`
+        // leaked task titles + descriptions across the whole org to any
+        // authenticated user.
+        //
+        // ->query() (instead of ->where()) scopes on the SQL hydration
+        // query rather than as a Meilisearch filter — keeps the fix
+        // independent of whether created_by / assigned_to are configured
+        // as filterable attributes in the search index.
+        $ownEmployeeId = $this->ownEmployeeIdIfScoped();
+        if ($ownEmployeeId !== null) {
+            $query->query(fn ($q) => $q->where(function ($w) use ($ownEmployeeId) {
+                $w->where('created_by', $ownEmployeeId)
+                    ->orWhere('assigned_to', $ownEmployeeId);
+            }));
+        }
+
+        return $query
             ->take($limit)
             ->get()
             ->map(fn (Task $task) => [

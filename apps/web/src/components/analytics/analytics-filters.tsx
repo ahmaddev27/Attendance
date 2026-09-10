@@ -42,13 +42,11 @@ export function AnalyticsFiltersBar({ value, onChange }: Props) {
   const { data: departments } = useQuery({
     queryKey: ['departments', 'analytics-filter'],
     queryFn: async () => (await departmentsApi.list({ per_page: 100, is_active: true })).data.data,
-    staleTime: 60_000,
   });
   const { data: teams } = useQuery({
     queryKey: ['teams', 'analytics-filter', value.department_id],
     queryFn: async () =>
       (await teamsApi.list({ per_page: 100, department_id: value.department_id, is_active: true })).data.data,
-    staleTime: 60_000,
   });
   const { data: employees } = useQuery({
     queryKey: ['employees', 'analytics-filter', value.department_id, value.team_id],
@@ -60,7 +58,6 @@ export function AnalyticsFiltersBar({ value, onChange }: Props) {
           team_id: value.team_id,
         })
       ).data.data,
-    staleTime: 60_000,
   });
 
   const applyPreset = (id: Preset) => {

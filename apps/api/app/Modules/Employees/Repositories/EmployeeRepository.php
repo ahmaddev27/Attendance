@@ -16,7 +16,7 @@ class EmployeeRepository
      *
      * @var list<string>
      */
-    private const WITH = ['position', 'department', 'team', 'directManager'];
+    private const WITH = ['position', 'department', 'team', 'directManager', 'workSchedule'];
 
     /**
      * Lock the employees table's current max employee_number for update.

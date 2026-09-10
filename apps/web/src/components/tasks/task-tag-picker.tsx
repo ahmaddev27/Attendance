@@ -25,7 +25,6 @@ export function TaskTagPicker({ value, onChange, disabled }: TaskTagPickerProps)
   const { data: allTags } = useQuery({
     queryKey: ['task-tags'],
     queryFn: async () => (await taskTagsApi.list()).data.data,
-    staleTime: 60_000,
   });
 
   const toggleTag = (tag: TaskTag) => {

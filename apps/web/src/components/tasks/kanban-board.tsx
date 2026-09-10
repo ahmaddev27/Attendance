@@ -46,7 +46,6 @@ export function KanbanBoard({ onTaskClick }: KanbanBoardProps) {
   const { data: statuses, isLoading: statusesLoading } = useQuery({
     queryKey: ['task-statuses'],
     queryFn: async () => (await taskStatusesApi.list()).data.data,
-    staleTime: 60_000,
   });
 
   const { data: board, isLoading: boardLoading } = useQuery({

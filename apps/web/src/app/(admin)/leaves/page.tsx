@@ -71,7 +71,6 @@ export default function LeavesPage() {
   const { data: leaveTypes } = useQuery({
     queryKey: ['leave-types', 'filter-options'],
     queryFn: async () => (await leaveTypesApi.list()).data.data,
-    staleTime: 60_000,
   });
 
   const { data, isLoading, isFetching } = useQuery({

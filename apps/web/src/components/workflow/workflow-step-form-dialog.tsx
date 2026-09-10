@@ -120,7 +120,6 @@ export function WorkflowStepFormDialog({ open, onOpenChange, workflowId, step, n
     queryKey: ['employees', 'hydrate', hydratedEmployeeId],
     queryFn: async () => (await employeesApi.get(hydratedEmployeeId as number)).data.data,
     enabled: open && !!hydratedEmployeeId && !Number.isNaN(hydratedEmployeeId),
-    staleTime: 60_000,
   });
 
   React.useEffect(() => {

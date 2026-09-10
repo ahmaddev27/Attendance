@@ -8,6 +8,7 @@ use App\Models\Position;
 use App\Modules\Organization\Repositories\PositionRepository;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Validation\ValidationException;
 
 class PositionService
 {
@@ -55,6 +56,16 @@ class PositionService
 
     public function delete(Position $position): bool
     {
+        // Guard against silent orphaning: employees assigned to this
+        // position would either be nulled out by a cascade or trigger
+        // a raw 1451 FK error. Force reassignment before deletion so
+        // the org chart stays consistent.
+        if ($position->employees()->count() > 0) {
+            throw ValidationException::withMessages([
+                'id' => 'لا يمكن حذف المسمى الوظيفي بينما يوجد موظفون معينون عليه.',
+            ]);
+        }
+
         return $this->positions->delete($position);
     }
 }

@@ -55,7 +55,6 @@ export default function MyTasksPage() {
   const { data: statuses } = useQuery({
     queryKey: ['task-statuses'],
     queryFn: async () => (await taskStatusesApi.list()).data.data,
-    staleTime: 60_000,
   });
 
   const listParams = {

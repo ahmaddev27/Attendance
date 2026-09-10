@@ -224,9 +224,22 @@ class EmployeeService
             // New user — assign the default 'employee' role additively so
             // downstream policy checks work. syncRoles is intentionally NOT
             // used here (see below).
-            if (Role::query()->where('name', 'employee')->exists()) {
-                $user->assignRole('employee');
+            //
+            // If the `employee` role is missing, fail loudly instead of
+            // silently creating a role-less user. A role-less user still
+            // authenticates but every policy check falls through to deny,
+            // so the operator sees "created successfully" and the new
+            // hire sees "forbidden" on every screen — a debugging nightmare
+            // that only surfaces when the deploy skipped the seeder or
+            // someone renamed the role.
+            if (! Role::query()->where('name', 'employee')->where('guard_name', 'web')->exists()) {
+                throw new \RuntimeException(
+                    'The `employee` role must be seeded before onboarding users. '
+                    .'Run: php artisan db:seed --class=RolePermissionSeeder'
+                );
             }
+
+            $user->assignRole('employee');
         } else {
             $user->password = Hash::make($plaintextPassword);
             $user->is_active = true;

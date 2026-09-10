@@ -35,7 +35,12 @@ class StoreEmployeeRequest extends FormRequest
             'position_id' => ['nullable', 'integer', 'exists:positions,id'],
             'department_id' => ['nullable', 'integer', 'exists:departments,id'],
             'team_id' => ['nullable', 'integer', 'exists:teams,id'],
-            'work_schedule_id' => ['nullable', 'integer', 'exists:work_schedules,id'],
+            // A schedule is mandatory: the kiosk check-in flow classifies
+            // late/early against it, and the monthly summary rolls up
+            // expected working days from it. An employee without a
+            // schedule silently breaks both — the FE Zod layer already
+            // rejects it, mirror that on the server.
+            'work_schedule_id' => ['required', 'integer', 'exists:work_schedules,id'],
             'direct_manager_id' => ['nullable', 'integer', 'exists:employees,id'],
             'employment_type' => ['required', new Enum(EmploymentType::class)],
             'joining_date' => ['required', 'date'],

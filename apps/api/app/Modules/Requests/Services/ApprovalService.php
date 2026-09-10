@@ -195,10 +195,6 @@ class ApprovalService
                 'decided_at' => now(),
             ]);
 
-            // TODO: scopePendingForApprover should exclude requests
-            // forwarded-away by this approver so the original approver's
-            // inbox no longer surfaces items they handed off.
-
             return $this->requests->findOrFail($locked->id);
         });
 

@@ -116,7 +116,6 @@ export function DepartmentFormDialog({ open, onOpenChange, department }: Departm
     queryKey: ['departments', 'parent-picker'],
     queryFn: async () => (await departmentsApi.list({ per_page: 200 })).data.data,
     enabled: open,
-    staleTime: 60_000,
   });
 
   const invalidParentIds = React.useMemo(() => {

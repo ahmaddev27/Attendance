@@ -12,6 +12,11 @@ let logoutInFlight = false;
 
 export type User = {
   id: number;
+  // Linked employee row's id (nullable — legacy users can be
+  // provisioned without an Employee). Needed so the request-detail
+  // dialog can compare a workflow step's `approver_ref` (an EMPLOYEE
+  // id, not a USER id) against the current viewer.
+  employee_id: number | null;
   employee_number: number;
   name: string;
   email: string;

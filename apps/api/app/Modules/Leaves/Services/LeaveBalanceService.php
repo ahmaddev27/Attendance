@@ -86,6 +86,24 @@ class LeaveBalanceService
                 'reason' => $reason,
             ]);
 
+            // Persist a structured audit trail in the activity_log table
+            // (spatie/laravel-activitylog). Log::info is fine for ops
+            // visibility, but a granted-days event MUST land in the same
+            // durable, filterable audit stream that the compliance UI
+            // reads — otherwise an HR user with `approve-leaves` can hand
+            // out arbitrary balance with no in-app trace.
+            activity('leave-balance')
+                ->causedBy(auth()->user())
+                ->performedOn($balance)
+                ->withProperties([
+                    'delta' => $delta,
+                    'reason' => $reason,
+                    'employee_id' => $employeeId,
+                    'leave_type_id' => $leaveTypeId,
+                    'year' => $year,
+                ])
+                ->log('balance_adjusted');
+
             return $balance->refresh();
         });
     }
@@ -100,10 +118,14 @@ class LeaveBalanceService
         return DB::transaction(function () use ($employee, $leaveType, $year) {
             $balance = $this->balances->getOrCreateForYear($employee->id, $leaveType->id, $year, lockForUpdate: true);
 
+            // Bare where() range on the DATE column so an index on
+            // (employee_id, start_date) can be used — whereYear() wraps the
+            // column in YEAR(...) and disqualifies any such index.
             $baseQuery = LeaveRequest::query()
                 ->where('employee_id', $employee->id)
                 ->where('leave_type_id', $leaveType->id)
-                ->whereYear('start_date', $year);
+                ->where('start_date', '>=', "{$year}-01-01")
+                ->where('start_date', '<', ($year + 1) . '-01-01');
 
             $balance->used = (clone $baseQuery)->where('status', LeaveStatus::Approved)->sum('days');
             $balance->pending = (clone $baseQuery)->where('status', LeaveStatus::Pending)->sum('days');

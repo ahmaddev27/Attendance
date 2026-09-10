@@ -85,8 +85,8 @@ class LeaveAnalyticsService
     {
         return $query
             ->join('leave_types as lt', 'lt.id', '=', 'lr.leave_type_id')
-            ->selectRaw('lt.name_ar as name, SUM(lr.days) as days, COUNT(*) as requests')
-            ->groupBy('lt.id', 'lt.name_ar')
+            ->selectRaw('lt.name as name, SUM(lr.days) as days, COUNT(*) as requests')
+            ->groupBy('lt.id', 'lt.name')
             ->orderByDesc('days')
             ->get()
             ->map(fn ($row) => [

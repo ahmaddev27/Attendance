@@ -48,6 +48,9 @@ type DeviceFormState = {
   allowed_lng: string;
   allowed_radius_meters: string;
   ip_whitelist: string;
+  enforce_geo: boolean;
+  enforce_ip: boolean;
+  qr_rotates_every_seconds: string;
   is_active: boolean;
 };
 
@@ -57,6 +60,12 @@ const EMPTY_FORM: DeviceFormState = {
   allowed_lng: '',
   allowed_radius_meters: '',
   ip_whitelist: '',
+  enforce_geo: false,
+  enforce_ip: false,
+  // 0 = printed-poster mode (no rotation). Default kept as the string form
+  // of the schema default so the input renders a numeric placeholder rather
+  // than an empty box on the "create" flow.
+  qr_rotates_every_seconds: '0',
   is_active: true,
 };
 
@@ -67,6 +76,9 @@ function deviceToForm(device: AttendanceDevice): DeviceFormState {
     allowed_lng: device.allowed_lng?.toString() ?? '',
     allowed_radius_meters: device.allowed_radius_meters?.toString() ?? '',
     ip_whitelist: (device.ip_whitelist ?? []).join('\n'),
+    enforce_geo: Boolean(device.enforce_geo),
+    enforce_ip: Boolean(device.enforce_ip),
+    qr_rotates_every_seconds: device.qr_rotates_every_seconds?.toString() ?? '0',
     is_active: device.is_active,
   };
 }
@@ -78,12 +90,18 @@ function formToPayload(form: DeviceFormState): AttendanceDevicePayload {
     .map((line) => line.trim())
     .filter(Boolean);
 
+  const rotateRaw = form.qr_rotates_every_seconds.trim();
+  const rotateSeconds = rotateRaw === '' ? 0 : Number(rotateRaw);
+
   return {
     name: form.name.trim(),
     allowed_lat: toNumberOrNull(form.allowed_lat),
     allowed_lng: toNumberOrNull(form.allowed_lng),
     allowed_radius_meters: toNumberOrNull(form.allowed_radius_meters),
     ip_whitelist: ipList.length > 0 ? ipList : null,
+    enforce_geo: form.enforce_geo,
+    enforce_ip: form.enforce_ip,
+    qr_rotates_every_seconds: Number.isFinite(rotateSeconds) ? rotateSeconds : 0,
     is_active: form.is_active,
   };
 }
@@ -206,18 +224,40 @@ export default function AttendanceDevicesPage() {
               <TableRow key={device.id}>
                 <TableCell className="font-medium text-ink">{device.name}</TableCell>
                 <TableCell>
-                  {device.allowed_lat != null && device.allowed_lng != null ? (
-                    <span className="num" dir="ltr">
-                      {device.allowed_lat}, {device.allowed_lng}
-                    </span>
-                  ) : (
-                    <span className="text-xs text-muted">غير محدد</span>
-                  )}
+                  <div className="flex flex-col gap-1">
+                    {device.allowed_lat != null && device.allowed_lng != null ? (
+                      <span className="num" dir="ltr">
+                        {device.allowed_lat}, {device.allowed_lng}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted">غير محدد</span>
+                    )}
+                    <Badge
+                      className={
+                        device.enforce_geo
+                          ? 'w-fit border-transparent bg-success-soft text-success'
+                          : 'w-fit border-transparent bg-surface-2 text-muted'
+                      }
+                    >
+                      {device.enforce_geo ? 'التقييد الجغرافي: مفعل' : 'التقييد الجغرافي: معطل'}
+                    </Badge>
+                  </div>
                 </TableCell>
                 <TableCell>
-                  <span className="num" dir="ltr">
-                    {device.ip_whitelist?.length ?? 0}
-                  </span>
+                  <div className="flex flex-col gap-1">
+                    <span className="num" dir="ltr">
+                      {device.ip_whitelist?.length ?? 0}
+                    </span>
+                    <Badge
+                      className={
+                        device.enforce_ip
+                          ? 'w-fit border-transparent bg-success-soft text-success'
+                          : 'w-fit border-transparent bg-surface-2 text-muted'
+                      }
+                    >
+                      {device.enforce_ip ? 'تقييد IP: مفعل' : 'تقييد IP: معطل'}
+                    </Badge>
+                  </div>
                 </TableCell>
                 <TableCell>
                   <Badge
@@ -327,6 +367,18 @@ export default function AttendanceDevicesPage() {
                 placeholder="اختياري — بدون تحديد نطاق المسافة"
               />
             </div>
+            <div className="flex items-center justify-between rounded-lg border border-hairline p-3">
+              <div>
+                <Label className="text-sm font-medium text-ink">تفعيل التقييد الجغرافي</Label>
+                <p className="mt-0.5 text-xs text-muted">
+                  عند التفعيل يُرفض المسح خارج نطاق الإحداثيات المسموح بها
+                </p>
+              </div>
+              <Switch
+                checked={form.enforce_geo}
+                onCheckedChange={(checked) => setForm({ ...form, enforce_geo: checked })}
+              />
+            </div>
             <div>
               <Label className="text-xs font-semibold text-ink-2">قائمة IP المسموح بها</Label>
               <Textarea
@@ -336,6 +388,32 @@ export default function AttendanceDevicesPage() {
                 dir="ltr"
                 rows={3}
                 placeholder={'عنوان IP واحد لكل سطر\nاتركه فارغاً للسماح لأي عنوان'}
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border border-hairline p-3">
+              <div>
+                <Label className="text-sm font-medium text-ink">تفعيل تقييد عناوين IP</Label>
+                <p className="mt-0.5 text-xs text-muted">
+                  عند التفعيل يجب أن يكون IP الموظف ضمن القائمة المُعرَّفة أعلاه
+                </p>
+              </div>
+              <Switch
+                checked={form.enforce_ip}
+                onCheckedChange={(checked) => setForm({ ...form, enforce_ip: checked })}
+              />
+            </div>
+            <div>
+              <Label className="text-xs font-semibold text-ink-2">
+                مدة تدوير رمز QR (بالثواني) — 0 = لا يدور أبداً
+              </Label>
+              <Input
+                type="number"
+                min={0}
+                value={form.qr_rotates_every_seconds}
+                onChange={(e) => setForm({ ...form, qr_rotates_every_seconds: e.target.value })}
+                className="mt-1.5 num"
+                dir="ltr"
+                placeholder="0"
               />
             </div>
             <div className="flex items-center justify-between rounded-lg border border-hairline p-3">

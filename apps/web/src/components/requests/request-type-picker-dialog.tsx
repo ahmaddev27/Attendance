@@ -26,7 +26,6 @@ export function RequestTypePickerDialog({ open, onOpenChange, onSelect }: Reques
     queryKey: ['request-types', 'picker'],
     queryFn: async () => (await requestTypesApi.list()).data.data,
     enabled: open,
-    staleTime: 60_000,
   });
 
   const activeTypes = (requestTypes ?? [])

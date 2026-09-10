@@ -127,7 +127,6 @@ export function RequestTypeFormDialog({ open, onOpenChange, requestType }: Reque
     queryKey: ['workflows', 'picker'],
     queryFn: async () => (await workflowsApi.list()).data.data,
     enabled: open,
-    staleTime: 60_000,
   });
 
   const mutation = useMutation({

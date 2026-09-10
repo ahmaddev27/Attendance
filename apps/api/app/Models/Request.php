@@ -164,6 +164,18 @@ class Request extends Model
 
         return $query
             ->where('status', RequestStatus::Pending)
+            // Symmetric with the forwarded-to inclusion in the OR block
+            // below: once $employee forwards a request on its current
+            // step, that request must LEAVE their inbox for as long as
+            // the forward remains in force. Without this an approver
+            // who hands a request off still sees it — and both they and
+            // the forwarded-to employee can act on it.
+            ->whereDoesntHave('approvals', function (Builder $approval) use ($employee) {
+                $approval->where('action', ApprovalAction::Forwarded)
+                    ->where('approver_id', $employee->id)
+                    ->where('decided_at', '>=', Carbon::now()->subDays(self::FORWARD_WINDOW_DAYS))
+                    ->whereColumn('workflow_step_id', 'requests.current_step_id');
+            })
             ->where(function (Builder $q) use ($employee, $roleNames, $formFieldMatchIds) {
                 $q->whereHas('currentStep', function (Builder $step) use ($employee) {
                     $step->where('approver_type', ApproverType::SpecificEmployee)

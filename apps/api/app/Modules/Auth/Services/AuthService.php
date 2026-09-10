@@ -11,6 +11,22 @@ use Illuminate\Validation\ValidationException;
 
 class AuthService
 {
+    /**
+     * A pre-computed 12-round bcrypt hash used to burn wall-clock time on
+     * the "unknown identifier" branch of login(). Without this, an
+     * unknown identifier short-circuits before Hash::check() runs, and
+     * the ~150ms cost of a real bcrypt check leaks whether the account
+     * exists — an attacker can enumerate valid employee_numbers by
+     * timing alone. Doing a throwaway Hash::check() against this fixed
+     * hash equalises the two branches.
+     *
+     * The plaintext behind this hash is intentionally never reachable
+     * from configured user rows (arbitrary long random string) and its
+     * cost matches the framework default so timing parity holds even
+     * as the real user's hash was written by bcrypt-12.
+     */
+    private const DUMMY_BCRYPT_HASH = '$2y$12$vHRsN4N94.ksJQcwqlVTp..4SoCKuit6XxxqVtvHJIg/yxWpRaviy';
+
     public function __construct(
         private readonly UserRepository $users,
     ) {}
@@ -43,7 +59,19 @@ class AuthService
             ? $this->users->findActiveByEmail($identifier)
             : $this->users->findActiveByEmployeeNumber((int) $identifier);
 
-        if (! $user || ! Hash::check($password, $user->password)) {
+        if (! $user) {
+            // Burn the same wall-clock a real Hash::check would cost so
+            // "unknown identifier" and "wrong password" are timing-
+            // indistinguishable. Result is discarded — the throw is the
+            // real outcome. See DUMMY_BCRYPT_HASH for rationale.
+            Hash::check($password, self::DUMMY_BCRYPT_HASH);
+
+            throw ValidationException::withMessages([
+                'identifier' => __('auth.failed'),
+            ]);
+        }
+
+        if (! Hash::check($password, $user->password)) {
             throw ValidationException::withMessages([
                 'identifier' => __('auth.failed'),
             ]);

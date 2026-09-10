@@ -36,8 +36,10 @@ import {
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import { LeaveTypeBadge } from '@/components/leaves/leave-type-badge';
+import { leaveTypesApi } from '@/lib/api/endpoints/leave-types';
 import { myLeavesApi } from '@/lib/api/endpoints/leaves';
 import { estimateWorkingDays } from '@/lib/leave-format';
+import type { LeaveType } from '@/lib/api/types';
 
 const submitLeaveSchema = z
   .object({
@@ -95,13 +97,32 @@ export function SubmitLeaveDialog({ open, onOpenChange }: SubmitLeaveDialogProps
     staleTime: 30_000,
   });
 
+  // Non-balance-based leave types (unpaid leave, etc.) never appear in the
+  // employee's /me/balances response — `LeaveBalanceService::accrueForYear`
+  // only seeds rows for balance-based types. Fetch the full catalog and
+  // merge the leftover, active non-balance types below so the picker
+  // exposes every type the employee is actually allowed to request.
+  const { data: leaveTypes } = useQuery({
+    queryKey: ['leave-types'],
+    queryFn: async () => (await leaveTypesApi.list()).data.data,
+    enabled: open,
+  });
+
   const leaveTypeId = form.watch('leave_type_id');
   const startDate = form.watch('start_date');
   const endDate = form.watch('end_date');
   const estimatedDays = estimateWorkingDays(startDate, endDate);
 
   const selectedBalance = (balances ?? []).find((balance) => balance.leave_type_id === leaveTypeId);
-  const requiresAttachment = selectedBalance?.leave_type?.requires_attachment ?? false;
+  const nonBalanceTypes: LeaveType[] = React.useMemo(() => {
+    const balanceTypeIds = new Set((balances ?? []).map((b) => b.leave_type_id));
+    return (leaveTypes ?? []).filter(
+      (type) => type.is_active && !type.is_balance_based && !balanceTypeIds.has(type.id),
+    );
+  }, [balances, leaveTypes]);
+  const selectedNonBalanceType = nonBalanceTypes.find((type) => type.id === leaveTypeId);
+  const requiresAttachment =
+    (selectedBalance?.leave_type?.requires_attachment ?? selectedNonBalanceType?.requires_attachment) ?? false;
 
   const mutation = useMutation({
     mutationFn: (values: SubmitLeaveFormValues) =>
@@ -159,7 +180,7 @@ export function SubmitLeaveDialog({ open, onOpenChange }: SubmitLeaveDialogProps
                     <SelectContent>
                       {(balances ?? []).map((balance) =>
                         balance.leave_type ? (
-                          <SelectItem key={balance.leave_type_id} value={String(balance.leave_type_id)}>
+                          <SelectItem key={`balance-${balance.leave_type_id}`} value={String(balance.leave_type_id)}>
                             <div className="flex w-full items-center justify-between gap-3">
                               <LeaveTypeBadge leaveType={balance.leave_type} />
                               <span className="num text-xs text-muted">متاح: {balance.available}</span>
@@ -167,6 +188,14 @@ export function SubmitLeaveDialog({ open, onOpenChange }: SubmitLeaveDialogProps
                           </SelectItem>
                         ) : null
                       )}
+                      {nonBalanceTypes.map((type) => (
+                        <SelectItem key={`type-${type.id}`} value={String(type.id)}>
+                          <div className="flex w-full items-center justify-between gap-3">
+                            <LeaveTypeBadge leaveType={type} />
+                            <span className="text-xs text-muted">غير مستند إلى رصيد</span>
+                          </div>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <FormMessage />
