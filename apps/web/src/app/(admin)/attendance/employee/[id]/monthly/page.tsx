@@ -7,8 +7,8 @@ import { useQuery } from '@tanstack/react-query';
 import { ArrowRight } from 'lucide-react';
 
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { MonthPicker } from '@/components/ui/month-picker';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmployeeAvatar } from '@/components/attendance/employee-avatar';
 import { MonthlyCalendarGrid } from '@/components/attendance/monthly-calendar-grid';
@@ -111,15 +111,11 @@ export default function EmployeeMonthlyAttendancePage() {
               )}
             </div>
           </div>
-          <div>
+          <div className="w-full sm:w-56">
             <Label className="text-xs font-semibold text-ink-2">الشهر</Label>
-            <Input
-              type="month"
-              value={yearMonth}
-              onChange={(e) => setYearMonth(e.target.value)}
-              className="mt-1.5"
-              dir="ltr"
-            />
+            <div className="mt-1.5">
+              <MonthPicker value={yearMonth} onChange={setYearMonth} />
+            </div>
           </div>
         </div>
       </div>
