@@ -144,8 +144,11 @@ test('submitting a leave request that requires an attachment without one is reje
 
 test('submitting with an attachment when one is required succeeds', function () {
     $employee = makeEmployeeWithSchedule(allDaysWorkSchedule());
-    $user = $employee->user;
-    $this->actingAsEmployeeUser($employee);
+    // actingAsEmployeeUser both creates the User and authenticates it —
+    // the returned User carries the id we need for the attachment_path
+    // prefix. Reading $employee->user here would be null (the helper
+    // creates the User row; it doesn't backfill the employee relation).
+    $user = $this->actingAsEmployeeUser($employee);
 
     $leaveType = LeaveType::factory()->create(['min_notice_days' => 0, 'requires_attachment' => true]);
 
