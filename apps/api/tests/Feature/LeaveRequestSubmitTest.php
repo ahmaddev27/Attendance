@@ -144,9 +144,18 @@ test('submitting a leave request that requires an attachment without one is reje
 
 test('submitting with an attachment when one is required succeeds', function () {
     $employee = makeEmployeeWithSchedule(allDaysWorkSchedule());
+    $user = $employee->user;
     $this->actingAsEmployeeUser($employee);
 
     $leaveType = LeaveType::factory()->create(['min_notice_days' => 0, 'requires_attachment' => true]);
+
+    // The attachment_path rule (SubmitLeaveRequestRequest) enforces:
+    //   1. prefix must be "leave-attachments/{caller.user.id}/"
+    //   2. no path traversal
+    //   3. file must exist on the `local` disk
+    // Simulate a legitimate prior upload by materialising the file.
+    $path = "leave-attachments/{$user->id}/medical-note.pdf";
+    \Illuminate\Support\Facades\Storage::disk('local')->put($path, 'fake pdf bytes');
 
     $start = Carbon::today()->addDays(10);
 
@@ -154,7 +163,7 @@ test('submitting with an attachment when one is required succeeds', function () 
         'leave_type_id' => $leaveType->id,
         'start_date' => $start->toDateString(),
         'end_date' => $start->copy()->addDay()->toDateString(),
-        'attachment_path' => 'attachments/medical-note.pdf',
+        'attachment_path' => $path,
     ]);
 
     $response->assertCreated();
