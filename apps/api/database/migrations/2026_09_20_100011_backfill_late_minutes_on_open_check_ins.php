@@ -25,6 +25,12 @@ return new class extends Migration
         Attendance::query()
             ->with('employee.workSchedule')
             ->whereNotNull('check_in_at')
+            // Filter strictly to OPEN sessions — the migration's whole
+            // point per its filename. Without this, closed rows whose
+            // late_minutes were legitimately corrected to 0 by an admin
+            // (or by the full check-out compute) get re-stamped here,
+            // undoing that correction on every re-run.
+            ->whereNull('check_out_at')
             ->where(function ($q) {
                 $q->whereNull('late_minutes')->orWhere('late_minutes', 0);
             })

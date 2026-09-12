@@ -41,6 +41,24 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
         ]);
+
+        // Trust every hop's X-Forwarded-* headers so `$request->ip()` /
+        // `->isSecure()` / `->getHost()` return the ORIGINAL client
+        // values, not the reverse-proxy peer. Without this, every
+        // rate-limiter key falls onto the proxy's own IP (bypassing
+        // per-client caps) and every "session cookie only over https"
+        // check trips on the plain-http proxy → app hop.
+        //
+        // `at: '*'` trusts any proxy — safe behind a single-hop reverse
+        // proxy (Apache/nginx/Cloudflare terminating TLS in front of this
+        // container). Ops can tighten to the actual proxy CIDR once the
+        // topology stabilises.
+        $middleware->trustProxies(at: '*', headers:
+            \Illuminate\Http\Request::HEADER_X_FORWARDED_FOR
+            | \Illuminate\Http\Request::HEADER_X_FORWARDED_HOST
+            | \Illuminate\Http\Request::HEADER_X_FORWARDED_PORT
+            | \Illuminate\Http\Request::HEADER_X_FORWARDED_PROTO
+        );
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

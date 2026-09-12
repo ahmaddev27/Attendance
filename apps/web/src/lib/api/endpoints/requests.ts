@@ -25,10 +25,17 @@ export const requestsApi = {
     apiClient.post(`/requests/${id}/forward`, payload),
 };
 
-/** Logged-in employee's own requests — submit, track, cancel. */
+/** Logged-in employee's own requests — submit, track, cancel, resubmit. */
 export const myRequestsApi = {
   list: () => apiClient.get<PaginatedResponse<RequestSummary>>('/me/requests'),
   get: (id: number) => apiClient.get<ApiResource<RequestDetail>>(`/me/requests/${id}`),
   submit: (payload: SubmitRequestPayload) => apiClient.post<ApiResource<RequestDetail>>('/me/requests', payload),
   cancel: (id: number) => apiClient.post(`/me/requests/${id}/cancel`),
+  /**
+   * Resubmit a Returned request with (typically edited) form_data.
+   * The backend keeps the original request_number and routes the
+   * request back through the workflow's first step.
+   */
+  resubmit: (id: number, formData: Record<string, unknown>) =>
+    apiClient.post<ApiResource<RequestDetail>>(`/me/requests/${id}/resubmit`, { form_data: formData }),
 };

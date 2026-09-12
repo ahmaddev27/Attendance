@@ -10,9 +10,14 @@ import type {
   PaginatedResponse,
 } from '@/lib/api/types';
 
+/**
+ * The upload endpoint no longer emits a `download_url` — attachments
+ * live on a private disk and are only reachable via a short-lived
+ * signed URL surfaced by `attachment_url` on the LeaveRequest resource
+ * once the leave row exists.
+ */
 export type LeaveAttachmentUpload = {
   attachment_path: string;
-  download_url: string;
 };
 
 /** Admin-facing leave request CRUD + approval workflow. */

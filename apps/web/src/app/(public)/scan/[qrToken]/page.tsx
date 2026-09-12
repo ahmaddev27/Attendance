@@ -14,10 +14,10 @@ import { scanApi, type ScanCheckPayload } from '@/lib/api/endpoints/attendance';
 import { formatTime } from '@/lib/attendance-format';
 import type { ScanDeviceInfo, ScanResponse, ScanStatus } from '@/lib/api/types';
 
-// The kiosk remembers the last successful employee here so the same person
-// returning to check out doesn't have to retype their number. Cleared on
-// the "تغيير" button below.
-const STORAGE_KEY = 'taqat_kiosk_employee_number';
+// Kiosks are shared devices: the page intentionally does NOT remember the
+// previous employee across mounts. Auto-loading the last number greeted
+// whoever walked up next by name and made an accidental check-in one tap
+// away for the wrong person.
 
 type ViewState =
   | 'loading-device'
@@ -34,33 +34,6 @@ type ReadyPayload = {
   // Which action the ready screen offers based on the status.state.
   action: 'check-in' | 'check-out';
 };
-
-function readSavedNumber(): number | null {
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const n = Number(raw);
-    return Number.isFinite(n) && n > 0 ? n : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveNumber(n: number) {
-  try {
-    window.localStorage.setItem(STORAGE_KEY, String(n));
-  } catch {
-    // Private browsing / storage disabled — kiosk still works.
-  }
-}
-
-function clearSavedNumber() {
-  try {
-    window.localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    /* ignore */
-  }
-}
 
 function getCurrentPosition(): Promise<GeolocationPosition | null> {
   // Geolocation is best-effort: if the device doesn't have it or the user
@@ -100,15 +73,9 @@ export default function KioskScanPage() {
     try {
       const info = await scanApi.deviceInfo(qrToken);
       setDevice(info);
-
-      // If the last employee is remembered on this browser, jump straight
-      // to the status probe. Otherwise show the number-entry screen.
-      const saved = readSavedNumber();
-      if (saved) {
-        probeStatus(saved);
-      } else {
-        setView('entering-number');
-      }
+      // Always start at the number-entry screen — shared kiosks must not
+      // pre-fill a previous employee (see comment at top of file).
+      setView('entering-number');
     } catch {
       setView('device-error');
     }
@@ -144,7 +111,6 @@ export default function KioskScanPage() {
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message
         ?? 'رقم وظيفي غير معروف أو غير مفعّل';
       toast.error(message);
-      clearSavedNumber();
       setView('entering-number');
     }
   };
@@ -171,7 +137,6 @@ export default function KioskScanPage() {
         ready.action === 'check-in'
           ? await scanApi.checkIn(payload)
           : await scanApi.checkOut(payload);
-      saveNumber(response.attendance.employee.employee_number);
       setSuccessResult({ action: ready.action, response });
       setView('success');
       // After a beat, reset back to the number-entry screen so the next
@@ -202,7 +167,6 @@ export default function KioskScanPage() {
   };
 
   const changeEmployee = () => {
-    clearSavedNumber();
     setReady(null);
     setEmployeeNumberInput('');
     setView('entering-number');
@@ -270,7 +234,17 @@ export default function KioskScanPage() {
         {view === 'ready' && ready && (
           <div className="flex w-full max-w-sm flex-col items-center gap-6">
             <LiveClock />
-            <p className="text-2xl font-bold text-ink">مرحباً {ready.status.employee.full_name}</p>
+            {/*
+              The /scan/status endpoint no longer returns full_name (that
+              would let anyone with a valid kiosk QR walk employee_number
+              and enumerate the directory). Greet by the employee number
+              here; the actual name is revealed on the success screen
+              after check-in / check-out.
+            */}
+            <p className="text-2xl font-bold text-ink">
+              مرحباً — الرقم الوظيفي{' '}
+              <span className="num" dir="ltr">{ready.status.employee.employee_number}</span>
+            </p>
             {ready.action === 'check-out' && ready.status.check_in_at && (
               <p className="text-sm text-muted">
                 سُجّل حضورك عند{' '}
@@ -303,7 +277,7 @@ export default function KioskScanPage() {
               className="mt-1 flex items-center gap-2 text-sm text-muted underline-offset-4 hover:text-ink hover:underline"
             >
               <RefreshCw className="h-3.5 w-3.5" />
-              لست {ready.status.employee.full_name}؟ تغيير
+              ليس رقمك؟ تغيير
             </button>
           </div>
         )}
@@ -312,7 +286,8 @@ export default function KioskScanPage() {
           <div className="flex w-full max-w-sm flex-col items-center gap-4 text-center">
             <CheckCircle2 className="h-16 w-16 text-success" />
             <p className="text-xl font-semibold text-ink">
-              أنهيت دوامك يا {ready.status.employee.full_name}
+              أنهيت دوامك — الرقم الوظيفي{' '}
+              <span className="num" dir="ltr">{ready.status.employee.employee_number}</span>
             </p>
             {ready.status.check_in_at && ready.status.check_out_at && (
               <p className="text-sm text-muted">

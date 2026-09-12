@@ -65,7 +65,9 @@ class EmployeeLeavesController extends Controller
      * Upload a supporting document for a leave request BEFORE it's
      * submitted. The returned `attachment_path` is what the client then
      * passes back on POST /me/leaves so the eventual LeaveRequest row
-     * can reference the stored file.
+     * can reference the stored file — the file itself lives on a
+     * private disk, so no download URL is issued at upload time; the
+     * resource layer builds a signed one once a LeaveRequest exists.
      *
      * We resolve the employee first so an unlinked user (no Employee
      * profile) can't fill disk space with orphaned files that will

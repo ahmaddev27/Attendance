@@ -164,9 +164,27 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/leave-requests/{leave_request}/approve', [LeaveRequestController::class, 'approve']);
         Route::post('/leave-requests/{leave_request}/reject', [LeaveRequestController::class, 'reject']);
         Route::post('/leave-requests/{leave_request}/cancel', [LeaveRequestController::class, 'cancel']);
+        // Admin uploads a supporting document when submitting on behalf
+        // of an employee. Same private-disk scheme + path-authorization
+        // rule as the self-service /me/leaves/attachment upload — the
+        // admin's own user_id namespaces the file, and
+        // SubmitLeaveRequestRequest's `attachment_path` rule accepts
+        // whichever user_id prefix belongs to the currently signed-in
+        // caller.
+        Route::post('/leave-requests/attachment', [LeaveRequestController::class, 'uploadAttachment']);
         Route::get('/leave-balances', [LeaveBalanceController::class, 'index']); // ?employee_id=X&year=Y
         Route::post('/leave-balances/adjust', [LeaveBalanceController::class, 'adjust']);
     });
+
+    // Attachment download. Signed URL (min 30) built by
+    // LeaveRequestResource::attachment_url; the `signed` middleware
+    // rejects any URL whose signature is invalid/expired. On top of
+    // that, the controller itself authorizes by (owner OR HR) — so a
+    // leaked signed link can only be used by someone already logged
+    // in as an authorized party.
+    Route::get('/leave-requests/{leaveRequest}/attachment', [LeaveRequestController::class, 'downloadAttachment'])
+        ->name('leaves.attachment.download')
+        ->middleware('signed');
 
     // Employee self-service (uses request()->user()->employee)
     Route::prefix('me/leaves')->group(function () {
@@ -178,7 +196,14 @@ Route::middleware('auth:sanctum')->group(function () {
         // requires_attachment leave types. Kept as its own route (not
         // nested under a {leave_request}) because the LeaveRequest row
         // doesn't exist yet at upload time.
-        Route::post('/attachment', [EmployeeLeavesController::class, 'uploadAttachment']);
+        //
+        // Throttled at 20/hour/user (falls back to IP for the
+        // unauthenticated hit that would 401 anyway) to bound an
+        // attacker or compromised session mass-uploading files into the
+        // temp bucket without ever creating a leave request — the write
+        // path was otherwise unbounded.
+        Route::post('/attachment', [EmployeeLeavesController::class, 'uploadAttachment'])
+            ->middleware('throttle:20,60');
         Route::post('/{leave_request}/cancel', [EmployeeLeavesController::class, 'cancel']);
     });
 });
@@ -287,6 +312,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/{request}', [MyRequestsController::class, 'show']);
         Route::post('/', [MyRequestsController::class, 'store']); // submit
         Route::post('/{request}/cancel', [MyRequestsController::class, 'cancel']);
+        // Resubmit a request that a workflow step returned to the
+        // employee for edits — reuses the returned form_data as the
+        // starting point on the FE. Ownership is enforced controller
+        // side; the state-guard (must be Returned) is service side.
+        Route::post('/{request}/resubmit', [MyRequestsController::class, 'resubmit']);
     });
 
     // Admin-only endpoints — protected by spatie/laravel-permission.

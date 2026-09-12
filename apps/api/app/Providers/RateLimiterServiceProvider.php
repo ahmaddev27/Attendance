@@ -69,21 +69,37 @@ class RateLimiterServiceProvider extends ServiceProvider
         //   • Enumeration: probing many identifiers from one origin to see
         //     which ones trigger a delivery (indirectly leaked via carrier
         //     receipts, though not via our own response body).
-        // Keyed by "identifier|ip" so a shared-NAT office still allows
-        // legitimate distinct accounts through while a single attacker on
-        // one IP can't grind through the numeric employee_number space.
+        //
+        // TWO independent limits — Laravel enforces the tightest of them.
+        // The earlier composite "identifier|ip" bucket was bypassable by
+        // an attacker rotating IPs while blasting the SAME identifier (SMS
+        // flood against one employee). Splitting the bucket in two:
+        //   • 5/hour per identifier — caps SMS flood against one number
+        //     regardless of source IP diversity.
+        //   • 20/hour per IP        — caps aggregate enumeration cost per
+        //     origin walking many identifiers.
         RateLimiter::for('password-reset-request', function (Request $request) {
             $identifier = mb_strtolower(trim((string) $request->input('identifier')));
-            return Limit::perHour(3)->by($identifier.'|'.$request->ip());
+
+            return [
+                Limit::perHour(5)->by('pwreset-id:'.$identifier),
+                Limit::perHour(20)->by('pwreset-ip:'.$request->ip()),
+            ];
         });
 
-        // Self-service password reset — VERIFY step. Tighter per-minute
-        // cap because each attempt is an OTP guess; with a 6-digit space
-        // (1e6) even at 5/min it takes ~140 days to brute-force the
-        // 10-minute window, which is safely infeasible.
+        // Self-service password reset — VERIFY step. Same split rationale:
+        // per-identifier cap protects one account from OTP brute-force
+        // regardless of source IP; per-IP cap bounds any single origin's
+        // aggregate blast. With a 6-digit space (1e6) even at 5/min per
+        // identifier it takes ~140 days to brute-force the 10-minute
+        // window, which is safely infeasible.
         RateLimiter::for('password-reset-attempt', function (Request $request) {
             $identifier = mb_strtolower(trim((string) $request->input('identifier')));
-            return Limit::perMinute(5)->by($identifier.'|'.$request->ip());
+
+            return [
+                Limit::perMinute(5)->by('pwattempt-id:'.$identifier),
+                Limit::perMinute(20)->by('pwattempt-ip:'.$request->ip()),
+            ];
         });
 
         // Task creation: 60 per hour per user. Defense-in-depth against a

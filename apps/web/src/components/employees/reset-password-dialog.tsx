@@ -8,7 +8,6 @@ import { toast } from 'sonner';
 import { apiClient } from '@/lib/api/client';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { Employee } from '@/lib/api/types';
 
@@ -29,35 +28,32 @@ type Props = {
 };
 
 /**
- * Two modes in one dialog:
- *   • Auto-generate — hit the backend with an empty body, get a random
- *     12-char password back, show it once.
- *   • Set manually — admin types a password, we send it as-is, backend
- *     hashes it.
+ * Auto-generate flow only. The backend always mints a random 12-character
+ * password and SMS-es it to the employee; there is no admin-supplied
+ * password path (EmployeeController::resetPassword ignored it, which made
+ * the previous "manual" tab a lie — the admin's typed value was silently
+ * discarded and a random one was surfaced instead).
  *
- * The plaintext is only shown here, once, in the response step. If the
- * admin closes the dialog before copying, they have to reset again — no
- * plaintext is ever stored on the server after hashing.
+ * The plaintext is shown here once as a fallback for when the SMS didn't
+ * reach the employee. If the admin closes the dialog before copying, they
+ * have to reset again — no plaintext is ever stored on the server after
+ * hashing.
  */
 export function ResetPasswordDialog({ employee, open, onOpenChange }: Props) {
-  const [mode, setMode] = React.useState<'auto' | 'manual'>('auto');
-  const [manualPassword, setManualPassword] = React.useState('');
   const [result, setResult] = React.useState<ResetResponse['data'] | null>(null);
 
   // Reset local state whenever the dialog is opened for a new employee.
   React.useEffect(() => {
     if (open) {
-      setMode('auto');
-      setManualPassword('');
       setResult(null);
     }
   }, [open, employee?.id]);
 
   const mutation = useMutation({
-    mutationFn: async (payload: { password?: string }) => {
+    mutationFn: async () => {
       const { data } = await apiClient.post<ResetResponse>(
         `/employees/${employee!.id}/reset-password`,
-        payload,
+        {},
       );
       return data.data;
     },
@@ -76,14 +72,6 @@ export function ResetPasswordDialog({ employee, open, onOpenChange }: Props) {
       toast.error(msg);
     },
   });
-
-  const onSubmit = () => {
-    if (mode === 'manual' && manualPassword.length < 8) {
-      toast.error('كلمة السر يجب أن تكون 8 أحرف على الأقل');
-      return;
-    }
-    mutation.mutate(mode === 'manual' ? { password: manualPassword } : {});
-  };
 
   const copyPassword = async () => {
     if (!result) return;
@@ -113,52 +101,10 @@ export function ResetPasswordDialog({ employee, open, onOpenChange }: Props) {
               <span className="num" dir="ltr">#{employee.employee_number}</span>
             </p>
 
-            {/* Mode toggle */}
-            <div className="flex rounded-lg border border-hairline bg-ground p-1">
-              <button
-                type="button"
-                onClick={() => setMode('auto')}
-                className={
-                  'flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ' +
-                  (mode === 'auto'
-                    ? 'bg-brand text-white shadow-sm'
-                    : 'text-ink-2 hover:bg-surface hover:text-ink')
-                }
-              >
-                توليد تلقائي
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode('manual')}
-                className={
-                  'flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ' +
-                  (mode === 'manual'
-                    ? 'bg-brand text-white shadow-sm'
-                    : 'text-ink-2 hover:bg-surface hover:text-ink')
-                }
-              >
-                إدخال يدوي
-              </button>
-            </div>
-
-            {mode === 'manual' ? (
-              <div className="space-y-1.5">
-                <Label htmlFor="new-password" className="text-xs">كلمة السر الجديدة</Label>
-                <Input
-                  id="new-password"
-                  type="text"
-                  value={manualPassword}
-                  onChange={(e) => setManualPassword(e.target.value)}
-                  placeholder="8 أحرف على الأقل"
-                  dir="ltr"
-                  className="font-mono"
-                />
-              </div>
-            ) : (
-              <p className="rounded-lg bg-brand-soft/50 p-3 text-xs text-brand-ink">
-                سنولّد كلمة سر عشوائية بـ 12 حرفاً. ستظهر مرة واحدة فقط بعد الحفظ.
-              </p>
-            )}
+            <p className="rounded-lg bg-brand-soft/50 p-3 text-xs text-brand-ink">
+              سيتم توليد كلمة سر جديدة تلقائياً وإرسالها للموظف عبر SMS.
+              ستظهر مرة واحدة فقط بعد الحفظ لتتمكن من نسخها إن لزم الأمر.
+            </p>
           </div>
         )}
 
@@ -202,7 +148,7 @@ export function ResetPasswordDialog({ employee, open, onOpenChange }: Props) {
               </Button>
               <Button
                 type="button"
-                onClick={onSubmit}
+                onClick={() => mutation.mutate()}
                 disabled={mutation.isPending || !employee}
                 className="gap-2"
               >

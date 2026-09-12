@@ -252,7 +252,11 @@ export type ScanStatus = {
    * is done, kiosk shows a "see you tomorrow" state.
    */
   state: 'not_checked_in' | 'checked_in' | 'checked_out';
-  employee: { id: number; employee_number: number; full_name: string };
+  // Deliberately no `full_name` — /scan/status is unauthenticated and
+  // returning the name would let a QR-holder enumerate the directory by
+  // walking employee_number. The greeting name comes back only after a
+  // successful check-in POST (see ScanResponse.attendance.employee).
+  employee: { id: number; employee_number: number };
   check_in_at: string | null;
   check_out_at: string | null;
   device_name: string;

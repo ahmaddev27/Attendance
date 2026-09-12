@@ -7,13 +7,21 @@ namespace App\Modules\Leaves\Resources;
 use App\Models\LeaveRequest;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 
 /**
  * @mixin LeaveRequest
  */
 class LeaveRequestResource extends JsonResource
 {
+    /**
+     * How long a signed download URL for the attachment stays valid.
+     * Matches TaskAttachmentService::DOWNLOAD_LINK_LIFETIME_MINUTES so
+     * the two attachment surfaces behave the same from the client's
+     * perspective.
+     */
+    private const ATTACHMENT_LINK_LIFETIME_MINUTES = 30;
+
     /**
      * @return array<string, mixed>
      */
@@ -39,11 +47,17 @@ class LeaveRequestResource extends JsonResource
             'end_date' => $this->end_date?->toDateString(),
             'days' => (float) $this->days,
             'reason' => $this->reason,
-            // FE reads `attachment_url` on the leave-details dialog; the
-            // storage path was leaking as an internal-only key. Resolved
-            // to a public URL so the review flow can actually download.
+            // Attachments live on the private `local` disk (see
+            // LeaveAttachmentService). Never leak a public URL — the FE
+            // downloads via a short-lived signed route whose middleware
+            // gate authorizes the caller (owner or HR) inside the
+            // controller action.
             'attachment_url' => $this->attachment_path
-                ? Storage::disk('public')->url($this->attachment_path)
+                ? URL::temporarySignedRoute(
+                    'leaves.attachment.download',
+                    now()->addMinutes(self::ATTACHMENT_LINK_LIFETIME_MINUTES),
+                    ['leaveRequest' => $this->id],
+                )
                 : null,
             'status' => $this->status?->value,
             'reviewed_by' => $this->reviewed_by,

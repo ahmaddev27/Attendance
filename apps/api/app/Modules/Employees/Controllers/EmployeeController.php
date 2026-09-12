@@ -9,6 +9,7 @@ use App\Models\Employee;
 use App\Modules\Employees\Requests\StoreEmployeeRequest;
 use App\Modules\Employees\Requests\UpdateEmployeeRequest;
 use App\Modules\Employees\Resources\EmployeeResource;
+use App\Modules\Employees\Resources\EmployeeSummaryResource;
 use App\Modules\Employees\Services\EmployeeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -68,7 +69,10 @@ class EmployeeController extends Controller
      * own team_id (or their own row when they aren't on a team). Admins
      * with `manage-users` still get the full list via `/employees` — this
      * endpoint is the "who can I hand this task to" question a regular
-     * employee needs answered, no PII beyond name+number.
+     * employee needs answered, so it returns EmployeeSummaryResource
+     * (id / employee_number / full_name / avatar_url only) rather than
+     * the full EmployeeResource — a regular employee has no business
+     * enumerating their teammates' phone / email / birth date / notes.
      */
     public function myTeam(Request $request): AnonymousResourceCollection
     {
@@ -97,7 +101,7 @@ class EmployeeController extends Controller
             });
         }
 
-        return EmployeeResource::collection($query->limit(50)->get());
+        return EmployeeSummaryResource::collection($query->limit(50)->get());
     }
 
     /**

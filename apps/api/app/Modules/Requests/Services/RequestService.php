@@ -6,6 +6,9 @@ namespace App\Modules\Requests\Services;
 
 use App\Models\Employee;
 use App\Models\Request as RequestModel;
+use App\Models\User;
+use App\Models\WorkflowStep;
+use App\Modules\Notifications\Services\NotificationService;
 use App\Modules\Requests\Events\RequestSubmitted;
 use App\Modules\Requests\Repositories\RequestRepository;
 use App\Modules\Workflow\Repositories\RequestTypeRepository;
@@ -26,6 +29,8 @@ class RequestService
         private readonly RequestTypeRepository $requestTypes,
         private readonly RequestNumberGenerator $numberGenerator,
         private readonly FormSchemaValidator $formValidator,
+        private readonly ApproverResolver $approverResolver,
+        private readonly NotificationService $notifier,
     ) {}
 
     /**
@@ -44,9 +49,15 @@ class RequestService
         return $this->requests->paginateForEmployee($employee, $filters, $perPage);
     }
 
-    public function pendingForApprover(Employee $employee, int $perPage = 25): LengthAwarePaginator
+    /**
+     * @param  list<string>  $roleNames  Only used when $employee is null —
+     *                                    lets a bootstrap super-admin (no
+     *                                    linked Employee) still see requests
+     *                                    routed via SpecificRole steps.
+     */
+    public function pendingForApprover(?Employee $employee, int $perPage = 25, array $roleNames = []): LengthAwarePaginator
     {
-        return $this->requests->paginatePendingForApprover($employee, $perPage);
+        return $this->requests->paginatePendingForApprover($employee, $perPage, $roleNames);
     }
 
     public function find(int $id): RequestModel
@@ -71,12 +82,12 @@ class RequestService
 
         $this->formValidator->validate($requestType, $formData);
 
-        return DB::transaction(function () use ($employee, $requestType, $formData) {
+        [$request, $firstStep] = DB::transaction(function () use ($employee, $requestType, $formData) {
             $requestNumber = $this->numberGenerator->generate();
             $firstStep = $requestType->workflow->firstStep();
             $hasWorkflow = $firstStep !== null;
 
-            $request = $this->requests->create([
+            $created = $this->requests->create([
                 'request_number' => $requestNumber,
                 'employee_id' => $employee->id,
                 'request_type_id' => $requestType->id,
@@ -87,10 +98,20 @@ class RequestService
                 'completed_at' => $hasWorkflow ? null : now(),
             ]);
 
-            RequestSubmitted::dispatch($request);
-
-            return $request;
+            return [$created, $firstStep];
         });
+
+        // Post-commit fan-out (mirrors ApprovalService::approve's pattern) —
+        // event + first-step approver notifications live outside the
+        // transaction so a notifier failure can't roll back the create and
+        // a broadcast can't reach the frontend before the DB row exists.
+        RequestSubmitted::dispatch($request);
+
+        if ($firstStep !== null) {
+            $this->notifyFirstStepApprovers($request, $firstStep);
+        }
+
+        return $request;
     }
 
     /**
@@ -113,7 +134,7 @@ class RequestService
 
         $this->formValidator->validate($requestType, $formData);
 
-        return DB::transaction(function () use ($request, $requestType, $formData) {
+        [$fresh, $firstStep] = DB::transaction(function () use ($request, $requestType, $formData) {
             $firstStep = $requestType->workflow->firstStep();
             $hasWorkflow = $firstStep !== null;
 
@@ -125,12 +146,36 @@ class RequestService
                 'completed_at' => $hasWorkflow ? null : now(),
             ]);
 
-            $fresh = $this->requests->findOrFail($request->id);
-
-            RequestSubmitted::dispatch($fresh);
-
-            return $fresh;
+            return [$this->requests->findOrFail($request->id), $firstStep];
         });
+
+        RequestSubmitted::dispatch($fresh);
+
+        if ($firstStep !== null) {
+            $this->notifyFirstStepApprovers($fresh, $firstStep);
+        }
+
+        return $fresh;
+    }
+
+    /**
+     * Fan out the "new request awaiting your approval" notification to
+     * every approver resolved for the workflow's first step. Kept here
+     * (rather than as a listener on RequestSubmitted) so submit/resubmit
+     * share exactly one implementation and the notification is guaranteed
+     * to fire — no queue-configuration dependency and no silent drop when
+     * a listener isn't registered.
+     */
+    private function notifyFirstStepApprovers(RequestModel $request, WorkflowStep $firstStep): void
+    {
+        $approvers = $this->approverResolver->resolve($firstStep, $request);
+
+        $users = $approvers
+            ->map(fn (Employee $employee) => $employee->user)
+            ->filter(fn ($user) => $user instanceof User)
+            ->values();
+
+        $this->notifier->requestPendingApproval($request, $users);
     }
 
     /**

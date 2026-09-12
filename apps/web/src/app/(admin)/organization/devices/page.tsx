@@ -50,7 +50,6 @@ type DeviceFormState = {
   ip_whitelist: string;
   enforce_geo: boolean;
   enforce_ip: boolean;
-  qr_rotates_every_seconds: string;
   is_active: boolean;
 };
 
@@ -62,10 +61,6 @@ const EMPTY_FORM: DeviceFormState = {
   ip_whitelist: '',
   enforce_geo: false,
   enforce_ip: false,
-  // 0 = printed-poster mode (no rotation). Default kept as the string form
-  // of the schema default so the input renders a numeric placeholder rather
-  // than an empty box on the "create" flow.
-  qr_rotates_every_seconds: '0',
   is_active: true,
 };
 
@@ -78,7 +73,6 @@ function deviceToForm(device: AttendanceDevice): DeviceFormState {
     ip_whitelist: (device.ip_whitelist ?? []).join('\n'),
     enforce_geo: Boolean(device.enforce_geo),
     enforce_ip: Boolean(device.enforce_ip),
-    qr_rotates_every_seconds: device.qr_rotates_every_seconds?.toString() ?? '0',
     is_active: device.is_active,
   };
 }
@@ -90,6 +84,10 @@ function formToPayload(form: DeviceFormState): AttendanceDevicePayload {
     .map((line) => line.trim())
     .filter(Boolean);
 
+  // Rotation was removed as a user-facing feature — the QR is now
+  // permanent for the life of the device. The payload intentionally omits
+  // qr_rotates_every_seconds so the server keeps its existing value
+  // (already 0 for new devices per the schema default).
   return {
     name: form.name.trim(),
     allowed_lat: toNumberOrNull(form.allowed_lat),
@@ -98,11 +96,6 @@ function formToPayload(form: DeviceFormState): AttendanceDevicePayload {
     ip_whitelist: ipList.length > 0 ? ipList : null,
     enforce_geo: form.enforce_geo,
     enforce_ip: form.enforce_ip,
-    // Rotation was removed as a user-facing feature — the QR is now
-    // permanent for the life of the device. Sent as 0 so old rows on the
-    // server that still carry a non-zero window get flipped on the next
-    // edit.
-    qr_rotates_every_seconds: 0,
     is_active: form.is_active,
   };
 }

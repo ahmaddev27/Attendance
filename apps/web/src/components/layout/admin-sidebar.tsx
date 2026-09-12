@@ -118,7 +118,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'النظام',
     items: [
       { href: '/audit', label: 'سجل النشاط', icon: History, permissions: ['view-audit-logs'] },
-      { href: '/settings', label: 'الإعدادات', icon: Settings, permissions: ['manage-users'] },
+      { href: '/settings', label: 'الإعدادات', icon: Settings, permissions: ['manage-settings'] },
     ],
   },
 ];

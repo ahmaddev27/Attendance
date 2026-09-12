@@ -63,6 +63,40 @@ class NotificationService
         ));
     }
 
+    /**
+     * Notify each HR user with the `approve-leaves` permission that a
+     * new leave request has been submitted. Mirrors
+     * requestPendingApproval()'s fan-out shape: eager-loads the two
+     * relations TaqatNotification::via() reads to avoid an N+1 across
+     * approvers, and gives each recipient their own dedup key so a
+     * quick re-submission still surfaces per person.
+     *
+     * @param  Collection<int, User>  $approvers
+     */
+    public function leaveSubmitted(LeaveRequest $leave, Collection $approvers): void
+    {
+        if ($approvers->isEmpty()) {
+            return;
+        }
+
+        $approvers->load(['pushTokens:id,user_id', 'employee:id,phone']);
+
+        $employeeName = $leave->employee?->full_name ?? 'موظف';
+        $typeName = $leave->leaveType?->name ?? 'إجازة';
+        $start = $leave->start_date?->format('Y-m-d') ?? '';
+        $end = $leave->end_date?->format('Y-m-d') ?? '';
+
+        foreach ($approvers as $approver) {
+            $this->dispatch($approver, "leave-submitted:{$leave->id}", new TaqatNotification(
+                title: 'طلب إجازة جديد بانتظار موافقتك',
+                body: sprintf('%s — %s (%s → %s)', $employeeName, $typeName, $start, $end),
+                url: '/leaves',
+                icon: 'inbox',
+                meta: ['leave_request_id' => $leave->id],
+            ));
+        }
+    }
+
     public function requestDecided(RequestModel $request): void
     {
         $recipient = $request->employee?->user;
@@ -138,7 +172,7 @@ class NotificationService
         $this->dispatch($recipient, "task-assigned:{$task->id}", new TaqatNotification(
             title: 'تم إسناد مهمة إليك',
             body: $task->title,
-            url: '/my-tasks',
+            url: "/my-tasks/{$task->id}",
             icon: 'clipboard-check',
             meta: ['task_id' => $task->id],
         ));
@@ -161,6 +195,11 @@ class NotificationService
         $isDuplicate = ! Cache::add($cacheKey, 1, self::DEDUP_WINDOW);
 
         if ($isDuplicate) {
+            // Preserve every channel flag the caller set (sendSms /
+            // sendWhatsapp / sendPush / suppressMail) — the earlier
+            // partial clone was dropping them silently, which meant a
+            // deduped "leave decided" second event downgraded to
+            // database-only and skipped the SMS the caller expected.
             $notification = new TaqatNotification(
                 title: $notification->title,
                 body: $notification->body,
@@ -168,6 +207,10 @@ class NotificationService
                 icon: $notification->icon,
                 meta: $notification->meta,
                 suppressBroadcast: true,
+                suppressMail: $notification->suppressMail,
+                sendSms: $notification->sendSms,
+                sendWhatsapp: $notification->sendWhatsapp,
+                sendPush: $notification->sendPush,
             );
         }
 

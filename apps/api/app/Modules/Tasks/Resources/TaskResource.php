@@ -41,13 +41,21 @@ class TaskResource extends JsonResource
                 'code' => $this->priority->code,
                 'color' => $this->priority->color,
             ]),
+            // creator/assignee use the full EmployeeSummary shape (id,
+            // employee_number, full_name, avatar_url) so the FE avatar
+            // component can render a real image instead of falling back to
+            // initials, and the number column has a value to show.
             'creator' => $this->whenLoaded('creator', fn () => $this->creator === null ? null : [
                 'id' => $this->creator->id,
+                'employee_number' => $this->creator->employee_number,
                 'full_name' => $this->creator->full_name,
+                'avatar_url' => $this->creator->avatar_url,
             ]),
             'assignee' => $this->whenLoaded('assignee', fn () => $this->assignee === null ? null : [
                 'id' => $this->assignee->id,
+                'employee_number' => $this->assignee->employee_number,
                 'full_name' => $this->assignee->full_name,
+                'avatar_url' => $this->assignee->avatar_url,
             ]),
             'tags' => TaskTagResource::collection($this->whenLoaded('tags')),
 

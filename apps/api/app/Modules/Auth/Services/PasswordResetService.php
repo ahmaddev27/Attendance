@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Modules\Auth\Repositories\UserRepository;
 use App\Modules\Sms\Services\SmsService;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -130,9 +131,19 @@ class PasswordResetService
 
         // Any Sanctum token minted before this reset represents a
         // pre-compromise credential and must not survive the rotation.
-        // Session-based logins on web are wiped separately by the
-        // client re-authenticating via /auth/login.
         $user->tokens()->delete();
+
+        // Also wipe every persisted Sanctum-SPA session for this user —
+        // the web login stores auth in the `sessions` table (not in the
+        // tokens above), and a compromised session cookie would happily
+        // survive a password rotation without this. Guarded on the DB
+        // driver so a redis/array session-store test setup doesn't
+        // trip on the missing table.
+        if (config('session.driver') === 'database') {
+            DB::table(config('session.table', 'sessions'))
+                ->where('user_id', $user->id)
+                ->delete();
+        }
 
         // One-shot code — burn it so a replay of the same 6 digits
         // fails even inside the 10-minute window.
@@ -152,9 +163,30 @@ class PasswordResetService
             return null;
         }
 
-        return str_contains($identifier, '@')
-            ? $this->users->findActiveByEmail($identifier)
-            : $this->users->findActiveByEmployeeNumber((int) $identifier);
+        // Email path — any '@' flips to the email lookup (mirrors
+        // AuthService::login so both flows accept the same input shape).
+        if (str_contains($identifier, '@')) {
+            return $this->users->findActiveByEmail($identifier);
+        }
+
+        // Non-email must be a positive integer employee number. The
+        // previous version cast blindly via (int) $identifier, so an input
+        // like "abc" became 0 and matched employee_number = 0 (a
+        // non-existent row today, but a silent time-bomb the moment
+        // anyone seeds a zero-numbered account). ctype_digit rejects
+        // negatives, decimals, whitespace, and leading zeros' worth of
+        // ambiguity outright.
+        if (! ctype_digit($identifier)) {
+            return null;
+        }
+
+        $employeeNumber = (int) $identifier;
+
+        if ($employeeNumber <= 0) {
+            return null;
+        }
+
+        return $this->users->findActiveByEmployeeNumber($employeeNumber);
     }
 
     private function cacheKey(int $userId): string

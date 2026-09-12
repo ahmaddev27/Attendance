@@ -32,9 +32,16 @@ import { RequestTypeBadge } from '@/components/requests/request-type-badge';
 import { RequestTypePickerDialog } from '@/components/requests/request-type-picker-dialog';
 import { SubmitRequestDialog } from '@/components/requests/submit-request-dialog';
 import { myRequestsApi } from '@/lib/api/endpoints/requests';
+import { requestTypesApi } from '@/lib/api/endpoints/request-types';
 import { CANCELLABLE_REQUEST_STATUSES } from '@/lib/constants/request-options';
 import { formatDateTime } from '@/lib/request-format';
 import type { RequestSummary, RequestType } from '@/lib/api/types';
+
+type ResubmitTarget = {
+  requestId: number;
+  requestType: RequestType;
+  formData: Record<string, unknown>;
+};
 
 export default function MyRequestsPage() {
   const queryClient = useQueryClient();
@@ -48,6 +55,32 @@ export default function MyRequestsPage() {
   const [submittingType, setSubmittingType] = React.useState<RequestType | null>(null);
   const [viewingRequestId, setViewingRequestId] = React.useState<number | null>(null);
   const [cancelTarget, setCancelTarget] = React.useState<RequestSummary | null>(null);
+  const [resubmitTarget, setResubmitTarget] = React.useState<ResubmitTarget | null>(null);
+  const [resubmitLoadingId, setResubmitLoadingId] = React.useState<number | null>(null);
+
+  // Resubmit needs the full RequestType (for its form_schema) plus the
+  // returned request's own form_data — the summary row carries neither.
+  // Fetched lazily on click so the list page doesn't over-fetch for
+  // every request in the table.
+  const openResubmit = async (request: RequestSummary) => {
+    setResubmitLoadingId(request.id);
+    try {
+      const [detailRes, typeRes] = await Promise.all([
+        myRequestsApi.get(request.id),
+        requestTypesApi.get(request.request_type.id),
+      ]);
+      setResubmitTarget({
+        requestId: request.id,
+        requestType: typeRes.data.data,
+        formData: detailRes.data.data.form_data,
+      });
+    } catch (err) {
+      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(message || 'تعذر تحميل بيانات الطلب');
+    } finally {
+      setResubmitLoadingId(null);
+    }
+  };
 
   const cancelMutation = useMutation({
     mutationFn: (id: number) => myRequestsApi.cancel(id),
@@ -131,6 +164,19 @@ export default function MyRequestsPage() {
                     <Button type="button" variant="outline" size="sm" onClick={() => setViewingRequestId(request.id)}>
                       عرض
                     </Button>
+                    {request.status === 'returned' && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="text-brand-ink hover:bg-brand-soft"
+                        disabled={resubmitLoadingId === request.id}
+                        onClick={() => openResubmit(request)}
+                      >
+                        {resubmitLoadingId === request.id && <Spinner className="me-2" />}
+                        إعادة تقديم
+                      </Button>
+                    )}
                     {CANCELLABLE_REQUEST_STATUSES.includes(request.status) && (
                       <Button
                         type="button"
@@ -163,6 +209,14 @@ export default function MyRequestsPage() {
         open={!!submittingType}
         onOpenChange={(open) => !open && setSubmittingType(null)}
         requestType={submittingType}
+      />
+
+      <SubmitRequestDialog
+        open={!!resubmitTarget}
+        onOpenChange={(open) => !open && setResubmitTarget(null)}
+        requestType={resubmitTarget?.requestType ?? null}
+        resubmitRequestId={resubmitTarget?.requestId ?? null}
+        initialFormData={resubmitTarget?.formData ?? null}
       />
 
       <RequestDetailDialog

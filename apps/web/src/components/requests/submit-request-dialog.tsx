@@ -71,11 +71,27 @@ type SubmitRequestDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   requestType: RequestType | null;
+  /**
+   * When set, the dialog operates in "resubmit" mode against an existing
+   * Returned request instead of creating a new one — it pre-fills the
+   * form with `initialFormData` and POSTs to /me/requests/{id}/resubmit
+   * on submit. Keeping the same dialog for both flows means the form
+   * validation and field rendering stay in one place.
+   */
+  resubmitRequestId?: number | null;
+  initialFormData?: Record<string, unknown> | null;
 };
 
 /** Employee self-service submission — renders `requestType.form_schema` as a dynamic form. */
-export function SubmitRequestDialog({ open, onOpenChange, requestType }: SubmitRequestDialogProps) {
+export function SubmitRequestDialog({
+  open,
+  onOpenChange,
+  requestType,
+  resubmitRequestId,
+  initialFormData,
+}: SubmitRequestDialogProps) {
   const queryClient = useQueryClient();
+  const isResubmit = resubmitRequestId != null;
   const [values, setValues] = React.useState<Record<string, unknown>>({});
   const [employeeSelections, setEmployeeSelections] = React.useState<Record<string, EmployeeSummary | null>>({});
   const [errors, setErrors] = React.useState<Record<string, string>>({});
@@ -83,18 +99,25 @@ export function SubmitRequestDialog({ open, onOpenChange, requestType }: SubmitR
 
   React.useEffect(() => {
     if (open && requestType) {
-      setValues(buildDefaultValues(requestType.form_schema));
+      const defaults = buildDefaultValues(requestType.form_schema);
+      // Merge the returned request's own values on top of the schema's
+      // defaults so a field that has since been added to the schema
+      // still renders with its default, and every schema-known field
+      // still passes the client-side validator on second submit.
+      setValues(initialFormData ? { ...defaults, ...initialFormData } : defaults);
       setEmployeeSelections({});
       setErrors({});
       setApiError(null);
     }
-  }, [open, requestType]);
+  }, [open, requestType, initialFormData]);
 
   const mutation = useMutation({
     mutationFn: (formData: Record<string, unknown>) =>
-      myRequestsApi.submit({ request_type_id: requestType!.id, form_data: formData }),
+      isResubmit
+        ? myRequestsApi.resubmit(resubmitRequestId!, formData)
+        : myRequestsApi.submit({ request_type_id: requestType!.id, form_data: formData }),
     onSuccess: () => {
-      toast.success('تم إرسال الطلب بنجاح');
+      toast.success(isResubmit ? 'تم إعادة تقديم الطلب' : 'تم إرسال الطلب بنجاح');
       queryClient.invalidateQueries({ queryKey: ['my-requests'] });
       onOpenChange(false);
     },
@@ -114,7 +137,10 @@ export function SubmitRequestDialog({ open, onOpenChange, requestType }: SubmitR
         setErrors((prev) => ({ ...prev, ...fieldErrors }));
       }
 
-      setApiError(response?.data?.message || 'تعذر إرسال الطلب، حاول مرة أخرى');
+      setApiError(
+        response?.data?.message ||
+          (isResubmit ? 'تعذر إعادة تقديم الطلب، حاول مرة أخرى' : 'تعذر إرسال الطلب، حاول مرة أخرى'),
+      );
     },
   });
 
@@ -166,7 +192,7 @@ export function SubmitRequestDialog({ open, onOpenChange, requestType }: SubmitR
             </Button>
             <Button type="submit" disabled={mutation.isPending} className="bg-brand text-white hover:bg-brand-hover">
               {mutation.isPending && <Spinner className="text-white" />}
-              إرسال الطلب
+              {isResubmit ? 'إعادة تقديم' : 'إرسال الطلب'}
             </Button>
           </DialogFooter>
         </form>

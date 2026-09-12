@@ -93,17 +93,17 @@ class LeaveRequestService
 
         if (empty($data['attachment_path']) && $leaveType->requires_attachment) {
             throw ValidationException::withMessages([
-                'attachment_path' => 'This leave type requires a supporting attachment.',
+                'attachment_path' => 'هذا النوع من الإجازة يتطلب إرفاق ملف داعم.',
             ]);
         }
 
-        return DB::transaction(function () use ($employee, $leaveType, $startDate, $endDate, $days, $data) {
+        $leaveRequest = DB::transaction(function () use ($employee, $leaveType, $startDate, $endDate, $days, $data) {
             // Locked inside the transaction so a second, overlapping
             // submission racing this one sees it (or is seen by it) before
             // either commits.
             if ($this->requests->hasOverlapping($employee->id, $startDate, $endDate, lockForUpdate: true)) {
                 throw ValidationException::withMessages([
-                    'start_date' => 'This employee already has a pending or approved leave request overlapping these dates.',
+                    'start_date' => 'يوجد طلب إجازة معلّق أو موافق عليه للموظف يتداخل مع هذه التواريخ.',
                 ]);
             }
 
@@ -112,7 +112,7 @@ class LeaveRequestService
 
                 if ($balance->available < $days) {
                     throw ValidationException::withMessages([
-                        'days' => 'Insufficient leave balance for this request.',
+                        'days' => 'رصيد الإجازة غير كافٍ لهذا الطلب.',
                     ]);
                 }
 
@@ -130,6 +130,17 @@ class LeaveRequestService
                 'status' => LeaveStatus::Pending,
             ]);
         });
+
+        // Fan out to every HR user with the approve-leaves permission so
+        // the pending item shows up in their bell/toast immediately —
+        // before this, they only discovered new requests on manual
+        // refresh. Notification is fire-after-commit so a rolled-back
+        // transaction never triggers a stray alert.
+        $approvers = User::permission('approve-leaves')->get();
+        $fresh = $leaveRequest->fresh(['employee.user', 'leaveType']);
+        $this->notifier->leaveSubmitted($fresh, $approvers);
+
+        return $fresh;
     }
 
     public function approve(LeaveRequest $leaveRequest, User $admin): LeaveRequest
@@ -137,9 +148,20 @@ class LeaveRequestService
         return DB::transaction(function () use ($leaveRequest, $admin) {
             $locked = $this->requests->findForUpdate($leaveRequest->id);
 
+            // Self-approval guard: an admin with a linked Employee row must
+            // never be able to approve/reject their own leave request, even
+            // if they otherwise hold approve-leaves permission. Enforced
+            // after the row lock so a race between "resubmit" and the check
+            // can't slip past.
+            if ((int) $admin->employee?->id === (int) $locked->employee_id) {
+                throw ValidationException::withMessages([
+                    'employee_id' => 'لا يمكنك الموافقة على طلبك الشخصي أو رفضه.',
+                ]);
+            }
+
             if (! $locked->canBeApproved()) {
                 throw ValidationException::withMessages([
-                    'status' => 'Only pending leave requests can be approved.',
+                    'status' => 'يمكن الموافقة فقط على طلبات الإجازة المعلّقة.',
                 ]);
             }
 
@@ -167,9 +189,16 @@ class LeaveRequestService
         return DB::transaction(function () use ($leaveRequest, $admin, $rejectionReason) {
             $locked = $this->requests->findForUpdate($leaveRequest->id);
 
+            // Self-approval guard mirror — see approve() for rationale.
+            if ((int) $admin->employee?->id === (int) $locked->employee_id) {
+                throw ValidationException::withMessages([
+                    'employee_id' => 'لا يمكنك الموافقة على طلبك الشخصي أو رفضه.',
+                ]);
+            }
+
             if (! $locked->canBeRejected()) {
                 throw ValidationException::withMessages([
-                    'status' => 'Only pending leave requests can be rejected.',
+                    'status' => 'يمكن رفض طلبات الإجازة المعلّقة فقط.',
                 ]);
             }
 
@@ -212,7 +241,7 @@ class LeaveRequestService
 
             if (! $locked->canBeCancelled()) {
                 throw ValidationException::withMessages([
-                    'status' => 'This leave request can no longer be cancelled.',
+                    'status' => 'لا يمكن إلغاء هذا الطلب في وضعه الحالي.',
                 ]);
             }
 
@@ -257,7 +286,7 @@ class LeaveRequestService
     {
         if ($leaveRequest->status !== LeaveStatus::Draft) {
             throw ValidationException::withMessages([
-                'status' => 'Only draft leave requests can be deleted — cancel a submitted request instead.',
+                'status' => 'يمكن حذف الطلبات في وضع المسودة فقط — استخدم "إلغاء" للطلبات المُرسلة.',
             ]);
         }
 
@@ -270,7 +299,7 @@ class LeaveRequestService
 
         if (! $leaveType->is_active) {
             throw ValidationException::withMessages([
-                'leave_type_id' => 'This leave type is not currently active.',
+                'leave_type_id' => 'هذا النوع من الإجازة غير مفعّل حالياً.',
             ]);
         }
 
@@ -283,8 +312,16 @@ class LeaveRequestService
         $earliestAllowed = Carbon::today()->addDays($noticeDays);
 
         if ($startDate->lt($earliestAllowed)) {
+            // Two branches so the sentence reads naturally for either flow —
+            // submitting a new request vs cancelling an already-approved
+            // one. Day count is interpolated so translators can review the
+            // wording without regenerating strings per policy tweak.
+            $message = $action === 'cancelled'
+                ? "يتطلب هذا النوع من الإجازة إشعاراً مسبقاً بـ {$noticeDays} يوم على الأقل قبل موعد بدء الإجازة لإلغائها."
+                : "يتطلب هذا النوع من الإجازة إشعاراً مسبقاً بـ {$noticeDays} يوم على الأقل قبل تقديم الطلب.";
+
             throw ValidationException::withMessages([
-                $field => "This leave type requires at least {$noticeDays} day(s) notice before it can be {$action}.",
+                $field => $message,
             ]);
         }
     }
@@ -293,7 +330,7 @@ class LeaveRequestService
     {
         if ($endDate->lt($startDate)) {
             throw ValidationException::withMessages([
-                'end_date' => 'The end date cannot be before the start date.',
+                'end_date' => 'لا يمكن أن يكون تاريخ النهاية قبل تاريخ البداية.',
             ]);
         }
     }
@@ -331,7 +368,7 @@ class LeaveRequestService
 
         if ($consecutiveDays > $leaveType->max_consecutive_days) {
             throw ValidationException::withMessages([
-                'end_date' => "This leave type cannot be requested for more than {$leaveType->max_consecutive_days} consecutive day(s).",
+                'end_date' => "لا يمكن طلب هذا النوع من الإجازة لأكثر من {$leaveType->max_consecutive_days} يوم متتالٍ.",
             ]);
         }
     }

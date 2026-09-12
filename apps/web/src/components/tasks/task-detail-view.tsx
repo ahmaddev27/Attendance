@@ -570,7 +570,7 @@ export function TaskDetailView({ taskId, basePath }: TaskDetailViewProps) {
 
           <div className="space-y-1.5 border-t border-hairline pt-4 text-xs text-muted">
             <p>
-              أنشأها <span className="font-medium text-ink-2">{task.creator.full_name}</span> بتاريخ{' '}
+              أنشأها <span className="font-medium text-ink-2">{task.creator?.full_name ?? 'النظام'}</span> بتاريخ{' '}
               <span className="num" dir="ltr">
                 {formatDate(task.created_at.slice(0, 10))}
               </span>

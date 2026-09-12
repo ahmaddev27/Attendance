@@ -49,11 +49,16 @@ class RequestRepository
         return $this->paginate([...$filters, 'employee_id' => $employee->id], $perPage);
     }
 
-    public function paginatePendingForApprover(Employee $employee, int $perPage): LengthAwarePaginator
+    /**
+     * @param  list<string>  $roleNames  Passed through to the scope for the
+     *                                    unlinked-user branch (see
+     *                                    Request::scopePendingForApprover).
+     */
+    public function paginatePendingForApprover(?Employee $employee, int $perPage, array $roleNames = []): LengthAwarePaginator
     {
         return RequestModel::query()
             ->with(self::WITH)
-            ->pendingForApprover($employee)
+            ->pendingForApprover($employee, $roleNames)
             ->orderBy('submitted_at')
             ->paginate($perPage);
     }

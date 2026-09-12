@@ -25,38 +25,26 @@ return new class extends Migration
 {
     public function up(): void
     {
-        $addedGeo = false;
-        $addedIp = false;
-
         if (! Schema::hasColumn('attendance_devices', 'enforce_geo')) {
             Schema::table('attendance_devices', function (Blueprint $table) {
                 $table->boolean('enforce_geo')->default(false)->after('allowed_radius_meters');
             });
-            $addedGeo = true;
         }
 
         if (! Schema::hasColumn('attendance_devices', 'enforce_ip')) {
             Schema::table('attendance_devices', function (Blueprint $table) {
                 $table->boolean('enforce_ip')->default(false)->after('ip_whitelist');
             });
-            $addedIp = true;
         }
 
         // Now safe to unconditionally reset. If the columns already
         // existed with non-false values, this is the same effect as
-        // migration 100009 (blanket disable).
+        // migration 100009 (blanket disable). Schema::hasColumn above
+        // makes the whole migration idempotent — repeat runs are no-ops.
         DB::table('attendance_devices')->update([
             'enforce_geo' => false,
             'enforce_ip' => false,
         ]);
-
-        // Record what we added so down() only drops what up() added.
-        if ($addedGeo || $addedIp) {
-            DB::table('migrations')->insert([
-                'migration' => 'self_heal_enforce_columns_added_'.($addedGeo ? 'geo' : '').($addedIp ? '_ip' : ''),
-                'batch' => (int) DB::table('migrations')->max('batch'),
-            ]);
-        }
     }
 
     public function down(): void

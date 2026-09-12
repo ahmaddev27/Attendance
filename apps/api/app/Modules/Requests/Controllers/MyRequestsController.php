@@ -69,4 +69,24 @@ class MyRequestsController extends Controller
 
         return new RequestResource($this->requests->cancel($request));
     }
+
+    /**
+     * Resubmit a returned request. Ownership is enforced HERE (via the
+     * acting employee) rather than in the service so the service can
+     * stay reusable from any future admin surface; the service still
+     * checks that the request is in the `Returned` state.
+     */
+    public function resubmit(SubmitRequestRequest $httpRequest, RequestModel $request): RequestResource
+    {
+        $employee = $this->resolveActingEmployee($httpRequest);
+
+        if ($request->employee_id !== $employee->id) {
+            abort(403, 'You may not resubmit another employee\'s request.');
+        }
+
+        /** @var array<string, mixed> $formData */
+        $formData = $httpRequest->validated()['form_data'] ?? [];
+
+        return new RequestResource($this->requests->resubmit($request, $formData));
+    }
 }

@@ -148,36 +148,49 @@ class Request extends Model
      * (typically small) set of pending, form_field-routed requests and
      * checking each in PHP instead of trying to force it into SQL.
      *
+     * A bootstrap super-admin (a User row without a linked Employee) can
+     * still be an approver through SpecificRole steps — pass a null
+     * $employee together with their role names in $roleNames to serve
+     * that case. When $employee is provided and $roleNames is empty, the
+     * roles are looked up from the linked user automatically (matching
+     * the original single-arg behavior).
+     *
      * @param  Builder<Request>  $query
+     * @param  list<string>      $roleNames
      * @return Builder<Request>
      */
-    public function scopePendingForApprover(Builder $query, Employee $employee): Builder
+    public function scopePendingForApprover(Builder $query, ?Employee $employee, array $roleNames = []): Builder
     {
         // Employee has no direct "its login user" relation worth trusting
         // here (employees.user_id is a separate, largely unused column —
         // every other module in this codebase resolves the link the other
-        // way round, via users.employee_id, e.g.
-        // EmployeeLeavesController::resolveEmployee()'s
-        // $request->user()->employee).
-        $roleNames = User::query()->where('employee_id', $employee->id)->first()?->getRoleNames()->all() ?? [];
-        $formFieldMatchIds = $this->formFieldMatchIds($employee);
+        // way round, via users.employee_id).
+        if ($employee !== null && $roleNames === []) {
+            $roleNames = User::query()->where('employee_id', $employee->id)->first()?->getRoleNames()->all() ?? [];
+        }
 
-        return $query
-            ->where('status', RequestStatus::Pending)
-            // Symmetric with the forwarded-to inclusion in the OR block
-            // below: once $employee forwards a request on its current
-            // step, that request must LEAVE their inbox for as long as
-            // the forward remains in force. Without this an approver
-            // who hands a request off still sees it — and both they and
-            // the forwarded-to employee can act on it.
-            ->whereDoesntHave('approvals', function (Builder $approval) use ($employee) {
+        $formFieldMatchIds = $employee !== null ? $this->formFieldMatchIds($employee) : [];
+
+        $query->where('status', RequestStatus::Pending);
+
+        // Symmetric with the forwarded-to inclusion in the OR block
+        // below: once $employee forwards a request on its current
+        // step, that request must LEAVE their inbox for as long as
+        // the forward remains in force. Without this an approver
+        // who hands a request off still sees it — and both they and
+        // the forwarded-to employee can act on it.
+        if ($employee !== null) {
+            $query->whereDoesntHave('approvals', function (Builder $approval) use ($employee) {
                 $approval->where('action', ApprovalAction::Forwarded)
                     ->where('approver_id', $employee->id)
                     ->where('decided_at', '>=', Carbon::now()->subDays(self::FORWARD_WINDOW_DAYS))
                     ->whereColumn('workflow_step_id', 'requests.current_step_id');
-            })
-            ->where(function (Builder $q) use ($employee, $roleNames, $formFieldMatchIds) {
-                $q->whereHas('currentStep', function (Builder $step) use ($employee) {
+            });
+        }
+
+        return $query->where(function (Builder $q) use ($employee, $roleNames, $formFieldMatchIds) {
+            if ($employee !== null) {
+                $q->orWhereHas('currentStep', function (Builder $step) use ($employee) {
                     $step->where('approver_type', ApproverType::SpecificEmployee)
                         ->where('approver_ref', (string) $employee->id);
                 });
@@ -192,24 +205,32 @@ class Request extends Model
                         ->whereHas('employee.department', fn (Builder $d) => $d->where('manager_id', $employee->id));
                 });
 
-                if ($roleNames !== []) {
-                    $q->orWhereHas('currentStep', function (Builder $step) use ($roleNames) {
-                        $step->where('approver_type', ApproverType::SpecificRole)
-                            ->whereIn('approver_ref', $roleNames);
-                    });
-                }
-
-                if ($formFieldMatchIds !== []) {
-                    $q->orWhereIn('id', $formFieldMatchIds);
-                }
-
                 $q->orWhereHas('approvals', function (Builder $approval) use ($employee) {
                     $approval->where('action', ApprovalAction::Forwarded)
                         ->where('forwarded_to_id', $employee->id)
                         ->where('decided_at', '>=', Carbon::now()->subDays(self::FORWARD_WINDOW_DAYS))
                         ->whereColumn('workflow_step_id', 'requests.current_step_id');
                 });
-            });
+            }
+
+            if ($roleNames !== []) {
+                $q->orWhereHas('currentStep', function (Builder $step) use ($roleNames) {
+                    $step->where('approver_type', ApproverType::SpecificRole)
+                        ->whereIn('approver_ref', $roleNames);
+                });
+            }
+
+            if ($formFieldMatchIds !== []) {
+                $q->orWhereIn('id', $formFieldMatchIds);
+            }
+
+            // No signal at all — an unlinked user with zero roles — should
+            // match nothing rather than degenerate to an empty group that
+            // would match every pending row.
+            if ($employee === null && $roleNames === [] && $formFieldMatchIds === []) {
+                $q->whereRaw('1 = 0');
+            }
+        });
     }
 
     /**

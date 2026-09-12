@@ -94,13 +94,19 @@ class ScanController extends Controller
                 default => 'checked_out',
             };
 
+            // NB: deliberately do NOT return the employee's full_name here.
+            // /scan/status is a public, unauthenticated endpoint gated only
+            // by (qr_token, employee_number); returning the name would let
+            // anyone holding a valid kiosk QR walk the employee_number
+            // space and enumerate the entire staff directory. The FE
+            // reveals the name only AFTER a successful check-in POST,
+            // which additionally passes the FraudGuard checks.
             return response()->json([
                 'data' => [
                     'state' => $state,
                     'employee' => [
                         'id' => $employee->id,
                         'employee_number' => $employee->employee_number,
-                        'full_name' => $employee->full_name,
                     ],
                     'check_in_at' => $attendance?->check_in_at?->toIso8601String(),
                     'check_out_at' => $attendance?->check_out_at?->toIso8601String(),
