@@ -29,7 +29,7 @@ class EmployeeDashboardService
 {
     /**
      * @return array{
-     *   today: array{status: string|null, checked_in_at: string|null, checked_out_at: string|null},
+     *   today: array{status: string|null, checked_in_at: string|null, checked_out_at: string|null, open_session_since: string|null},
      *   month: array{present: int, late: int, absent: int, leave: int, working_days_elapsed: int},
      *   leaves: array{pending: int, upcoming: array{start_date: string, end_date: string, type: string}|null, balances: array<int, array{type: string, remaining: float, entitled: float}>},
      *   requests: array{pending: int},
@@ -58,7 +58,7 @@ class EmployeeDashboardService
     }
 
     /**
-     * @return array{status: string|null, checked_in_at: string|null, checked_out_at: string|null}
+     * @return array{status: string|null, checked_in_at: string|null, checked_out_at: string|null, open_session_since: string|null}
      */
     private function today(Employee $employee, CarbonImmutable $today): array
     {
@@ -70,13 +70,27 @@ class EmployeeDashboardService
             ->first();
 
         if (! $record) {
-            return ['status' => null, 'checked_in_at' => null, 'checked_out_at' => null];
+            return [
+                'status' => null,
+                'checked_in_at' => null,
+                'checked_out_at' => null,
+                'open_session_since' => null,
+            ];
         }
+
+        // Populated only while the session is still open — check_in_at
+        // is set AND check_out_at is not. The frontend home banner keys
+        // off this single field so it doesn't have to reason about the
+        // status enum or reconcile checked_in_at with checked_out_at.
+        $openSince = $record->check_in_at && ! $record->check_out_at
+            ? $record->check_in_at->toIso8601String()
+            : null;
 
         return [
             'status' => $record->status?->value,
             'checked_in_at' => $record->check_in_at?->toIso8601String(),
             'checked_out_at' => $record->check_out_at?->toIso8601String(),
+            'open_session_since' => $openSince,
         ];
     }
 
@@ -225,7 +239,7 @@ class EmployeeDashboardService
 
     /**
      * @return array{
-     *   today: array{status: null, checked_in_at: null, checked_out_at: null},
+     *   today: array{status: null, checked_in_at: null, checked_out_at: null, open_session_since: null},
      *   month: array{present: 0, late: 0, absent: 0, leave: 0, working_days_elapsed: 0},
      *   leaves: array{pending: 0, upcoming: null, balances: array<int, mixed>},
      *   requests: array{pending: 0},
@@ -235,7 +249,12 @@ class EmployeeDashboardService
     private function empty(CarbonImmutable $today): array
     {
         return [
-            'today' => ['status' => null, 'checked_in_at' => null, 'checked_out_at' => null],
+            'today' => [
+                'status' => null,
+                'checked_in_at' => null,
+                'checked_out_at' => null,
+                'open_session_since' => null,
+            ],
             'month' => ['present' => 0, 'late' => 0, 'absent' => 0, 'leave' => 0, 'working_days_elapsed' => 0],
             'leaves' => ['pending' => 0, 'upcoming' => null, 'balances' => []],
             'requests' => ['pending' => 0],

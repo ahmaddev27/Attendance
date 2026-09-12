@@ -108,6 +108,34 @@ export default function EmployeeHomePage() {
         </Card>
       )}
 
+      {/*
+       * Open-session reminder banner. Rendered only while the employee
+       * has an active check-in with no matching check-out — the payload
+       * populates `open_session_since` for exactly that window, so no
+       * client-side reconciliation of the status enum is needed here.
+       * Amber tone matches the warning palette used elsewhere for
+       * time-sensitive nudges (overdue tasks, pending approvals).
+       */}
+      {data?.today.open_session_since && (
+        <Card className="flex items-center gap-3 border-warn-soft bg-warn-soft/40 p-4 text-warn-ink">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-warn-soft text-warn-ink">
+            <Clock className="h-5 w-5" />
+          </span>
+          <div className="flex-1 text-sm">
+            <p className="font-semibold">
+              أنت مسجّل حضور منذ{' '}
+              <span className="num" dir="ltr">
+                {formatTime(data.today.open_session_since)}
+              </span>{' '}
+              — لا تنسى تسجيل الانصراف
+            </p>
+            <p className="mt-0.5 text-xs opacity-80">
+              امسح رمز QR عند نهاية الدوام لتسجيل الانصراف قبل الإغلاق التلقائي.
+            </p>
+          </div>
+        </Card>
+      )}
+
       {/* KPI grid */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard

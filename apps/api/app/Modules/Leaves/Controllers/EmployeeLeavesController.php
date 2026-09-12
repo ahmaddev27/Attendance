@@ -7,9 +7,12 @@ namespace App\Modules\Leaves\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
+use App\Models\User;
 use App\Modules\Leaves\Requests\SubmitLeaveRequestRequest;
+use App\Modules\Leaves\Requests\UploadLeaveAttachmentRequest;
 use App\Modules\Leaves\Resources\LeaveBalanceResource;
 use App\Modules\Leaves\Resources\LeaveRequestResource;
+use App\Modules\Leaves\Services\LeaveAttachmentService;
 use App\Modules\Leaves\Services\LeaveBalanceService;
 use App\Modules\Leaves\Services\LeaveRequestService;
 use Illuminate\Http\JsonResponse;
@@ -29,6 +32,7 @@ class EmployeeLeavesController extends Controller
     public function __construct(
         private readonly LeaveRequestService $leaveRequests,
         private readonly LeaveBalanceService $leaveBalances,
+        private readonly LeaveAttachmentService $leaveAttachments,
     ) {}
 
     public function index(Request $request): AnonymousResourceCollection
@@ -55,6 +59,28 @@ class EmployeeLeavesController extends Controller
         $leaveRequest = $this->leaveRequests->submit($employee, $request->validated());
 
         return (new LeaveRequestResource($leaveRequest))->response()->setStatusCode(201);
+    }
+
+    /**
+     * Upload a supporting document for a leave request BEFORE it's
+     * submitted. The returned `attachment_path` is what the client then
+     * passes back on POST /me/leaves so the eventual LeaveRequest row
+     * can reference the stored file.
+     *
+     * We resolve the employee first so an unlinked user (no Employee
+     * profile) can't fill disk space with orphaned files that will
+     * never be attached to a submitted request.
+     */
+    public function uploadAttachment(UploadLeaveAttachmentRequest $request): JsonResponse
+    {
+        $this->resolveEmployee($request);
+
+        /** @var User $user */
+        $user = $request->user();
+
+        $result = $this->leaveAttachments->store($user, $request->file('file'));
+
+        return response()->json(['data' => $result], 201);
     }
 
     public function cancel(Request $request, LeaveRequest $leave_request): LeaveRequestResource

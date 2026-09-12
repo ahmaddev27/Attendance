@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -99,6 +100,11 @@ export default function LoginPage() {
               {loading && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
               دخول
             </Button>
+            <div className="text-center">
+              <Link href="/forgot-password" className="text-xs text-brand hover:underline">
+                نسيت كلمة السر؟
+              </Link>
+            </div>
           </form>
         </Card>
       </div>

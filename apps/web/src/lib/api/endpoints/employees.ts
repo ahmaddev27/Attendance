@@ -4,7 +4,10 @@ import type {
   Employee,
   EmployeeInput,
   EmployeeListParams,
+  MyProfile,
+  MyProfileUpdatePayload,
   PaginatedResponse,
+  UpdateMyPasswordPayload,
 } from '@/lib/api/types';
 
 export const employeesApi = {
@@ -25,4 +28,18 @@ export const employeesApi = {
    */
   myTeam: (search?: string) =>
     apiClient.get<{ data: Employee[] }>('/me/team', { params: { search } }),
+};
+
+/**
+ * Employee self-service profile — read the linked user + employee for the
+ * /profile page, update the phone number, and rotate the password. Every
+ * write is scoped server-side to the caller's own row, so no id is ever
+ * shipped from the client.
+ */
+export const myProfileApi = {
+  show: () => apiClient.get<ApiResource<MyProfile>>('/me/profile'),
+  update: (payload: MyProfileUpdatePayload) =>
+    apiClient.patch<ApiResource<MyProfile>>('/me/profile', payload),
+  updatePassword: (payload: UpdateMyPasswordPayload) =>
+    apiClient.post<{ data: { ok: true }; message?: string }>('/me/password', payload),
 };

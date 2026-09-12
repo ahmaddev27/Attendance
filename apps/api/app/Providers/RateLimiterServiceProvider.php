@@ -61,6 +61,31 @@ class RateLimiterServiceProvider extends ServiceProvider
             return Limit::perHour(30)->by(optional($request->user())->id ?: $request->ip());
         });
 
+        // Self-service password reset — REQUEST step. The unauthenticated
+        // caller submits an identifier and we may fire an SMS. Two costs
+        // to bound:
+        //   • Carrier bill / abuse: a single identifier being blasted with
+        //     codes as an SMS-flood vector against a real employee.
+        //   • Enumeration: probing many identifiers from one origin to see
+        //     which ones trigger a delivery (indirectly leaked via carrier
+        //     receipts, though not via our own response body).
+        // Keyed by "identifier|ip" so a shared-NAT office still allows
+        // legitimate distinct accounts through while a single attacker on
+        // one IP can't grind through the numeric employee_number space.
+        RateLimiter::for('password-reset-request', function (Request $request) {
+            $identifier = mb_strtolower(trim((string) $request->input('identifier')));
+            return Limit::perHour(3)->by($identifier.'|'.$request->ip());
+        });
+
+        // Self-service password reset — VERIFY step. Tighter per-minute
+        // cap because each attempt is an OTP guess; with a 6-digit space
+        // (1e6) even at 5/min it takes ~140 days to brute-force the
+        // 10-minute window, which is safely infeasible.
+        RateLimiter::for('password-reset-attempt', function (Request $request) {
+            $identifier = mb_strtolower(trim((string) $request->input('identifier')));
+            return Limit::perMinute(5)->by($identifier.'|'.$request->ip());
+        });
+
         // Task creation: 60 per hour per user. Defense-in-depth against a
         // rogue employee (or a compromised session) mass-creating tasks
         // assigned to a target — the app has no per-user cap otherwise.

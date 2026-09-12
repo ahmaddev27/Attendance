@@ -319,6 +319,28 @@ export type EmployeeListParams = {
   employment_type?: EmploymentType;
 };
 
+/**
+ * `/me/profile` — the linked user + the employee row (or null when the
+ * signed-in account is not bound to an employees row, e.g. bootstrap
+ * super-admin).
+ */
+export type MyProfile = {
+  user: User;
+  employee: Employee | null;
+};
+
+/** `PATCH /me/profile` — the ONLY field the employee is allowed to change. */
+export type MyProfileUpdatePayload = {
+  phone?: string | null;
+};
+
+/** `POST /me/password` — Laravel's `confirmed` rule expects the `_confirmation` suffix. */
+export type UpdateMyPasswordPayload = {
+  current_password: string;
+  password: string;
+  password_confirmation: string;
+};
+
 // ---------------------------------------------------------------------------
 // Organization structure — departments, teams, positions
 // ---------------------------------------------------------------------------
@@ -465,6 +487,7 @@ export type LeaveRequestPayload = {
   start_date: string;
   end_date: string;
   reason?: string;
+  attachment_path?: string;
 };
 
 export type LeaveRequestListParams = {

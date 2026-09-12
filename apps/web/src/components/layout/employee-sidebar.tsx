@@ -34,6 +34,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/my-leaves', label: 'إجازاتي', icon: CalendarCheck },
   { href: '/my-requests', label: 'طلباتي', icon: FileText },
   { href: '/my-notifications', label: 'الإشعارات', icon: Bell },
+  { href: '/profile', label: 'الملف الشخصي', icon: User },
 ];
 
 function isActivePath(pathname: string | null, href: string) {

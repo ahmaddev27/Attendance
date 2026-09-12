@@ -26,6 +26,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as Location from 'expo-location';
 
 import { Button } from '../components/Button';
 import { useAuth } from '../hooks/useAuth';
@@ -33,6 +34,47 @@ import { api, extractApiMessage } from '../lib/api';
 import { colors, radius, spacing, typography } from '../lib/theme';
 
 type Mode = 'check-in' | 'check-out';
+
+/**
+ * Best-effort geolocation for the scan payload. Mirrors the web kiosk's
+ * behaviour: always resolves (never throws), returning `null` when the
+ * user denies permission, the OS has no fix, or the request times out.
+ *
+ * The backend only enforces geo when the device's `enforce_geo=true` AND
+ * the device has configured coordinates — so sending `null` from a
+ * geo-off device still succeeds, while a geo-enforced device will 422
+ * with a readable Arabic message.
+ */
+async function getCurrentPosition(): Promise<{
+  latitude: number;
+  longitude: number;
+} | null> {
+  try {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') return null;
+
+    // 10s ceiling so a stuck GPS never blocks the scan flow. We race
+    // the location request against a timer instead of relying on the
+    // OS, whose per-provider timeouts are not consistent across
+    // Android vendors.
+    const position = await Promise.race<
+      Location.LocationObject | null
+    >([
+      Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      }),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 10_000)),
+    ]);
+
+    if (!position) return null;
+    return {
+      latitude: position.coords.latitude,
+      longitude: position.coords.longitude,
+    };
+  } catch {
+    return null;
+  }
+}
 
 export default function ScanScreen() {
   const router = useRouter();
@@ -60,9 +102,17 @@ export default function ScanScreen() {
 
     setSubmitting(true);
     try {
+      // Attempt to attach a GPS fix unconditionally — cheap when
+      // the device has no geofencing (backend ignores the coords),
+      // and required when `enforce_geo=true` (backend would 422 on
+      // missing coords otherwise). See getCurrentPosition() above
+      // for the fail-open behaviour on denial/timeout.
+      const position = await getCurrentPosition();
       await api.post(`/scan/${mode}`, {
         employee_number: user.employee_number,
         qr_token: qrToken,
+        latitude: position?.latitude,
+        longitude: position?.longitude,
       });
       Alert.alert(
         'تم بنجاح',

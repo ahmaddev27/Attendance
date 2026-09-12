@@ -6,7 +6,9 @@ use App\Modules\Attendance\Controllers\HolidayController;
 use App\Modules\Attendance\Controllers\ScanController;
 use App\Modules\Attendance\Controllers\WorkScheduleController;
 use App\Modules\Auth\Controllers\AuthController;
+use App\Modules\Auth\Controllers\PasswordResetController;
 use App\Modules\Employees\Controllers\EmployeeController;
+use App\Modules\Employees\Controllers\MyProfileController;
 use App\Modules\Leaves\Controllers\EmployeeLeavesController;
 use App\Modules\Leaves\Controllers\LeaveBalanceController;
 use App\Modules\Leaves\Controllers\LeaveRequestController;
@@ -57,6 +59,21 @@ Route::prefix('auth')->group(function () {
     // enumerate employee_numbers at line-rate. See RouteServiceProvider
     // for the 'login' rate-limiter definition.
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
+
+    // Self-service password reset (SMS OTP). Both endpoints are
+    // deliberately public — the whole point is that a user who's
+    // forgotten their credentials can still reach them. Enumeration
+    // protection lives at three layers:
+    //   1. Named rate-limiters (password-reset-request /
+    //      password-reset-attempt) — see RateLimiterServiceProvider.
+    //   2. PasswordResetService returns/errs identically for unknown
+    //      identifiers, missing codes, and wrong codes.
+    //   3. PasswordResetController returns a fixed 200 body from
+    //      /forgot-password regardless of whether the account exists.
+    Route::post('/forgot-password', [PasswordResetController::class, 'forgot'])
+        ->middleware('throttle:password-reset-request');
+    Route::post('/reset-password', [PasswordResetController::class, 'reset'])
+        ->middleware('throttle:password-reset-attempt');
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
@@ -156,6 +173,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/', [EmployeeLeavesController::class, 'index']); // my leave requests
         Route::get('/balances', [EmployeeLeavesController::class, 'balances']); // my balances
         Route::post('/', [EmployeeLeavesController::class, 'store']); // submit
+        // Upload a supporting document BEFORE submitting the leave — the
+        // returned attachment_path feeds POST /me/leaves for
+        // requires_attachment leave types. Kept as its own route (not
+        // nested under a {leave_request}) because the LeaveRequest row
+        // doesn't exist yet at upload time.
+        Route::post('/attachment', [EmployeeLeavesController::class, 'uploadAttachment']);
         Route::post('/{leave_request}/cancel', [EmployeeLeavesController::class, 'cancel']);
     });
 });
@@ -327,6 +350,18 @@ Route::middleware('auth:sanctum')->group(function () {
     // members, or the caller alone when they have no team. Any auth user;
     // controller scopes by request->user()->employee->team_id.
     Route::get('/me/team', [\App\Modules\Employees\Controllers\EmployeeController::class, 'myTeam']);
+
+    // Employee self-service profile — read, phone-only PATCH, password
+    // rotation. Every write is scoped to $request->user()->employee at the
+    // controller (never accepts an id from the client) so a non-admin
+    // session cannot use these endpoints to edit somebody else's row.
+    // Password rotation is throttled to blunt online guessing of
+    // current_password from a hijacked session; the limiter shares the
+    // login bucket already tuned for credential-verification attempts.
+    Route::get('/me/profile', [MyProfileController::class, 'show']);
+    Route::patch('/me/profile', [MyProfileController::class, 'update']);
+    Route::post('/me/password', [MyProfileController::class, 'updatePassword'])
+        ->middleware('throttle:login');
 
     // Notifications (M7). Every user sees only their own inbox — the
     // controller uses $request->user()->notifications, not a global list.

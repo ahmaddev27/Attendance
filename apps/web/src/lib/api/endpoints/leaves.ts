@@ -1,3 +1,5 @@
+import type { AxiosProgressEvent } from 'axios';
+
 import { apiClient } from '@/lib/api/client';
 import type {
   ApiResource,
@@ -7,6 +9,11 @@ import type {
   LeaveRequestPayload,
   PaginatedResponse,
 } from '@/lib/api/types';
+
+export type LeaveAttachmentUpload = {
+  attachment_path: string;
+  download_url: string;
+};
 
 /** Admin-facing leave request CRUD + approval workflow. */
 export const leaveRequestsApi = {
@@ -29,4 +36,19 @@ export const myLeavesApi = {
   submit: (payload: Omit<LeaveRequestPayload, 'employee_id'>) =>
     apiClient.post<ApiResource<LeaveRequest>>('/me/leaves', payload),
   cancel: (id: number) => apiClient.post(`/me/leaves/${id}/cancel`),
+  /**
+   * Uploads a supporting document before submit — the returned
+   * `attachment_path` is then passed on the submit payload so the
+   * eventual LeaveRequest row references the stored file. Streams via
+   * multipart/form-data with `onUploadProgress` so the dialog can show
+   * a progress indicator for large PDFs.
+   */
+  uploadAttachment: (file: File, onUploadProgress?: (event: AxiosProgressEvent) => void) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return apiClient.post<ApiResource<LeaveAttachmentUpload>>('/me/leaves/attachment', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress,
+    });
+  },
 };

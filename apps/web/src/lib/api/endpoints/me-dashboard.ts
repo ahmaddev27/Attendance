@@ -6,6 +6,11 @@ export type EmployeeDashboardKpis = {
     status: string | null;
     checked_in_at: string | null;
     checked_out_at: string | null;
+    // ISO datetime of the still-open session's check-in, or null when
+    // the session is closed / no attendance row exists yet. The home
+    // banner keys off this single field so it doesn't have to
+    // reconcile the status enum with checked_in_at / checked_out_at.
+    open_session_since: string | null;
   };
   month: {
     present: number;

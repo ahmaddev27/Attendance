@@ -25,6 +25,7 @@
       "bundleIdentifier": "com.taqat.mobile",
       "infoPlist": {
         "NSCameraUsageDescription": "TAQAT يستخدم الكاميرا لمسح رمز QR لتسجيل الحضور والانصراف.",
+        "NSLocationWhenInUseUsageDescription": "نحتاج موقعك لتأكيد وجودك ضمن نطاق الحضور المسموح.",
         "CFBundleAllowMixedLocalizations": true,
         "CFBundleDevelopmentRegion": "ar",
         "CFBundleLocalizations": ["ar", "en"]
@@ -36,7 +37,13 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#2678C4"
       },
-      "permissions": ["CAMERA", "VIBRATE", "RECEIVE_BOOT_COMPLETED"]
+      "permissions": [
+        "CAMERA",
+        "VIBRATE",
+        "RECEIVE_BOOT_COMPLETED",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -50,6 +57,12 @@
         "expo-camera",
         {
           "cameraPermission": "TAQAT يحتاج إلى الكاميرا لمسح رمز الحضور."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "نحتاج موقعك لتأكيد وجودك ضمن نطاق الحضور المسموح."
         }
       ],
       [

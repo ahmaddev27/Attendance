@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Paperclip } from 'lucide-react';
+import { Paperclip, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -63,6 +63,16 @@ const EMPTY_VALUES: SubmitLeaveFormValues = {
   reason: '',
 };
 
+/** Kept in sync with UploadLeaveAttachmentRequest::MAX_FILE_SIZE_KB. */
+const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+const ACCEPTED_ATTACHMENT_MIMES = 'application/pdf,image/jpeg,image/jpg,image/png';
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
 type SubmitLeaveDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -73,10 +83,19 @@ type SubmitLeaveDialogProps = {
  * employee's own balances query (per spec) rather than the full leave-types
  * list, so only types the employee actually has an entitlement for — with
  * their live available-day count — are offered.
+ *
+ * When the selected leave type requires an attachment (e.g. sick leave with
+ * a medical certificate), the user picks a file, we upload it via
+ * POST /me/leaves/attachment to obtain a stored `attachment_path`, then
+ * include that path in the submit payload. The upload is a distinct HTTP
+ * call because the LeaveRequest row doesn't exist yet at upload time.
  */
 export function SubmitLeaveDialog({ open, onOpenChange }: SubmitLeaveDialogProps) {
   const queryClient = useQueryClient();
   const [apiError, setApiError] = React.useState<string | null>(null);
+  const [attachmentFile, setAttachmentFile] = React.useState<File | null>(null);
+  const [attachmentUploading, setAttachmentUploading] = React.useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const form = useForm<SubmitLeaveFormValues>({
     resolver: zodResolver(submitLeaveSchema),
@@ -87,6 +106,11 @@ export function SubmitLeaveDialog({ open, onOpenChange }: SubmitLeaveDialogProps
     if (open) {
       form.reset(EMPTY_VALUES);
       setApiError(null);
+      setAttachmentFile(null);
+      setAttachmentUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -126,13 +150,27 @@ export function SubmitLeaveDialog({ open, onOpenChange }: SubmitLeaveDialogProps
     (selectedBalance?.leave_type?.requires_attachment ?? selectedNonBalanceType?.requires_attachment) ?? false;
 
   const mutation = useMutation({
-    mutationFn: (values: SubmitLeaveFormValues) =>
-      myLeavesApi.submit({
+    mutationFn: async (values: SubmitLeaveFormValues) => {
+      let attachmentPath: string | undefined;
+
+      if (attachmentFile) {
+        setAttachmentUploading(true);
+        try {
+          const uploadRes = await myLeavesApi.uploadAttachment(attachmentFile);
+          attachmentPath = uploadRes.data.data.attachment_path;
+        } finally {
+          setAttachmentUploading(false);
+        }
+      }
+
+      return myLeavesApi.submit({
         leave_type_id: values.leave_type_id,
         start_date: values.start_date,
         end_date: values.end_date,
         reason: values.reason || undefined,
-      }),
+        attachment_path: attachmentPath,
+      });
+    },
     onSuccess: () => {
       toast.success('تم إرسال طلب الإجازة بنجاح');
       queryClient.invalidateQueries({ queryKey: ['my-leaves'] });
@@ -150,8 +188,41 @@ export function SubmitLeaveDialog({ open, onOpenChange }: SubmitLeaveDialogProps
 
   const onSubmit = form.handleSubmit((values) => {
     setApiError(null);
+
+    if (requiresAttachment && !attachmentFile) {
+      toast.error('يرجى إرفاق ملف داعم');
+      setApiError('يرجى إرفاق ملف داعم لهذا النوع من الإجازة');
+      return;
+    }
+
     mutation.mutate(values);
   });
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+
+    if (!file) {
+      setAttachmentFile(null);
+      return;
+    }
+
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      toast.error('حجم الملف يتجاوز الحد الأقصى (5 ميغابايت)');
+      // Clear the input so re-picking the same file still triggers change.
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      setAttachmentFile(null);
+      return;
+    }
+
+    setAttachmentFile(file);
+  };
+
+  const clearAttachment = () => {
+    setAttachmentFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const isSubmitting = mutation.isPending || attachmentUploading;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -259,11 +330,46 @@ export function SubmitLeaveDialog({ open, onOpenChange }: SubmitLeaveDialogProps
                   <Paperclip className="h-4 w-4 text-muted" />
                   مرفق مطلوب لهذا النوع من الإجازة
                 </label>
-                {/* Actual upload wiring is out of scope for this pass — the
-                    file picker is a placeholder until the API exposes an
-                    attachment upload endpoint. */}
-                <Input type="file" className="mt-1.5" disabled />
-                <p className="mt-1 text-xs text-muted">سيتم تفعيل رفع المرفقات قريباً</p>
+
+                {!attachmentFile ? (
+                  <>
+                    <Input
+                      ref={fileInputRef}
+                      type="file"
+                      accept={ACCEPTED_ATTACHMENT_MIMES}
+                      className="mt-1.5"
+                      onChange={handleFileChange}
+                      disabled={isSubmitting}
+                    />
+                    <p className="mt-1 text-xs text-muted">
+                      PDF أو صورة (JPG/PNG) بحد أقصى 5 ميغابايت
+                    </p>
+                  </>
+                ) : (
+                  <div className="mt-1.5 flex items-center justify-between gap-3 rounded-lg border border-line bg-surface px-3 py-2 text-sm">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-ink" title={attachmentFile.name}>
+                        {attachmentFile.name}
+                      </p>
+                      <p className="num text-xs text-muted">{formatFileSize(attachmentFile.size)}</p>
+                    </div>
+                    {attachmentUploading ? (
+                      <Spinner className="h-4 w-4 text-muted" />
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={clearAttachment}
+                        disabled={isSubmitting}
+                        className="text-muted hover:text-danger"
+                      >
+                        <X className="h-4 w-4" />
+                        <span className="sr-only">إزالة</span>
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -272,12 +378,16 @@ export function SubmitLeaveDialog({ open, onOpenChange }: SubmitLeaveDialogProps
             )}
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
                 إلغاء
               </Button>
-              <Button type="submit" disabled={mutation.isPending} className="bg-brand text-white hover:bg-brand-hover">
-                {mutation.isPending && <Spinner className="text-white" />}
-                إرسال الطلب
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                className="bg-brand text-white hover:bg-brand-hover"
+              >
+                {isSubmitting && <Spinner className="text-white" />}
+                {attachmentUploading ? 'جارٍ رفع المرفق...' : 'إرسال الطلب'}
               </Button>
             </DialogFooter>
           </form>
