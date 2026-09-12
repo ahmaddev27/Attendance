@@ -136,9 +136,21 @@ class LeaveRequestService
         // before this, they only discovered new requests on manual
         // refresh. Notification is fire-after-commit so a rolled-back
         // transaction never triggers a stray alert.
-        $approvers = User::permission('approve-leaves')->get();
+        //
+        // Wrapped in try/catch: a mail-provider outage (bad Resend key
+        // in tests, Anthropic-throttled reverb push, etc.) must NOT
+        // fail the actual leave submission — the user's request is
+        // already saved. Log the notifier failure and move on.
         $fresh = $leaveRequest->fresh(['employee.user', 'leaveType']);
-        $this->notifier->leaveSubmitted($fresh, $approvers);
+        try {
+            $approvers = User::permission('approve-leaves')->get();
+            $this->notifier->leaveSubmitted($fresh, $approvers);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('leaveSubmitted notifier failed', [
+                'leave_request_id' => $fresh->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         return $fresh;
     }

@@ -168,14 +168,24 @@ class RequestService
      */
     private function notifyFirstStepApprovers(RequestModel $request, WorkflowStep $firstStep): void
     {
-        $approvers = $this->approverResolver->resolve($firstStep, $request);
+        // Notifier failures (mail-provider outage, push service down,
+        // Reverb dropping the broadcast) MUST NOT break request submit
+        // — the row is already committed. Log + swallow.
+        try {
+            $approvers = $this->approverResolver->resolve($firstStep, $request);
 
-        $users = $approvers
-            ->map(fn (Employee $employee) => $employee->user)
-            ->filter(fn ($user) => $user instanceof User)
-            ->values();
+            $users = $approvers
+                ->map(fn (Employee $employee) => $employee->user)
+                ->filter(fn ($user) => $user instanceof User)
+                ->values();
 
-        $this->notifier->requestPendingApproval($request, $users);
+            $this->notifier->requestPendingApproval($request, $users);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('requestPendingApproval notifier failed', [
+                'request_id' => $request->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
