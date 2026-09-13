@@ -24,6 +24,13 @@ use Illuminate\Validation\ValidationException;
  */
 class RecruitmentPipelineStageController extends Controller
 {
+    /**
+     * Store/Update requests cap display_order at 32767, so shifting by this
+     * amount keeps every parked value inside UNSIGNED SMALLINT (65535) and
+     * strictly above any final position the reorder will assign.
+     */
+    private const REORDER_PARK_OFFSET = 32768;
+
     public function store(StoreRecruitmentPipelineStageRequest $request, RecruitmentPipeline $pipeline): JsonResponse
     {
         $data = $request->validated();
@@ -101,9 +108,13 @@ class RecruitmentPipelineStageController extends Controller
         }
 
         DB::transaction(function () use ($stageIds, $pipeline) {
+            // Park every row above the reachable range first. display_order is
+            // UNSIGNED SMALLINT with a (pipeline_id, display_order) unique index,
+            // so a negative sentinel overflows on MySQL and any in-range
+            // temporary value can collide mid-shuffle.
             RecruitmentPipelineStage::query()
                 ->where('pipeline_id', $pipeline->id)
-                ->update(['display_order' => DB::raw('-1 * display_order')]);
+                ->update(['display_order' => DB::raw('display_order + ' . self::REORDER_PARK_OFFSET)]);
 
             foreach ($stageIds as $index => $stageId) {
                 RecruitmentPipelineStage::query()
