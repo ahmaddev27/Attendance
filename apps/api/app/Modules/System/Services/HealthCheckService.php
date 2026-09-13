@@ -77,12 +77,23 @@ final class HealthCheckService
 
     public function recordSchedulerHeartbeat(): void
     {
-        Cache::put(self::SCHEDULER_HEARTBEAT_KEY, now()->getTimestamp(), self::HEARTBEAT_TTL_SECONDS);
+        $this->recordHeartbeat(self::SCHEDULER_HEARTBEAT_KEY);
     }
 
     public function recordQueueHeartbeat(): void
     {
-        Cache::put(self::QUEUE_HEARTBEAT_KEY, now()->getTimestamp(), self::HEARTBEAT_TTL_SECONDS);
+        $this->recordHeartbeat(self::QUEUE_HEARTBEAT_KEY);
+    }
+
+    /**
+     * Stored as a string on purpose: the Redis cache store hands numeric
+     * values back as strings, so an int check read every production
+     * heartbeat as missing. Writing strings keeps every store, including
+     * the array store the tests use, on the same read path.
+     */
+    private function recordHeartbeat(string $key): void
+    {
+        Cache::put($key, (string) now()->getTimestamp(), self::HEARTBEAT_TTL_SECONDS);
     }
 
     /**
@@ -145,11 +156,11 @@ final class HealthCheckService
             return self::CHECK_MISSING;
         }
 
-        if (! is_int($beat)) {
+        if (! is_numeric($beat)) {
             return self::CHECK_MISSING;
         }
 
-        return now()->getTimestamp() - $beat > $staleAfterSeconds ? self::CHECK_STALE : self::CHECK_OK;
+        return now()->getTimestamp() - (int) $beat > $staleAfterSeconds ? self::CHECK_STALE : self::CHECK_OK;
     }
 
     private function usesRedis(): bool
