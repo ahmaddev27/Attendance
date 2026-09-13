@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Notifications\Services;
 
+use App\Models\Client;
+use App\Models\JobRequirement;
+use App\Models\Lead;
 use App\Models\LeaveRequest;
+use App\Models\RecruitmentPipelineStage;
 use App\Models\Request as RequestModel;
 use App\Models\Task;
 use App\Models\User;
@@ -175,6 +179,85 @@ class NotificationService
             url: "/my-tasks/{$task->id}",
             icon: 'clipboard-check',
             meta: ['task_id' => $task->id],
+        ));
+    }
+
+    /**
+     * Sales notification when a Lead becomes a Client. The Case owner
+     * is the primary recipient (they'll drive the campaign); the
+     * original Lead owner is CC'd so their conversion counter still
+     * ticks in the "my sales" view even after handoff.
+     */
+    public function leadConverted(Lead $lead, Client $client, User $caseOwner, ?User $leadOwner = null): void
+    {
+        $body = sprintf(
+            '%s → %s',
+            $lead->company_name,
+            $client->client_number,
+        );
+
+        $notification = new TaqatNotification(
+            title: 'تم تحويل عميل محتمل إلى عميل فعلي',
+            body: $body,
+            url: "/recruitment/clients/{$client->id}",
+            icon: 'user-check',
+            meta: [
+                'lead_id' => $lead->id,
+                'client_id' => $client->id,
+            ],
+        );
+
+        $this->dispatch($caseOwner, "lead-converted:{$lead->id}", $notification);
+
+        // Only CC the lead owner if they're a different user — otherwise
+        // dedup keeps them from receiving two toasts for the same event.
+        if ($leadOwner instanceof User && $leadOwner->id !== $caseOwner->id) {
+            $this->dispatch($leadOwner, "lead-converted:{$lead->id}", $notification);
+        }
+    }
+
+    /**
+     * Notify the newly resolved stage owner when a Job advances into a
+     * stage they own. Fires in ADDITION to the auto-generated Task's
+     * taskAssigned notification when both apply — the dedup window
+     * squashes any duplicate broadcast/toast.
+     *
+     * When PipelineTaskGenerator could not create the auto-task (owner
+     * user has no linked Employee row), this remains the ONLY nudge
+     * the owner gets that the job has landed on them.
+     */
+    public function jobStageAdvanced(JobRequirement $job, RecruitmentPipelineStage $newStage, User $newOwner): void
+    {
+        $this->dispatch($newOwner, "job-stage-advanced:{$job->id}:{$newStage->id}", new TaqatNotification(
+            title: 'مرحلة جديدة تنتظر إجراءك',
+            body: sprintf('%s — %s', $job->job_number, $newStage->name),
+            url: "/recruitment/jobs/{$job->id}",
+            icon: 'arrow-right-circle',
+            meta: [
+                'job_requirement_id' => $job->id,
+                'stage_id' => $newStage->id,
+            ],
+        ));
+    }
+
+    /**
+     * Fired by the SLA scanner when a job has been in its current stage
+     * beyond the stage's sla_hours. Sent to both the current owner and
+     * the Case owner (kept separate so the manager sees an overdue
+     * pipeline even if the owner is on leave).
+     */
+    public function stageSlaBreached(JobRequirement $job, RecruitmentPipelineStage $stage, int $hoursOverdue, User $recipient): void
+    {
+        $this->dispatch($recipient, "stage-sla-breached:{$job->id}:{$stage->id}", new TaqatNotification(
+            title: 'تجاوز موعد المرحلة',
+            body: sprintf('%s — %s (متأخر %d ساعة)', $job->job_number, $stage->name, $hoursOverdue),
+            url: "/recruitment/jobs/{$job->id}",
+            icon: 'alert-triangle',
+            meta: [
+                'job_requirement_id' => $job->id,
+                'stage_id' => $stage->id,
+                'hours_overdue' => $hoursOverdue,
+            ],
         ));
     }
 
