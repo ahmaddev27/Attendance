@@ -11,6 +11,7 @@ use App\Models\LeaveRequest;
 use App\Models\RecruitmentPipelineStage;
 use App\Models\Request as RequestModel;
 use App\Models\Task;
+use App\Models\TaskComment;
 use App\Models\User;
 use App\Modules\Notifications\Notifications\TaqatNotification;
 use Illuminate\Support\Collection;
@@ -179,6 +180,29 @@ class NotificationService
             url: "/my-tasks/{$task->id}",
             icon: 'clipboard-check',
             meta: ['task_id' => $task->id],
+        ));
+    }
+
+    /**
+     * Someone was named in a task comment. The listener already drops the
+     * author; the dedup key carries the comment id so being named in two
+     * different comments still reaches the person twice.
+     */
+    public function mentionedInComment(TaskComment $comment, User $recipient): void
+    {
+        $task = $comment->task;
+        if (! $task instanceof Task) {
+            return;
+        }
+
+        $author = $comment->user?->name ?? 'أحد الزملاء';
+
+        $this->dispatch($recipient, "task-comment-mention:{$comment->id}", new TaqatNotification(
+            title: 'تمت الإشارة إليك في تعليق',
+            body: sprintf('%s أشار إليك في مهمة: %s', $author, $task->title),
+            url: "/my-tasks/{$task->id}",
+            icon: 'at-sign',
+            meta: ['task_id' => $task->id, 'comment_id' => $comment->id],
         ));
     }
 
