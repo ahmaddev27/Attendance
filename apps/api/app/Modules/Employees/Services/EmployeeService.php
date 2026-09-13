@@ -64,7 +64,7 @@ class EmployeeService
         unset($data['employee_number']);
 
         $result = DB::transaction(function () use ($data) {
-            $data['employee_number'] = $this->employees->maxEmployeeNumberForUpdate() + 1;
+            $data['employee_number'] = $this->employees->nextEmployeeNumberForUpdate();
 
             $employee = $this->employees->create($data);
 

@@ -3,6 +3,7 @@
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Team;
+use App\Models\User;
 use App\Models\WorkSchedule;
 use App\Shared\Enums\EmployeeStatus;
 use Illuminate\Database\QueryException;
@@ -218,4 +219,40 @@ test('the database rejects a duplicate employee_number', function () {
 
     expect(fn () => Employee::factory()->create(['employee_number' => 7777]))
         ->toThrow(QueryException::class);
+});
+
+test('deleting the most recent employee does not make the next create reuse its number', function () {
+    $schedule = WorkSchedule::factory()->create();
+    $payload = fn (string $firstName) => [
+        'first_name' => $firstName,
+        'last_name' => 'Rahal',
+        'employment_type' => 'full_time',
+        'joining_date' => '2026-01-15',
+        'work_schedule_id' => $schedule->id,
+    ];
+
+    $this->postJson('/api/employees', $payload('Omar'))
+        ->assertCreated()
+        ->assertJsonPath('data.employee_number', 1);
+    $second = $this->postJson('/api/employees', $payload('Huda'))->assertCreated();
+    $this->deleteJson('/api/employees/'.$second->json('data.id'))->assertSuccessful();
+
+    $this->postJson('/api/employees', $payload('Rami'))
+        ->assertCreated()
+        ->assertJsonPath('data.employee_number', 3);
+});
+
+test('a login user already holding the next number does not block the create', function () {
+    User::factory()->create(['employee_number' => 1]);
+    $schedule = WorkSchedule::factory()->create();
+
+    $this->postJson('/api/employees', [
+        'first_name' => 'Dana',
+        'last_name' => 'Haddad',
+        'employment_type' => 'full_time',
+        'joining_date' => '2026-01-15',
+        'work_schedule_id' => $schedule->id,
+    ])
+        ->assertCreated()
+        ->assertJsonPath('data.employee_number', 2);
 });

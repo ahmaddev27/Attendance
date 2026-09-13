@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Employees\Repositories;
 
 use App\Models\Employee;
+use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -19,14 +20,32 @@ class EmployeeRepository
     private const WITH = ['position', 'department', 'team', 'directManager', 'workSchedule'];
 
     /**
-     * Lock the employees table's current max employee_number for update.
-     * Must be called inside a transaction (see EmployeeService::create) so
-     * concurrent create requests serialize on this row range instead of
-     * racing to compute the same "next" number.
+     * Reserve the next employee_number. Must be called inside a transaction
+     * (see EmployeeService::create) so concurrent creates serialize on the
+     * locked range instead of racing to the same number.
+     *
+     * Soft-deleted employees keep their number — the unique index covers
+     * trashed rows — and a login user can hold a number with no employee
+     * row (the seeded admin). Ignoring either made the next create collide
+     * and fail with a 500 once the most recent employee had been deleted.
      */
-    public function maxEmployeeNumberForUpdate(): int
+    public function nextEmployeeNumberForUpdate(): int
     {
-        return (int) Employee::query()->lockForUpdate()->max('employee_number');
+        $next = (int) Employee::withTrashed()->lockForUpdate()->max('employee_number') + 1;
+
+        $takenByUsers = User::query()
+            ->where('employee_number', '>=', $next)
+            ->orderBy('employee_number')
+            ->pluck('employee_number');
+
+        foreach ($takenByUsers as $taken) {
+            if ((int) $taken !== $next) {
+                break;
+            }
+            $next++;
+        }
+
+        return $next;
     }
 
     public function findByNumber(int $employeeNumber): ?Employee
