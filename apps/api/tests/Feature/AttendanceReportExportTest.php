@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Attendance;
+use App\Models\Department;
 use App\Models\Employee;
 use App\Shared\Enums\AttendanceStatus;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -58,6 +59,32 @@ beforeEach(function (): void {
         'overtime_minutes' => 30,
         'late_minutes' => 0,
     ]);
+});
+
+test('csv export streams a BOM-prefixed file with the Arabic header and one row per employee', function () {
+    $year = (int) now()->format('Y');
+    $month = (int) now()->format('n');
+
+    $department = Department::factory()->create(['name' => 'المالية']);
+    $employee = Attendance::query()->sole()->employee;
+    $employee->update(['first_name' => 'سارة', 'last_name' => 'الحداد', 'department_id' => $department->id]);
+
+    $response = $this->get(
+        "/api/admin/reports/attendance/monthly?year={$year}&month={$month}&format=csv"
+    );
+
+    $response->assertOk();
+    expect($response->headers->get('content-type'))->toBe('text/csv; charset=UTF-8');
+    expect($response->headers->get('content-disposition'))
+        ->toBe(sprintf('attachment; filename="attendance-%04d-%02d.csv"', $year, $month));
+
+    // Byte-exact on purpose: Excel users rely on this layout, so any drift
+    // in the header, quoting or column order must fail loudly.
+    expect(attendanceExportBody($response))->toBe(
+        "\xEF\xBB\xBF"
+        .'"رقم الموظف",الاسم,القسم,"أيام الحضور","أيام التأخير","أيام الغياب","أيام الإجازة","إجمالي الدقائق","دقائق الوقت الإضافي","دقائق التأخير"'."\n"
+        ."{$employee->employee_number},\"سارة الحداد\",المالية,1,0,0,0,480,30,0\n"
+    );
 });
 
 test('xlsx export returns a spreadsheetml attachment', function () {

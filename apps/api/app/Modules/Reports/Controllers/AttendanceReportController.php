@@ -8,7 +8,9 @@ use App\Http\Controllers\Controller;
 use App\Modules\Reports\Exports\AttendanceMonthlyExcelExport;
 use App\Modules\Reports\Exports\AttendanceMonthlyPdfView;
 use App\Modules\Reports\Services\AttendanceReportService;
+use App\Shared\Support\CsvStream;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Generator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -19,8 +21,25 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AttendanceReportController extends Controller
 {
+    /**
+     * @var list<string>
+     */
+    private const CSV_HEADER = [
+        'رقم الموظف',
+        'الاسم',
+        'القسم',
+        'أيام الحضور',
+        'أيام التأخير',
+        'أيام الغياب',
+        'أيام الإجازة',
+        'إجمالي الدقائق',
+        'دقائق الوقت الإضافي',
+        'دقائق التأخير',
+    ];
+
     public function __construct(
         private readonly AttendanceReportService $service,
+        private readonly CsvStream $csv,
     ) {}
 
     /**
@@ -57,55 +76,33 @@ class AttendanceReportController extends Controller
         $filenameBase = sprintf('attendance-%04d-%02d', $year, $month);
 
         return match ($validated['format'] ?? 'json') {
-            'csv' => $this->csv($rows, "{$filenameBase}.csv"),
+            'csv' => $this->csv->download("{$filenameBase}.csv", self::CSV_HEADER, $this->csvRows($rows)),
             'xlsx' => $this->xlsx($rows, "{$filenameBase}.xlsx", $year, $month),
             'pdf' => $this->pdf($rows, "{$filenameBase}.pdf", $year, $month),
             default => response()->json(['data' => $rows]),
         };
     }
 
-    private function csv(iterable $rows, string $filename): StreamedResponse
+    /**
+     * @param  iterable<int, array<string, mixed>>  $rows
+     * @return Generator<int, list<int|string|null>>
+     */
+    private function csvRows(iterable $rows): Generator
     {
-        $headers = [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-        ];
-
-        return response()->stream(function () use ($rows): void {
-            $out = fopen('php://output', 'wb');
-            // Excel-friendly UTF-8 BOM so Arabic columns render correctly.
-            fwrite($out, "\xEF\xBB\xBF");
-
-            fputcsv($out, [
-                'رقم الموظف',
-                'الاسم',
-                'القسم',
-                'أيام الحضور',
-                'أيام التأخير',
-                'أيام الغياب',
-                'أيام الإجازة',
-                'إجمالي الدقائق',
-                'دقائق الوقت الإضافي',
-                'دقائق التأخير',
-            ]);
-
-            foreach ($rows as $row) {
-                fputcsv($out, [
-                    $row['employee_number'],
-                    $row['full_name'],
-                    $row['department'] ?? '',
-                    $row['present_days'],
-                    $row['late_days'],
-                    $row['absent_days'],
-                    $row['leave_days'],
-                    $row['total_minutes'],
-                    $row['overtime_minutes'],
-                    $row['late_minutes'],
-                ]);
-            }
-
-            fclose($out);
-        }, 200, $headers);
+        foreach ($rows as $row) {
+            yield [
+                $row['employee_number'],
+                $row['full_name'],
+                $row['department'] ?? '',
+                $row['present_days'],
+                $row['late_days'],
+                $row['absent_days'],
+                $row['leave_days'],
+                $row['total_minutes'],
+                $row['overtime_minutes'],
+                $row['late_minutes'],
+            ];
+        }
     }
 
     /**

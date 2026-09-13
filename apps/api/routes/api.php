@@ -35,6 +35,8 @@ use App\Modules\Reports\Controllers\AdminDashboardController;
 use App\Modules\Reports\Controllers\AttendanceReportController;
 use App\Modules\Reports\Controllers\AuditLogController;
 use App\Modules\Reports\Controllers\EmployeeDashboardController;
+use App\Modules\Reports\Controllers\LeaveReportController;
+use App\Modules\Reports\Controllers\RequestReportController;
 use App\Modules\Search\Controllers\SearchController;
 use App\Modules\Settings\Controllers\OptionListController;
 use App\Modules\Settings\Controllers\SettingsController;
@@ -360,6 +362,8 @@ Route::middleware('auth:sanctum')->group(function () {
         // Reports (attendance monthly, ...)
         Route::middleware('permission:view-reports')->group(function () {
             Route::get('/reports/attendance/monthly', [AttendanceReportController::class, 'monthly']);
+            Route::get('/reports/leaves/export', [LeaveReportController::class, 'export']);
+            Route::get('/reports/requests/export', [RequestReportController::class, 'export']);
         });
 
         // Analytics dashboards (Phase 3). Same permission gate as reports;

@@ -17,6 +17,8 @@ use App\Modules\Recruitment\Resources\LeadSummaryResource;
 use App\Modules\Recruitment\Resources\RecruitmentCaseResource;
 use App\Modules\Recruitment\Services\LeadConversionService;
 use App\Modules\Recruitment\Services\LeadService;
+use App\Shared\Support\CsvStream;
+use Generator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request as HttpRequest;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -32,9 +34,32 @@ class LeadController extends Controller
 {
     private const DEFAULT_PER_PAGE = 25;
 
+    /**
+     * @var list<string>
+     */
+    private const EXPORT_HEADER = [
+        'lead_number',
+        'company_name',
+        'country',
+        'city',
+        'industry',
+        'company_size',
+        'source',
+        'status',
+        'owner_id',
+        'contact_person',
+        'contact_email',
+        'contact_phone',
+        'expected_hiring_volume',
+        'last_contact_at',
+        'next_followup_at',
+        'created_at',
+    ];
+
     public function __construct(
         private readonly LeadService $leads,
         private readonly LeadConversionService $conversion,
+        private readonly CsvStream $csv,
     ) {}
 
     public function index(HttpRequest $request): AnonymousResourceCollection
@@ -113,11 +138,6 @@ class LeadController extends Controller
         ], 201);
     }
 
-    /**
-     * CSV export of the filtered list. UTF-8 BOM prepended so Excel
-     * picks up Arabic company names without a manual "import from text"
-     * dance — mirrors AttendanceReportController::csv.
-     */
     public function export(HttpRequest $request): StreamedResponse
     {
         $filters = $request->only([
@@ -139,56 +159,35 @@ class LeadController extends Controller
 
         $filename = 'leads-'.now()->format('Y-m-d-His').'.csv';
 
-        return response()->stream(function () use ($paginator): void {
-            $out = fopen('php://output', 'wb');
-            fwrite($out, "\xEF\xBB\xBF");
+        return $this->csv->download($filename, self::EXPORT_HEADER, $this->exportRows($paginator->items()));
+    }
 
-            fputcsv($out, [
-                'lead_number',
-                'company_name',
-                'country',
-                'city',
-                'industry',
-                'company_size',
-                'source',
-                'status',
-                'owner_id',
-                'contact_person',
-                'contact_email',
-                'contact_phone',
-                'expected_hiring_volume',
-                'last_contact_at',
-                'next_followup_at',
-                'created_at',
-            ]);
-
-            foreach ($paginator->items() as $lead) {
-                /** @var Lead $lead */
-                fputcsv($out, [
-                    $lead->lead_number,
-                    $lead->company_name,
-                    $lead->country,
-                    $lead->city,
-                    $lead->industry,
-                    $lead->company_size,
-                    $lead->source,
-                    $lead->status?->value,
-                    $lead->owner_id,
-                    $lead->contact_person,
-                    $lead->contact_email,
-                    $lead->contact_phone,
-                    $lead->expected_hiring_volume,
-                    $lead->last_contact_at?->toIso8601String(),
-                    $lead->next_followup_at?->toIso8601String(),
-                    $lead->created_at?->toIso8601String(),
-                ]);
-            }
-
-            fclose($out);
-        }, 200, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-        ]);
+    /**
+     * @param  array<int, Lead>  $leads
+     * @return Generator<int, list<int|string|null>>
+     */
+    private function exportRows(array $leads): Generator
+    {
+        foreach ($leads as $lead) {
+            yield [
+                $lead->lead_number,
+                $lead->company_name,
+                $lead->country,
+                $lead->city,
+                $lead->industry,
+                $lead->company_size,
+                $lead->source,
+                $lead->status?->value,
+                $lead->owner_id,
+                $lead->contact_person,
+                $lead->contact_email,
+                $lead->contact_phone,
+                $lead->expected_hiring_volume,
+                $lead->last_contact_at?->toIso8601String(),
+                $lead->next_followup_at?->toIso8601String(),
+                $lead->created_at?->toIso8601String(),
+            ];
+        }
     }
 
     private function actor(HttpRequest $request): User
