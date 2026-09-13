@@ -32,15 +32,35 @@ jobs:
   rehearse:
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    # The runner context is not available at job level, so the paths that
+    # depend on RUNNER_TEMP are exported by the first step instead.
     env:
-      ORIGIN: ${{ runner.temp }}/origin.git
-      APP: ${{ runner.temp }}/app
       COMPOSE: docker compose -f docker-compose.simple.yml
       REDIS_PASSWORD: rehearsal-redis-pass
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Rehearsal paths
+        run: |
+          echo "ORIGIN=$RUNNER_TEMP/origin.git" >> "$GITHUB_ENV"
+          echo "APP=$RUNNER_TEMP/app" >> "$GITHUB_ENV"
+
+      - name: Lint the remote programs (same checks as CI)
+        run: |
+          set -euo pipefail
+          command -v shellcheck > /dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck; }
+          bash -n infra/scripts/run-on-vps.sh
+          shellcheck -S warning infra/scripts/run-on-vps.sh
+          mkdir -p "$RUNNER_TEMP/remote"
+          for entry in infra/scripts/vps-*.sh; do
+            combined="$RUNNER_TEMP/remote/$(basename "$entry")"
+            cat infra/scripts/lib/vps-common.sh "$entry" > "$combined"
+            echo "→ $entry"
+            bash -n "$combined"
+            shellcheck -s bash -S warning "$combined"
+          done
 
       - name: Play the VPS — sshd on localhost for the runner user
         run: |
