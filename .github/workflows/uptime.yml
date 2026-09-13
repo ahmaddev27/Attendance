@@ -1,0 +1,45 @@
+name: Uptime
+
+# Probes production every 10 minutes. A failed run is the alert: GitHub emails
+# the account that last changed this schedule. Three attempts over about a
+# minute ride out the few seconds of a container switch during deploys.
+#
+# Note: GitHub pauses scheduled workflows in public repositories after 60 days
+# without commits; re-enable it from the Actions tab if that happens.
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: uptime
+  cancel-in-progress: true
+
+jobs:
+  probe:
+    name: Probe /api/health
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check production health
+        env:
+          HEALTH_URL: ${{ vars.HEALTH_URL || 'https://attendees.taqatgaza.com/api/health' }}
+        run: |
+          set -uo pipefail
+          code=000
+          status=unreachable
+          for attempt in 1 2 3; do
+            code="$(curl -sS -o body.json -w '%{http_code}' --max-time 20 "$HEALTH_URL" || true)"
+            status="$(jq -r '.status // "unknown"' body.json 2>/dev/null || echo unknown)"
+            if [ "$code" = "200" ] && [ "$status" = "ok" ]; then
+              echo "✓ healthy (attempt $attempt)"
+              exit 0
+            fi
+            echo "attempt $attempt: HTTP $code, status $status"
+            [ "$attempt" -lt 3 ] && sleep 30
+          done
+          echo "checks: $(jq -c '.checks // {}' body.json 2>/dev/null || echo '{}')"
+          echo "::error title=Production is not healthy::HTTP $code, status $status"
+          exit 1

@@ -1,0 +1,56 @@
+name: Backup
+
+# Nightly backup of the production database and uploaded files, restored into
+# a scratch database on every run to prove the dump is usable. Details and the
+# off-site setup: docs/deployment/backup-restore.md.
+on:
+  schedule:
+    # 23:30 UTC = 02:30 Asia/Amman: after the day's traffic, before the 03:00
+    # pruning job.
+    - cron: '30 23 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    name: Back up production data
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    # Same group as deploy and restore: a dump never races a migration.
+    concurrency:
+      group: vps-deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github/actions
+            infra/scripts
+
+      - name: Prepare SSH key
+        uses: ./.github/actions/vps-ssh
+        with:
+          ssh-key: ${{ secrets.VPS_SSH_KEY }}
+          host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_SSH_PORT }}
+
+      - name: Back up, verify and rotate
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
+          APP_PATH: ${{ secrets.VPS_APP_PATH }}
+          BACKUP_KEEP_DAYS: ${{ vars.BACKUP_KEEP_DAYS }}
+          BACKUP_S3_PREFIX: ${{ vars.BACKUP_S3_PREFIX }}
+          BACKUP_S3_REGION: ${{ vars.BACKUP_S3_REGION }}
+          BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+          BACKUP_S3_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+          BACKUP_S3_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+          BACKUP_S3_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+          REMOTE_ENV: >-
+            APP_PATH BACKUP_KEEP_DAYS BACKUP_S3_PREFIX BACKUP_S3_REGION BACKUP_S3_BUCKET
+            BACKUP_S3_ENDPOINT BACKUP_S3_ACCESS_KEY_ID BACKUP_S3_SECRET_ACCESS_KEY BACKUP_PASSPHRASE
+        run: bash infra/scripts/run-on-vps.sh infra/scripts/lib/vps-common.sh infra/scripts/vps-backup.sh
