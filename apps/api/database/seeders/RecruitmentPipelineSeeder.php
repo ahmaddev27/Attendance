@@ -30,7 +30,9 @@ class RecruitmentPipelineSeeder extends Seeder
             [
                 'name' => 'Standard Job Pipeline',
                 'description' => 'Default hiring workflow from job creation through hire.',
-                'is_default' => true,
+                // Only claim the default slot when it is free — an admin who
+                // already picked a default pipeline keeps it.
+                'is_default' => ! RecruitmentPipeline::query()->where('is_default', true)->exists(),
                 'is_active' => true,
             ]
         );
