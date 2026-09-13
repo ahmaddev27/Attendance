@@ -7,6 +7,7 @@ import {
   Bell,
   Briefcase,
   Building,
+  Building2,
   Calendar,
   CalendarOff,
   Check,
@@ -15,15 +16,19 @@ import {
   BarChart3,
   FileCog,
   FileText,
+  FolderKanban,
   GitBranch,
   History,
   Home,
   Inbox,
+  LayoutDashboard,
   LogOut,
   Palette,
   QrCode,
+  Route,
   Settings,
   Settings2,
+  Target,
   TrendingUp,
   Users,
   UsersRound,
@@ -52,7 +57,7 @@ type NavSection = {
 
 /**
  * Grouped sidebar navigation. Each section is a logical cluster (people,
- * attendance, leaves, workflow, tasks, reports, system). A section is
+ * attendance, leaves, workflow, tasks, recruitment, reports, system). A section is
  * rendered only when at least one of its items is visible to the current
  * user — keeps the sidebar tight for viewers with narrow permissions
  * (e.g. an approve-leaves-only manager shouldn't see empty "الأشخاص" or
@@ -105,6 +110,17 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: '/tasks', label: 'كل المهام', icon: ClipboardCheck, permissions: ['create-tasks'] },
       { href: '/tasks-config/statuses', label: 'إعدادات المهام', icon: Settings2, permissions: ['manage-workflows'] },
+    ],
+  },
+  {
+    title: 'التوظيف',
+    items: [
+      { href: '/recruitment/dashboard', label: 'لوحة التوظيف', icon: LayoutDashboard, permissions: ['view-leads', 'view-jobs'] },
+      { href: '/recruitment/leads', label: 'العملاء المحتملون', icon: Target, permissions: ['view-leads'] },
+      { href: '/recruitment/clients', label: 'العملاء', icon: Building2, permissions: ['view-clients'] },
+      { href: '/recruitment/cases', label: 'الحملات', icon: FolderKanban, permissions: ['view-recruitment-cases'] },
+      { href: '/recruitment/jobs', label: 'الوظائف', icon: Briefcase, permissions: ['view-jobs'] },
+      { href: '/recruitment/pipelines', label: 'مسارات التوظيف', icon: Route, permissions: ['manage-recruitment-pipelines'] },
     ],
   },
   {
