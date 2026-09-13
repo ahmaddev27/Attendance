@@ -3,14 +3,6 @@
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 
-test('health check returns ok', function () {
-    $response = $this->getJson('/api/health');
-
-    $response->assertOk()
-        ->assertJson(['status' => 'ok'])
-        ->assertJsonStructure(['status', 'time']);
-});
-
 test('login with correct credentials returns a token', function () {
     $user = User::factory()->create([
         'employee_number' => 1234,

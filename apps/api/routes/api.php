@@ -36,6 +36,7 @@ use App\Modules\Reports\Controllers\EmployeeDashboardController;
 use App\Modules\Search\Controllers\SearchController;
 use App\Modules\Settings\Controllers\OptionListController;
 use App\Modules\Settings\Controllers\SettingsController;
+use App\Modules\System\Controllers\HealthController;
 use App\Modules\Requests\Controllers\ApprovalInboxController;
 use App\Modules\Requests\Controllers\MyRequestsController;
 use App\Modules\Requests\Controllers\RequestController;
@@ -52,12 +53,10 @@ use App\Modules\Workflow\Controllers\WorkflowStepController;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/health', function () {
-    return response()->json([
-        'status' => 'ok',
-        'time' => now()->toIso8601String(),
-    ]);
-});
+// Readiness probe for the deploy gate and the uptime workflow. Each call
+// touches the database, cache and disk, so it is throttled like any
+// other public endpoint.
+Route::get('/health', HealthController::class)->middleware('throttle:60,1');
 
 // Reverb / Echo channel-auth endpoint. api.php already prefixes '/api',
 // so we DON'T re-add it here — otherwise the route ends up at

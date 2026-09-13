@@ -2,6 +2,8 @@
 
 use App\Models\Employee;
 use App\Modules\AI\Services\MotivationService;
+use App\Modules\System\Jobs\RecordQueueHeartbeat;
+use App\Modules\System\Services\HealthCheckService;
 use App\Shared\Enums\EmployeeStatus;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -11,6 +13,24 @@ use Illuminate\Support\Facades\Schedule;
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+
+/*
+|--------------------------------------------------------------------------
+| Health heartbeats
+|--------------------------------------------------------------------------
+|
+| /api/health cannot see background containers directly, so both leave a
+| timestamp in the shared cache every minute. The scheduler beat proves
+| `schedule:work` is ticking; the queued beat only lands when a worker
+| picks it up, which also proves the queue path end to end.
+*/
+Schedule::call(fn () => app(HealthCheckService::class)->recordSchedulerHeartbeat())
+    ->everyMinute()
+    ->name('health:scheduler-heartbeat');
+
+Schedule::job(new RecordQueueHeartbeat())
+    ->everyMinute()
+    ->name('health:queue-heartbeat');
 
 /*
 |--------------------------------------------------------------------------
