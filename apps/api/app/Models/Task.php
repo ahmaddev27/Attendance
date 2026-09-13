@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Shared\Enums\TaskEntityType;
 use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -33,6 +34,12 @@ class Task extends Model implements HasMedia
         'priority_id',
         'created_by',
         'assigned_to',
+        // Polymorphic pointer to the business entity this task is about.
+        // Nullable — pre-Recruitment generic tasks (with no entity)
+        // remain valid. See App\Shared\Enums\TaskEntityType for the
+        // registered values.
+        'entity_type',
+        'entity_id',
         'estimated_hours',
         'actual_hours',
         'progress_percent',
@@ -47,6 +54,8 @@ class Task extends Model implements HasMedia
     protected function casts(): array
     {
         return [
+            'entity_type' => TaskEntityType::class,
+            'entity_id' => 'integer',
             'start_date' => 'date',
             'due_date' => 'date',
             'completed_at' => 'datetime',

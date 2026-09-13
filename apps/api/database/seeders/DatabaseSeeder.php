@@ -19,10 +19,17 @@ class DatabaseSeeder extends Seeder
     {
         // Bootstrap-only seeders: their own prod-guards live inside them
         // (AdminUserSeeder refuses without ALLOW_ADMIN_SEED,
-        // RolePermissionSeeder is idempotent by design).
+        // RolePermissionSeeder is idempotent by design). The three
+        // Recruitment fixtures — Permissions, Pipeline template,
+        // and Settings picker lists — are all idempotent (findOrCreate /
+        // firstOrCreate) and safe on prod: they add rows the module
+        // needs to function at all rather than demo data.
         $this->call([
             AdminUserSeeder::class,
             RolePermissionSeeder::class,
+            RecruitmentPermissionSeeder::class,
+            RecruitmentPipelineSeeder::class,
+            RecruitmentSettingsSeeder::class,
         ]);
 
         if (app()->environment('production') && ! env('ALLOW_DEMO_SEED')) {
