@@ -51,16 +51,18 @@ jobs:
         run: |
           set -euo pipefail
           command -v shellcheck > /dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck; }
-          bash -n infra/scripts/run-on-vps.sh
-          shellcheck -S warning infra/scripts/run-on-vps.sh
+          failures=0
+          bash -n infra/scripts/run-on-vps.sh || failures=$((failures + 1))
+          shellcheck -S warning infra/scripts/run-on-vps.sh || failures=$((failures + 1))
           mkdir -p "$RUNNER_TEMP/remote"
           for entry in infra/scripts/vps-*.sh; do
             combined="$RUNNER_TEMP/remote/$(basename "$entry")"
             cat infra/scripts/lib/vps-common.sh "$entry" > "$combined"
             echo "→ $entry"
-            bash -n "$combined"
-            shellcheck -s bash -S warning "$combined"
+            bash -n "$combined" || failures=$((failures + 1))
+            shellcheck -s bash -S warning "$combined" || failures=$((failures + 1))
           done
+          [ "$failures" -eq 0 ]
 
       - name: Play the VPS — sshd on localhost for the runner user
         run: |

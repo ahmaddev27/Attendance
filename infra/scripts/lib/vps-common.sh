@@ -5,6 +5,7 @@
 # on its own.
 
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.simple.yml}"
+# shellcheck disable=SC2034  # read by the backup and restore entry scripts
 BACKUP_DIR="${BACKUP_DIR:-$HOME/taqat-backups}"
 
 section() {
@@ -17,7 +18,7 @@ fail() { printf '   ✗ %s\n' "$*" >&2; }
 
 enter_app_dir() {
   : "${APP_PATH:?APP_PATH missing}"
-  cd "$APP_PATH"
+  cd "$APP_PATH" || exit 1
   if [ ! -f "$COMPOSE_FILE" ]; then
     fail "$COMPOSE_FILE missing in $APP_PATH"
     exit 1

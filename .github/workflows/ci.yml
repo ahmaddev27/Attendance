@@ -191,12 +191,15 @@ jobs:
           # Entry scripts only run concatenated with the shared library, so
           # lint them the same way.
           mkdir -p "$RUNNER_TEMP/remote"
+          # Lint every program before failing so one run shows every finding.
+          failures=0
           for entry in infra/scripts/vps-*.sh; do
             combined="$RUNNER_TEMP/remote/$(basename "$entry")"
             cat infra/scripts/lib/vps-common.sh "$entry" > "$combined"
             echo "→ $entry"
-            shellcheck -s bash -S warning "$combined"
+            shellcheck -s bash -S warning "$combined" || failures=$((failures + 1))
           done
+          [ "$failures" -eq 0 ]
 
   ci-status:
     name: CI status
