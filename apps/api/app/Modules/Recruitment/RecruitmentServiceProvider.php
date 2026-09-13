@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace App\Modules\Recruitment;
 
 use App\Modules\Recruitment\Events\JobRequirementStageAdvanced;
+use App\Modules\Recruitment\Events\JobRequirementSubmitted;
+use App\Modules\Recruitment\Events\LeadCreated;
+use App\Modules\Recruitment\Listeners\NotifyCaseOwnerOfSubmittedJob;
+use App\Modules\Recruitment\Listeners\NotifyLeadOwnerOfNewLead;
 use App\Modules\Recruitment\Services\PipelineTaskGeneratorService;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
@@ -33,5 +37,8 @@ class RecruitmentServiceProvider extends ServiceProvider
             JobRequirementStageAdvanced::class,
             [PipelineTaskGeneratorService::class, 'handle'],
         );
+
+        Event::listen(LeadCreated::class, NotifyLeadOwnerOfNewLead::class);
+        Event::listen(JobRequirementSubmitted::class, NotifyCaseOwnerOfSubmittedJob::class);
     }
 }

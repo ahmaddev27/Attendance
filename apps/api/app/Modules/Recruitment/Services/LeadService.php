@@ -97,7 +97,7 @@ class LeadService
 
         // Post-commit fan-out — a broadcast error here can't roll back
         // the insert (mirrors LeaveRequestService::submit's pattern).
-        LeadCreated::dispatch($lead);
+        LeadCreated::dispatch($lead, $actor);
 
         return $lead;
     }

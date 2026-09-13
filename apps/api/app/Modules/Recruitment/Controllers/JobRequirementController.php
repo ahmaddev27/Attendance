@@ -54,7 +54,7 @@ class JobRequirementController extends Controller
 
     public function store(StoreJobRequirementRequest $request): JsonResponse
     {
-        $job = $this->jobs->create($request->validated());
+        $job = $this->jobs->create($request->validated(), $request->user());
 
         return (new JobRequirementResource($job))->response()->setStatusCode(201);
     }

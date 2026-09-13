@@ -55,7 +55,7 @@ class JobRequirementService
     /**
      * @param  array<string, mixed>  $data
      */
-    public function create(array $data): JobRequirement
+    public function create(array $data, ?User $actor = null): JobRequirement
     {
         $pipeline = $this->resolvePipeline($data['pipeline_id'] ?? null);
         $firstStage = $pipeline->firstStage();
@@ -79,7 +79,7 @@ class JobRequirementService
             return $this->jobs->create($data);
         });
 
-        JobRequirementSubmitted::dispatch($job);
+        JobRequirementSubmitted::dispatch($job, $actor);
 
         // A non-terminal first stage with auto_generate_task = true
         // triggers the initial "publish" task (or whatever the pipeline

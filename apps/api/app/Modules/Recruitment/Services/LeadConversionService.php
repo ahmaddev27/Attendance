@@ -77,7 +77,7 @@ class LeadConversionService
 
             $client = $this->resolveClient($locked, $payload, $actor);
             $case = $this->createCase($client, $locked, $payload);
-            $jobs = $this->createJobs($case, $payload['jobs'] ?? []);
+            $jobs = $this->createJobs($case, $payload['jobs'] ?? [], $actor);
 
             $updatedLead = $this->leads->update($locked, [
                 'status' => LeadStatus::Converted->value,
@@ -224,13 +224,13 @@ class LeadConversionService
      * @param  list<array<string, mixed>>  $jobsPayload
      * @return Collection<int, \App\Models\JobRequirement>
      */
-    private function createJobs(RecruitmentCase $case, array $jobsPayload): Collection
+    private function createJobs(RecruitmentCase $case, array $jobsPayload, User $actor): Collection
     {
         return collect($jobsPayload)
             ->map(fn (array $jobData) => $this->jobs->create(array_merge($jobData, [
                 'recruitment_case_id' => $case->id,
                 'owner_id' => $jobData['owner_id'] ?? $case->owner_id,
-            ])))
+            ]), $actor))
             ->values();
     }
 }

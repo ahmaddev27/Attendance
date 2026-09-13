@@ -260,6 +260,42 @@ class NotificationService
     }
 
     /**
+     * A lead was created and assigned to someone other than its creator.
+     * The listener skips the self-assignment case, so this only fires
+     * when the owner genuinely learns something new.
+     */
+    public function leadCreated(Lead $lead, User $owner): void
+    {
+        $this->dispatch($owner, "lead-created:{$lead->id}", new TaqatNotification(
+            title: 'عميل محتمل جديد مُسنَد إليك',
+            body: sprintf('%s · %s', $lead->lead_number, $lead->company_name),
+            url: "/recruitment/leads/{$lead->id}",
+            icon: 'user-plus',
+            meta: ['lead_id' => $lead->id],
+        ));
+    }
+
+    /**
+     * A job requirement landed under a case owned by someone else — the
+     * case owner sees new demand on their campaign without polling the
+     * jobs list. Distinct from jobStageAdvanced, which targets the stage
+     * owner rather than the campaign owner.
+     */
+    public function jobRequirementSubmitted(JobRequirement $job, User $caseOwner): void
+    {
+        $this->dispatch($caseOwner, "job-submitted:{$job->id}", new TaqatNotification(
+            title: 'وظيفة جديدة في حملتك',
+            body: sprintf('%s · %s', $job->job_number, $job->title),
+            url: "/recruitment/jobs/{$job->id}",
+            icon: 'briefcase',
+            meta: [
+                'job_id' => $job->id,
+                'recruitment_case_id' => $job->recruitment_case_id,
+            ],
+        ));
+    }
+
+    /**
      * Fired by the SLA scanner when a job has been in its current stage
      * beyond the stage's sla_hours. Sent to both the current owner and
      * the Case owner (kept separate so the manager sees an overdue
