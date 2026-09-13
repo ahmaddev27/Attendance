@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Recruitment\Requests;
 
-use App\Shared\Enums\LeadSource;
+use App\Models\Lead;
+use App\Modules\Settings\Services\OptionListService;
 use App\Shared\Enums\LeadStatus;
+use App\Shared\Enums\OptionList;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -41,7 +43,7 @@ class UpdateLeadRequest extends FormRequest
             'contact_phone' => ['sometimes', 'nullable', 'string', 'max:30'],
             'linkedin_url' => ['sometimes', 'nullable', 'string', 'max:255', 'url'],
 
-            'source' => ['sometimes', 'string', 'max:50', Rule::in(array_map(fn (LeadSource $c) => $c->value, LeadSource::cases()))],
+            'source' => ['sometimes', 'string', 'max:50', Rule::in($this->allowedSources())],
             'status' => ['sometimes', 'string', Rule::in(array_map(fn (LeadStatus $c) => $c->value, LeadStatus::cases()))],
 
             'owner_id' => ['sometimes', 'integer', 'exists:users,id'],
@@ -53,5 +55,24 @@ class UpdateLeadRequest extends FormRequest
 
             'lost_reason' => ['sometimes', 'nullable', 'string', 'max:255'],
         ];
+    }
+
+    /**
+     * The configured sources plus the lead's current one: an admin
+     * removing a source from the list must not make every lead that
+     * already uses it impossible to save.
+     *
+     * @return list<string>
+     */
+    private function allowedSources(): array
+    {
+        $allowed = app(OptionListService::class)->values(OptionList::LeadSources);
+        $lead = $this->route('lead');
+
+        if ($lead instanceof Lead && is_string($lead->source)) {
+            $allowed[] = $lead->source;
+        }
+
+        return $allowed;
     }
 }

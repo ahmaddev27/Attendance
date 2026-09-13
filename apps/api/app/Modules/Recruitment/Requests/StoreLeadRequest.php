@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Recruitment\Requests;
 
-use App\Shared\Enums\LeadSource;
+use App\Modules\Settings\Services\OptionListService;
 use App\Shared\Enums\LeadStatus;
+use App\Shared\Enums\OptionList;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -40,7 +41,7 @@ class StoreLeadRequest extends FormRequest
             'contact_phone' => ['nullable', 'string', 'max:30'],
             'linkedin_url' => ['nullable', 'string', 'max:255', 'url'],
 
-            'source' => ['required', 'string', 'max:50', Rule::in(array_map(fn (LeadSource $c) => $c->value, LeadSource::cases()))],
+            'source' => ['required', 'string', 'max:50', Rule::in(app(OptionListService::class)->values(OptionList::LeadSources))],
             'status' => ['sometimes', 'string', Rule::in(array_map(fn (LeadStatus $c) => $c->value, LeadStatus::cases()))],
 
             'owner_id' => ['sometimes', 'integer', 'exists:users,id'],

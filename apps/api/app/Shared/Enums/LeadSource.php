@@ -5,12 +5,10 @@ declare(strict_types=1);
 namespace App\Shared\Enums;
 
 /**
- * How the lead was acquired. Kept as an enum for validation defaults;
- * the effective list an Admin can pick from is stored in
- * `settings.recruitment.lead_sources` (JSON), so a new source added
- * from the admin UI shows up in the picker without a migration.
- * Never assume `LeadSource::cases()` is exhaustive at runtime — treat
- * this enum as the safe fallback.
+ * Built-in lead sources — the defaults for OptionList::LeadSources.
+ * The effective list is admin-editable from /settings, so validation
+ * and pickers read OptionListService, never `LeadSource::cases()`.
+ * A lead may carry a source that is no longer (or never was) a case.
  */
 enum LeadSource: string
 {
@@ -23,4 +21,19 @@ enum LeadSource: string
     case DirectOutreach = 'direct_outreach';
     case Event = 'event';
     case Other = 'other';
+
+    public function label(): string
+    {
+        return match ($this) {
+            self::LinkedIn => 'لينكدإن',
+            self::Referral => 'إحالة',
+            self::Website => 'الموقع',
+            self::ExistingClient => 'عميل حالي',
+            self::Partner => 'شريك',
+            self::Email => 'بريد إلكتروني',
+            self::DirectOutreach => 'تواصل مباشر',
+            self::Event => 'فعالية',
+            self::Other => 'أخرى',
+        };
+    }
 }

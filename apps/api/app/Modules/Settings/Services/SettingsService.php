@@ -87,6 +87,16 @@ class SettingsService
     }
 
     /**
+     * Delete a setting so reads fall back to config/defaults again.
+     */
+    public function forget(string $key): void
+    {
+        Setting::query()->where('key', $key)->delete();
+
+        Cache::forget(self::CACHE_PREFIX.$key);
+    }
+
+    /**
      * Bulk save — used by the admin UI on form submit. Runs each set() in
      * turn (transactionally isn't necessary — a partial save is still valid,
      * unlike creating an employee where several rows go together).

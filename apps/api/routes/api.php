@@ -34,6 +34,7 @@ use App\Modules\Reports\Controllers\AttendanceReportController;
 use App\Modules\Reports\Controllers\AuditLogController;
 use App\Modules\Reports\Controllers\EmployeeDashboardController;
 use App\Modules\Search\Controllers\SearchController;
+use App\Modules\Settings\Controllers\OptionListController;
 use App\Modules\Settings\Controllers\SettingsController;
 use App\Modules\Requests\Controllers\ApprovalInboxController;
 use App\Modules\Requests\Controllers\MyRequestsController;
@@ -368,6 +369,11 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/settings', [SettingsController::class, 'index']);
             Route::put('/settings', [SettingsController::class, 'update']);
 
+            // Picker lists (currencies, lead sources, industries, ...).
+            Route::get('/option-lists', [OptionListController::class, 'adminIndex']);
+            Route::put('/option-lists/{list}', [OptionListController::class, 'update']);
+            Route::delete('/option-lists/{list}', [OptionListController::class, 'destroy']);
+
             // Manual smoke-test endpoints — send a real message through the
             // currently-configured transport so an admin can verify creds
             // right after editing them. Run inline (not queued) so the
@@ -433,6 +439,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // per-row visibility filtering is out of scope for M9 and lands in a
     // follow-up milestone.
     Route::get('/search', [SearchController::class, 'query']);
+
+    // Picker lists for form dropdowns — codes and display labels only,
+    // nothing sensitive, so any signed-in user may read them.
+    Route::get('/option-lists', [OptionListController::class, 'index']);
 });
 
 // M11 — Recruitment. Every endpoint sits behind auth:sanctum plus a
