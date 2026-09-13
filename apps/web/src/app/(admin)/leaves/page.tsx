@@ -33,15 +33,21 @@ import { ApproveLeaveDialog } from '@/components/leaves/approve-leave-dialog';
 import { RejectLeaveDialog } from '@/components/leaves/reject-leave-dialog';
 import { LeaveDetailsDialog } from '@/components/leaves/leave-details-dialog';
 import { CreateLeaveDialog } from '@/components/leaves/create-leave-dialog';
+import { ExportCsvButton } from '@/components/reports/export-csv-button';
 import { leaveRequestsApi } from '@/lib/api/endpoints/leaves';
 import { leaveTypesApi } from '@/lib/api/endpoints/leave-types';
+import { reportsApi } from '@/lib/api/endpoints/reports';
 import { formatDate } from '@/lib/attendance-format';
 import { LEAVE_STATUS_OPTIONS } from '@/lib/constants/leave-options';
+import { hasPermission, useAuthStore } from '@/lib/stores/auth-store';
 import type { EmployeeSummary, LeaveRequest, LeaveStatus } from '@/lib/api/types';
 
 const PER_PAGE = 20;
 
 export default function LeavesPage() {
+  const user = useAuthStore((s) => s.user);
+  const canExport = hasPermission(user, 'view-reports');
+
   const [page, setPage] = React.useState(1);
   const [status, setStatus] = React.useState<LeaveStatus | 'all'>('all');
   const [leaveTypeId, setLeaveTypeId] = React.useState<string | undefined>();
@@ -88,10 +94,20 @@ export default function LeavesPage() {
           <p className="text-xs font-medium text-muted">الإجازات</p>
           <h1 className="mt-1 text-2xl font-bold text-ink">طلبات الإجازة</h1>
         </div>
-        <Button onClick={() => setCreateOpen(true)} className="gap-2 bg-brand text-white hover:bg-brand-hover">
-          <Plus className="h-4 w-4" />
-          طلب جديد
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {canExport && (
+            <ExportCsvButton
+              filename={`leaves-${new Date().getFullYear()}.csv`}
+              // The export scopes by year and has no employee or date-range
+              // filter, so only the filters it understands are forwarded.
+              fetchCsv={() => reportsApi.leavesCsv({ status: filters.status, leave_type_id: filters.leave_type_id })}
+            />
+          )}
+          <Button onClick={() => setCreateOpen(true)} className="gap-2 bg-brand text-white hover:bg-brand-hover">
+            <Plus className="h-4 w-4" />
+            طلب جديد
+          </Button>
+        </div>
       </div>
 
       <div className="mb-4 grid grid-cols-1 gap-3 rounded-xl border border-hairline bg-surface p-4 sm:grid-cols-2 lg:grid-cols-5">

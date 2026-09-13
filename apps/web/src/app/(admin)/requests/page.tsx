@@ -12,19 +12,25 @@ import { FilterBar } from '@/components/data-table/filter-bar';
 import { FilterSelect } from '@/components/data-table/filter-select';
 import { EmployeeAvatar } from '@/components/employees/employee-avatar';
 import { EmployeeSearchSelect } from '@/components/attendance/employee-search-select';
+import { ExportCsvButton } from '@/components/reports/export-csv-button';
 import { RequestDetailDialog } from '@/components/requests/request-detail-dialog';
 import { RequestStatusBadge } from '@/components/requests/request-status-badge';
 import { RequestTypeBadge } from '@/components/requests/request-type-badge';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { reportsApi } from '@/lib/api/endpoints/reports';
 import { requestTypesApi } from '@/lib/api/endpoints/request-types';
 import { requestsApi } from '@/lib/api/endpoints/requests';
 import { REQUEST_STATUS_OPTIONS } from '@/lib/constants/request-options';
 import { formatDateTime } from '@/lib/request-format';
+import { hasPermission, useAuthStore } from '@/lib/stores/auth-store';
 import type { EmployeeSummary, RequestStatus, RequestSummary } from '@/lib/api/types';
 
 const PER_PAGE = 20;
 
 export default function RequestsPage() {
+  const user = useAuthStore((s) => s.user);
+  const canExport = hasPermission(user, 'view-reports');
+
   const [page, setPage] = React.useState(1);
   const [search, setSearch] = React.useState('');
   const [status, setStatus] = React.useState<string | undefined>();
@@ -36,6 +42,17 @@ export default function RequestsPage() {
   const [viewingRequestId, setViewingRequestId] = React.useState<number | null>(null);
 
   const debouncedSearch = useDebouncedValue(search);
+
+  // Shared by the list and the CSV export, which supports every filter
+  // here except the free-text search and the employee picker.
+  const filters = {
+    // 'all' is a UI-only sentinel — the backend repository filters
+    // by status literally, so passing 'all' would match nothing.
+    status: status && status !== 'all' ? (status as RequestStatus) : undefined,
+    request_type_id: requestTypeId ? Number(requestTypeId) : undefined,
+    from: from || undefined,
+    to: to || undefined,
+  };
 
   React.useEffect(() => {
     setPage(1);
@@ -50,16 +67,11 @@ export default function RequestsPage() {
     queryKey: ['requests', 'list', { page, search: debouncedSearch, status, requestTypeId, employeeId: employee?.id, from, to }],
     queryFn: async () => {
       const { data } = await requestsApi.list({
+        ...filters,
         page,
         per_page: PER_PAGE,
         search: debouncedSearch || undefined,
-        // 'all' is a UI-only sentinel — the backend repository filters
-        // by status literally, so passing 'all' would match nothing.
-        status: status && status !== 'all' ? (status as RequestStatus) : undefined,
-        request_type_id: requestTypeId ? Number(requestTypeId) : undefined,
         employee_id: employee?.id,
-        from: from || undefined,
-        to: to || undefined,
       });
       return data;
     },
@@ -124,9 +136,17 @@ export default function RequestsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-xs font-medium text-muted">مسارات العمل</p>
-        <h1 className="mt-1 text-2xl font-bold text-ink">جميع الطلبات</h1>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <p className="text-xs font-medium text-muted">مسارات العمل</p>
+          <h1 className="mt-1 text-2xl font-bold text-ink">جميع الطلبات</h1>
+        </div>
+        {canExport && (
+          <ExportCsvButton
+            filename={`requests-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.csv`}
+            fetchCsv={() => reportsApi.requestsCsv(filters)}
+          />
+        )}
       </div>
 
       <FilterBar searchValue={search} onSearchChange={setSearch} searchPlaceholder="بحث برقم الطلب...">

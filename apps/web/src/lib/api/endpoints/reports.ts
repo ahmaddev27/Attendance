@@ -1,4 +1,5 @@
 import { apiClient } from '@/lib/api/client';
+import type { LeaveStatus, RequestStatus } from '@/lib/api/types';
 
 export type AttendanceReportRow = {
   employee_id: number;
@@ -17,6 +18,23 @@ export type AttendanceReportRow = {
 export type AttendanceMonthlyParams = {
   year: number;
   month: number;
+  department_id?: number;
+};
+
+/** A leave belongs to `year` when any of its days fall inside it; the API defaults to the current year. */
+export type LeaveReportExportParams = {
+  year?: number;
+  leave_type_id?: number;
+  status?: LeaveStatus;
+  department_id?: number;
+};
+
+/** `from`/`to` are Y-m-d and bound the submission date inclusively. */
+export type RequestReportExportParams = {
+  request_type_id?: number;
+  status?: RequestStatus;
+  from?: string;
+  to?: string;
   department_id?: number;
 };
 
@@ -52,4 +70,8 @@ export const reportsApi = {
       params: { ...params, format: 'pdf' },
       responseType: 'blob',
     }),
+  leavesCsv: (params: LeaveReportExportParams) =>
+    apiClient.get<Blob>('/admin/reports/leaves/export', { params, responseType: 'blob' }),
+  requestsCsv: (params: RequestReportExportParams) =>
+    apiClient.get<Blob>('/admin/reports/requests/export', { params, responseType: 'blob' }),
 };
