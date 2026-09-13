@@ -587,6 +587,18 @@ export type TaskHistoryEntry = {
   created_at: string;
 };
 
+/** Business object a task is about — mirrors App\Shared\Enums\TaskEntityType. */
+export type TaskEntityType = 'lead' | 'client' | 'recruitment_case' | 'job_requirement';
+
+export type TaskEntity = {
+  type: TaskEntityType;
+  id: number;
+  /** "J-2026-0045 — Senior Backend Dev"; null when the entity row is gone. */
+  label: string | null;
+  /** Frontend route to the entity, e.g. "/recruitment/jobs/45". */
+  link: string;
+};
+
 export type Task = {
   id: number;
   parent_task_id: number | null;
@@ -597,6 +609,7 @@ export type Task = {
   creator: EmployeeSummary;
   assignee: EmployeeSummary | null;
   tags: TaskTag[];
+  entity: TaskEntity | null;
   estimated_hours: number | null;
   actual_hours: number | null;
   progress_percent: number;

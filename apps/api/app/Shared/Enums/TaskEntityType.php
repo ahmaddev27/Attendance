@@ -20,4 +20,18 @@ enum TaskEntityType: string
     case Client = 'client';
     case RecruitmentCase = 'recruitment_case';
     case JobRequirement = 'job_requirement';
+
+    /**
+     * Frontend route of the entity — the one place the web app's URL
+     * shape for Recruitment objects is spelled out on the API side.
+     */
+    public function route(int $id): string
+    {
+        return match ($this) {
+            self::Lead => "/recruitment/leads/{$id}",
+            self::Client => "/recruitment/clients/{$id}",
+            self::RecruitmentCase => "/recruitment/cases/{$id}",
+            self::JobRequirement => "/recruitment/jobs/{$id}",
+        };
+    }
 }

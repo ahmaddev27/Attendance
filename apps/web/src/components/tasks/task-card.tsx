@@ -5,6 +5,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { MessageSquare, Paperclip } from 'lucide-react';
 
 import { EmployeeAvatar } from '@/components/employees/employee-avatar';
+import { TaskEntityChip } from '@/components/tasks/task-entity-chip';
 import { TaskPriorityDot } from '@/components/tasks/task-priority-badge';
 import { TaskTagBadge } from '@/components/tasks/task-tag-badge';
 import { formatDate } from '@/lib/attendance-format';
@@ -53,6 +54,8 @@ export function TaskCard({ task, onClick, dragOverlay = false }: TaskCardProps) 
         <p className="line-clamp-2 flex-1 text-sm font-medium text-ink">{task.title}</p>
         <TaskPriorityDot priority={task.priority} className="mt-1" />
       </div>
+
+      {task.entity && <TaskEntityChip entity={task.entity} />}
 
       {visibleTags.length > 0 && (
         <div className="flex flex-wrap gap-1">

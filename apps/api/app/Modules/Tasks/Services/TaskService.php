@@ -40,6 +40,7 @@ class TaskService
         private readonly TaskStatusRepository $statuses,
         private readonly TaskHistoryService $history,
         private readonly NotificationService $notifier,
+        private readonly TaskEntityLabeler $entityLabels,
     ) {}
 
     /**
@@ -47,11 +48,15 @@ class TaskService
      */
     public function paginate(array $filters, int $perPage = 25, ?User $actor = null): LengthAwarePaginator
     {
-        return $this->tasks->paginate(
+        $page = $this->tasks->paginate(
             $filters,
             $perPage,
             ownedByEmployeeId: $this->authorizedScopeFor($actor),
         );
+
+        $this->entityLabels->hydrate($page->items());
+
+        return $page;
     }
 
     /**
@@ -69,6 +74,8 @@ class TaskService
     {
         $grouped = $this->tasks->groupByStatus($filters, $this->authorizedScopeFor($actor));
 
+        $this->entityLabels->hydrate($grouped->flatMap(fn (array $entry) => $entry['tasks']));
+
         return $this->statuses->all()
             ->keyBy(fn (TaskStatus $status) => $status->code)
             ->map(function (TaskStatus $status) use ($grouped) {
@@ -84,7 +91,11 @@ class TaskService
 
     public function find(int $id): Task
     {
-        return $this->tasks->findOrFail($id);
+        $task = $this->tasks->findOrFail($id);
+
+        $this->entityLabels->hydrate([$task]);
+
+        return $task;
     }
 
     /**
@@ -97,6 +108,7 @@ class TaskService
         $task = $this->tasks->findOrFail($id);
 
         $this->assertCanActOnTask($task, $actor);
+        $this->entityLabels->hydrate([$task]);
 
         return $task;
     }

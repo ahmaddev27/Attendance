@@ -17,6 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { TaskEntityChip } from '@/components/tasks/task-entity-chip';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
@@ -304,6 +305,7 @@ export function TaskDetailView({ taskId, basePath }: TaskDetailViewProps) {
                 <Pencil className="h-4 w-4" />
               </button>
               <TaskStatusBadge status={task.status} />
+              {task.entity && <TaskEntityChip entity={task.entity} />}
             </div>
           )}
         </div>

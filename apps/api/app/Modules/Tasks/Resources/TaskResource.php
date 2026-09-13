@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tasks\Resources;
 
 use App\Models\Task;
+use App\Shared\Enums\TaskEntityType;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -58,6 +59,16 @@ class TaskResource extends JsonResource
                 'avatar_url' => $this->assignee->avatar_url,
             ]),
             'tags' => TaskTagResource::collection($this->whenLoaded('tags')),
+
+            // `entity_label` is a read-side attribute stamped by
+            // TaskEntityLabeler in one query per entity type — never a
+            // column, never persisted.
+            'entity' => $this->entity_type instanceof TaskEntityType && $this->entity_id !== null ? [
+                'type' => $this->entity_type->value,
+                'id' => $this->entity_id,
+                'label' => $this->getAttribute('entity_label'),
+                'link' => $this->entity_type->route((int) $this->entity_id),
+            ] : null,
 
             'comments_count' => $this->when(isset($this->comments_count), fn () => (int) $this->comments_count),
             'attachments_count' => $this->when(isset($this->attachments_count), fn () => (int) $this->attachments_count),
