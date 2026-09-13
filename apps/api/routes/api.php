@@ -20,6 +20,15 @@ use App\Modules\AI\Controllers\MotivationController;
 use App\Modules\Analytics\Controllers\AnalyticsController;
 use App\Modules\Notifications\Controllers\MyNotificationsController;
 use App\Modules\Push\Controllers\PushTokenController;
+use App\Modules\Recruitment\Controllers\ClientContactController;
+use App\Modules\Recruitment\Controllers\ClientController;
+use App\Modules\Recruitment\Controllers\JobRequirementController;
+use App\Modules\Recruitment\Controllers\LeadActivityController;
+use App\Modules\Recruitment\Controllers\LeadController;
+use App\Modules\Recruitment\Controllers\RecruitmentCaseController;
+use App\Modules\Recruitment\Controllers\RecruitmentDashboardController;
+use App\Modules\Recruitment\Controllers\RecruitmentPipelineController;
+use App\Modules\Recruitment\Controllers\RecruitmentPipelineStageController;
 use App\Modules\Reports\Controllers\AdminDashboardController;
 use App\Modules\Reports\Controllers\AttendanceReportController;
 use App\Modules\Reports\Controllers\AuditLogController;
@@ -424,4 +433,114 @@ Route::middleware('auth:sanctum')->group(function () {
     // per-row visibility filtering is out of scope for M9 and lands in a
     // follow-up milestone.
     Route::get('/search', [SearchController::class, 'query']);
+});
+
+// M11 — Recruitment. Every endpoint sits behind auth:sanctum plus a
+// dedicated `*-leads`/`*-clients`/`*-jobs`/`*-recruitment-*` permission
+// gate so the module's 16 fine-grained roles (see docs/recruitment/
+// 03-phase-1-plan.md §4 RBAC matrix) map 1:1 to route access. Static
+// paths (`/leads/kanban`, `/leads/export`) are registered BEFORE their
+// `{lead}` siblings — otherwise Laravel would bind "kanban"/"export"
+// as the route-model-binding value and 404 instead of dispatching.
+Route::middleware('auth:sanctum')->group(function () {
+    // Leads
+    Route::middleware('permission:view-leads')->group(function () {
+        Route::get('/leads/kanban', [LeadController::class, 'kanban']);
+        Route::get('/leads/export', [LeadController::class, 'export'])
+            ->middleware('permission:export-recruitment-data');
+        Route::get('/leads', [LeadController::class, 'index']);
+        Route::get('/leads/{lead}', [LeadController::class, 'show']);
+        Route::get('/leads/{lead}/activities', [LeadActivityController::class, 'index']);
+    });
+
+    Route::middleware('permission:manage-leads')->group(function () {
+        // Rate-limited by user id (recruitment-lead-create, 30/hour) to
+        // bound a compromised sales-rep session or a runaway
+        // integration script from flooding the pipeline.
+        Route::post('/leads', [LeadController::class, 'store'])
+            ->middleware('throttle:recruitment-lead-create');
+        Route::patch('/leads/{lead}', [LeadController::class, 'update']);
+        Route::delete('/leads/{lead}', [LeadController::class, 'destroy']);
+        Route::post('/leads/{lead}/activities', [LeadActivityController::class, 'store']);
+    });
+
+    Route::post('/leads/{lead}/convert', [LeadController::class, 'convert'])
+        ->middleware('permission:convert-leads');
+
+    // Clients
+    Route::middleware('permission:view-clients')->group(function () {
+        Route::get('/clients', [ClientController::class, 'index']);
+        Route::get('/clients/{client}', [ClientController::class, 'show']);
+        Route::get('/clients/{client}/profile', [ClientController::class, 'profile']);
+    });
+
+    Route::middleware('permission:manage-clients')->group(function () {
+        Route::post('/clients', [ClientController::class, 'store']);
+        Route::patch('/clients/{client}', [ClientController::class, 'update']);
+        Route::delete('/clients/{client}', [ClientController::class, 'destroy']);
+
+        Route::post('/clients/{client}/contacts', [ClientContactController::class, 'store']);
+        Route::patch('/clients/{client}/contacts/{contact}', [ClientContactController::class, 'update']);
+        Route::delete('/clients/{client}/contacts/{contact}', [ClientContactController::class, 'destroy']);
+    });
+
+    // Recruitment Cases
+    Route::middleware('permission:view-recruitment-cases')->group(function () {
+        Route::get('/recruitment-cases', [RecruitmentCaseController::class, 'index']);
+        Route::get('/recruitment-cases/{case}', [RecruitmentCaseController::class, 'show']);
+        Route::get('/clients/{client}/cases', [RecruitmentCaseController::class, 'indexForClient']);
+    });
+
+    Route::middleware('permission:manage-recruitment-cases')->group(function () {
+        Route::post('/recruitment-cases', [RecruitmentCaseController::class, 'store']);
+        Route::patch('/recruitment-cases/{case}', [RecruitmentCaseController::class, 'update']);
+        Route::delete('/recruitment-cases/{case}', [RecruitmentCaseController::class, 'destroy']);
+    });
+
+    // Job Requirements
+    Route::middleware('permission:view-jobs')->group(function () {
+        Route::get('/jobs', [JobRequirementController::class, 'index']);
+        Route::get('/jobs/{job}', [JobRequirementController::class, 'show']);
+        Route::get('/recruitment-cases/{case}/jobs', [JobRequirementController::class, 'indexForCase']);
+    });
+
+    Route::middleware('permission:manage-jobs')->group(function () {
+        Route::post('/jobs', [JobRequirementController::class, 'store']);
+        Route::patch('/jobs/{job}', [JobRequirementController::class, 'update']);
+        Route::delete('/jobs/{job}', [JobRequirementController::class, 'destroy']);
+        Route::post('/jobs/{job}/cancel', [JobRequirementController::class, 'cancel']);
+    });
+
+    // Advancing a stage is its own permission — a stage owner shouldn't
+    // need `manage-jobs` (broad CRUD) just to hand off their stage's
+    // work to the next owner.
+    Route::post('/jobs/{job}/advance-stage', [JobRequirementController::class, 'advanceStage'])
+        ->middleware('permission:advance-job-stage');
+
+    // Pipelines (Admin)
+    Route::middleware('permission:manage-recruitment-pipelines')->group(function () {
+        Route::get('/recruitment-pipelines', [RecruitmentPipelineController::class, 'index']);
+        Route::post('/recruitment-pipelines', [RecruitmentPipelineController::class, 'store']);
+        Route::get('/recruitment-pipelines/{pipeline}', [RecruitmentPipelineController::class, 'show']);
+        Route::patch('/recruitment-pipelines/{pipeline}', [RecruitmentPipelineController::class, 'update']);
+        Route::delete('/recruitment-pipelines/{pipeline}', [RecruitmentPipelineController::class, 'destroy']);
+
+        // /stages/reorder must precede the {stage} routes so "reorder"
+        // isn't bound as a stage id.
+        Route::post('/recruitment-pipelines/{pipeline}/stages/reorder', [RecruitmentPipelineStageController::class, 'reorder']);
+        Route::post('/recruitment-pipelines/{pipeline}/stages', [RecruitmentPipelineStageController::class, 'store']);
+        Route::patch('/recruitment-pipelines/{pipeline}/stages/{stage}', [RecruitmentPipelineStageController::class, 'update']);
+        Route::delete('/recruitment-pipelines/{pipeline}/stages/{stage}', [RecruitmentPipelineStageController::class, 'destroy']);
+    });
+
+    // Recruitment Dashboard — accessible to either sales (view-leads)
+    // OR recruitment (view-jobs) staff, since the panel serves both.
+    // Spatie's `permission:` middleware treats the pipe as OR.
+    Route::middleware('permission:view-leads|view-jobs')
+        ->prefix('recruitment/dashboard')
+        ->group(function () {
+            Route::get('/kpis', [RecruitmentDashboardController::class, 'kpis']);
+            Route::get('/funnel', [RecruitmentDashboardController::class, 'funnel']);
+            Route::get('/leaderboard', [RecruitmentDashboardController::class, 'leaderboard']);
+        });
 });

@@ -112,5 +112,16 @@ class RateLimiterServiceProvider extends ServiceProvider
         RateLimiter::for('create-tasks', function (Request $request) {
             return Limit::perHour(60)->by(optional($request->user())->id ?: $request->ip());
         });
+
+        // Lead creation (Recruitment M11): 30 per hour per sales rep.
+        // Caps how quickly a single compromised or misconfigured
+        // integration (e.g. a broken LinkedIn scraper) can flood the
+        // pipeline before an admin notices — the duplicate-warning
+        // dedup path in LeadService blocks obvious clones but nothing
+        // else bounds raw volume otherwise.
+        // Attach with `->middleware('throttle:recruitment-lead-create')`.
+        RateLimiter::for('recruitment-lead-create', function (Request $request) {
+            return Limit::perHour(30)->by(optional($request->user())->id ?: $request->ip());
+        });
     }
 }

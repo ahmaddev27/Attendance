@@ -160,3 +160,30 @@ Schedule::command('taqat:notify-open-sessions')
     ->onOneServer()
     ->withoutOverlapping()
     ->name('taqat:notify-open-sessions');
+
+/*
+|--------------------------------------------------------------------------
+| Recruitment SLA + stale-lead sweeps
+|--------------------------------------------------------------------------
+|
+| Two schedules feeding the Recruitment inbox:
+|
+|   - recruitment:scan-sla         : hourly sweep that finds every open
+|     JobRequirement whose current stage has exceeded its sla_hours and
+|     notifies both the current stage owner and the case owner. Runs
+|     in the background so a slow batch never blocks the scheduler tick.
+|   - recruitment:scan-stale-leads : 09:00 daily reminder for every
+|     active Lead not touched in the past 7 days (see the command for
+|     the --days option).
+|
+| Both use withoutOverlapping() to guard against a slow previous run
+| stampeding the next tick.
+*/
+Schedule::command('recruitment:scan-sla')
+    ->hourly()
+    ->withoutOverlapping()
+    ->runInBackground();
+
+Schedule::command('recruitment:scan-stale-leads')
+    ->dailyAt('09:00')
+    ->withoutOverlapping();

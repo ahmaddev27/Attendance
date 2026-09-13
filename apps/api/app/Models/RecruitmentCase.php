@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
  * One hiring engagement / campaign for a single Client. Groups the
@@ -20,6 +22,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 class RecruitmentCase extends Model
 {
+    use LogsActivity;
     use SoftDeletes;
 
     protected $fillable = [
@@ -102,5 +105,18 @@ class RecruitmentCase extends Model
             RecruitmentCaseStatus::Active->value,
             RecruitmentCaseStatus::OnHold->value,
         ]);
+    }
+
+    /**
+     * See Lead::getActivitylogOptions — same trade-offs, focused on
+     * business fields to keep the timeline signal-rich.
+     */
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly($this->fillable)
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('recruitment.case');
     }
 }

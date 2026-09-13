@@ -241,6 +241,25 @@ class NotificationService
     }
 
     /**
+     * Fired by the stale-lead scheduler when an active Lead has not been
+     * touched in more than the configured number of days. Routed to the
+     * lead's own owner — a manager view aggregates this separately.
+     */
+    public function leadStale(Lead $lead, User $owner, int $daysSinceLastContact): void
+    {
+        $this->dispatch($owner, "lead-stale:{$lead->id}", new TaqatNotification(
+            title: 'متابعة عميل محتمل متأخرة',
+            body: sprintf('لم يتم التواصل مع %s منذ %d يوم', $lead->company_name, $daysSinceLastContact),
+            url: "/recruitment/leads/{$lead->id}",
+            icon: 'bell-ring',
+            meta: [
+                'lead_id' => $lead->id,
+                'days_since_last_contact' => $daysSinceLastContact,
+            ],
+        ));
+    }
+
+    /**
      * Fired by the SLA scanner when a job has been in its current stage
      * beyond the stage's sla_hours. Sent to both the current owner and
      * the Case owner (kept separate so the manager sees an overdue

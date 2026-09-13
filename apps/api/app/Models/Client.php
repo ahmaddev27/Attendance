@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
  * A company we have engaged with formally — the anchor for
@@ -22,6 +24,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 class Client extends Model
 {
+    use LogsActivity;
     use SoftDeletes;
 
     protected $fillable = [
@@ -106,5 +109,18 @@ class Client extends Model
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('status', ClientStatus::Active);
+    }
+
+    /**
+     * See Lead::getActivitylogOptions — same trade-offs, focused on
+     * business fields to keep the timeline signal-rich.
+     */
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly($this->fillable)
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('recruitment.client');
     }
 }

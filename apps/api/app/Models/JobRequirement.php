@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
  * A single open position inside a RecruitmentCase — the entity the
@@ -21,6 +23,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 class JobRequirement extends Model
 {
+    use LogsActivity;
     use SoftDeletes;
 
     protected $fillable = [
@@ -141,5 +144,18 @@ class JobRequirement extends Model
             JobRequirementStatus::Active->value,
             JobRequirementStatus::OnHold->value,
         ]);
+    }
+
+    /**
+     * See Lead::getActivitylogOptions — same trade-offs, focused on
+     * business fields to keep the timeline signal-rich.
+     */
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly($this->fillable)
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('recruitment.job_requirement');
     }
 }

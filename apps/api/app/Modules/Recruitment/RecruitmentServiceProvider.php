@@ -17,6 +17,13 @@ use Illuminate\Support\ServiceProvider;
  * stays self-contained — pulling the provider out of
  * bootstrap/providers.php disables every bit of Recruitment automation
  * without touching anything else.
+ *
+ * Audit logging for Lead / Client / RecruitmentCase / JobRequirement is
+ * handled at the model layer via Spatie's LogsActivity trait rather
+ * than dedicated Observers — every create/update/delete already flows
+ * through Eloquent events the trait hooks into, and the existing
+ * Reports\AuditLogController reads the same activity_log table for
+ * free. No boot-time registration is needed.
  */
 class RecruitmentServiceProvider extends ServiceProvider
 {

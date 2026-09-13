@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
  * A prospective client captured by the Sales team before formal
@@ -19,6 +21,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 class Lead extends Model
 {
+    use LogsActivity;
     use SoftDeletes;
 
     protected $fillable = [
@@ -122,5 +125,21 @@ class Lead extends Model
     public function scopeOwnedBy(Builder $query, int $userId): Builder
     {
         return $query->where('owner_id', $userId);
+    }
+
+    /**
+     * Records only the fillable attributes so the activity_log row does
+     * not carry timestamps / soft-delete columns as change diffs — the
+     * audit surface stays focused on business fields. logOnlyDirty()
+     * suppresses empty-diff updates so `touch()` calls do not spam the
+     * timeline with no-op rows.
+     */
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly($this->fillable)
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('recruitment.lead');
     }
 }
