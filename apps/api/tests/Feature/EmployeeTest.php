@@ -256,3 +256,19 @@ test('a login user already holding the next number does not block the create', f
         ->assertCreated()
         ->assertJsonPath('data.employee_number', 2);
 });
+
+test('the reserved system number range does not push new hires past it', function () {
+    Employee::factory()->create(['employee_number' => 900000]);
+    Employee::factory()->create(['employee_number' => 41]);
+    $schedule = WorkSchedule::factory()->create();
+
+    $this->postJson('/api/employees', [
+        'first_name' => 'Nour',
+        'last_name' => 'Saleh',
+        'employment_type' => 'full_time',
+        'joining_date' => '2026-01-15',
+        'work_schedule_id' => $schedule->id,
+    ])
+        ->assertCreated()
+        ->assertJsonPath('data.employee_number', 42);
+});

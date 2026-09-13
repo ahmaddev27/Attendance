@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Shared\Enums\EmployeeStatus;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use RuntimeException;
 
 class EmployeeRepository
 {
@@ -19,6 +20,13 @@ class EmployeeRepository
      * @var list<string>
      */
     private const WITH = ['position', 'department', 'team', 'directManager', 'workSchedule'];
+
+    /**
+     * Numbers from here up belong to system accounts: migration
+     * 2026_09_20_100008 gives each super-admin an employee record at 900000+,
+     * so regular hires must keep counting below it.
+     */
+    private const SYSTEM_NUMBER_RANGE_START = 900000;
 
     /**
      * Reserve the next employee_number. Must be called inside a transaction
@@ -32,10 +40,14 @@ class EmployeeRepository
      */
     public function nextEmployeeNumberForUpdate(): int
     {
-        $next = (int) Employee::withTrashed()->lockForUpdate()->max('employee_number') + 1;
+        $next = (int) Employee::withTrashed()
+            ->where('employee_number', '<', self::SYSTEM_NUMBER_RANGE_START)
+            ->lockForUpdate()
+            ->max('employee_number') + 1;
 
         $takenByUsers = User::query()
             ->where('employee_number', '>=', $next)
+            ->where('employee_number', '<', self::SYSTEM_NUMBER_RANGE_START)
             ->orderBy('employee_number')
             ->pluck('employee_number');
 
@@ -44,6 +56,10 @@ class EmployeeRepository
                 break;
             }
             $next++;
+        }
+
+        if ($next >= self::SYSTEM_NUMBER_RANGE_START) {
+            throw new RuntimeException('Regular employee numbers have reached the reserved system range.');
         }
 
         return $next;
