@@ -166,10 +166,42 @@ jobs:
           NEXT_PUBLIC_REVERB_PORT: "8080"
           NEXT_PUBLIC_REVERB_APP_KEY: taqat-app-key
 
+  infra-scripts:
+    name: Infra scripts (bash -n + shellcheck)
+    runs-on: ubuntu-latest
+    # The deploy, backup and restore programs run on production over SSH with
+    # no second chance, so a syntax slip must fail here, before deploy starts.
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Syntax check
+        run: |
+          set -euo pipefail
+          bash -n infra/scripts/run-on-vps.sh
+          for entry in infra/scripts/vps-*.sh; do
+            echo "→ $entry"
+            cat infra/scripts/lib/vps-common.sh "$entry" | bash -n
+          done
+
+      - name: shellcheck
+        run: |
+          set -euo pipefail
+          command -v shellcheck > /dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck; }
+          shellcheck -S warning infra/scripts/run-on-vps.sh
+          # Entry scripts only run concatenated with the shared library, so
+          # lint them the same way.
+          mkdir -p "$RUNNER_TEMP/remote"
+          for entry in infra/scripts/vps-*.sh; do
+            combined="$RUNNER_TEMP/remote/$(basename "$entry")"
+            cat infra/scripts/lib/vps-common.sh "$entry" > "$combined"
+            echo "→ $entry"
+            shellcheck -s bash -S warning "$combined"
+          done
+
   ci-status:
     name: CI status
     if: always()
-    needs: [api-tests, web-build]
+    needs: [api-tests, web-build, infra-scripts]
     runs-on: ubuntu-latest
     steps:
       - name: Fail if any job failed

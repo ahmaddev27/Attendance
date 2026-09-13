@@ -34,6 +34,16 @@ x-logging: &default-logging
       max-size: "10m"
       max-file: "5"
 
+# Laravel logging for every api-based container. Overrides .env on purpose:
+# `daily` rotates storage/logs (14 days) instead of growing one file inside
+# the api_storage volume until the disk fills, and `stderr` in JSON makes the
+# same lines readable with `docker compose logs`, which Docker already rotates.
+x-api-log-env: &api-log-env
+  LOG_CHANNEL: stack
+  LOG_STACK: daily,stderr
+  LOG_DAILY_DAYS: "14"
+  LOG_STDERR_FORMATTER: Monolog\Formatter\JsonFormatter
+
 # All api-based services (api, queue, scheduler, reverb) share the same
 # image. Defining it once here keeps them in lock-step and makes the file
 # shorter. Docker Compose builds it once when any of them is built.
@@ -44,6 +54,8 @@ x-api-service: &api-service
   image: taqat-api:local
   restart: unless-stopped
   env_file: .env
+  environment:
+    <<: *api-log-env
   volumes:
     - api_storage:/var/www/html/storage
   networks: [taqat]
@@ -78,17 +90,20 @@ services:
     image: redis:7-alpine
     container_name: taqat_redis
     restart: unless-stopped
-    # Bounded memory + LRU eviction so a queue-backlog spike (jobs
-    # piling up faster than they drain) can't consume every byte of RAM
-    # on the box and start evicting active session data unpredictably.
-    # Persistence is turned off: this Redis is only used for cache /
-    # sessions / queues / Reverb pub-sub — every piece of state has a
-    # canonical source elsewhere (MySQL, MinIO), so we treat it as a
-    # pure warm memory tier and skip both RDB snapshots and AOF fsyncs.
+    # This Redis holds queued jobs and sessions, which have no other copy:
+    # a restart used to drop pending SMS/notification jobs and log everyone
+    # out. The append-only file (fsync every second) survives restarts at the
+    # cost of at most one second of writes; RDB snapshots stay off to avoid
+    # fork-doubling memory on a small box.
+    #
+    # Eviction only touches keys that carry a TTL (cache entries, sessions).
+    # Queue lists never expire, so memory pressure can no longer silently
+    # delete jobs — at worst new writes fail loudly and /api/health reports it.
     command: >-
       redis-server --requirepass ${REDIS_PASSWORD}
-      --maxmemory 512mb --maxmemory-policy allkeys-lru
-      --save "" --appendonly no
+      --maxmemory 512mb --maxmemory-policy volatile-lru
+      --appendonly yes --appendfsync everysec
+      --save ""
     volumes:
       - redis_data:/data
     healthcheck:
@@ -177,7 +192,10 @@ services:
     # for horizontal scaling unless every node subscribes to the same
     # Redis channel. Turning this on now keeps the single-node config
     # working AND lets us scale out without redeploying config.
+    # A service-level `environment` replaces the anchor's map, so the log
+    # settings are merged back in explicitly.
     environment:
+      <<: *api-log-env
       REVERB_SCALING_ENABLED: "true"
     ports:
       - "127.0.0.1:${REVERB_PORT:-8182}:8080"

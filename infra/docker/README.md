@@ -95,17 +95,19 @@ on a cron/systemd timer, then `docker compose exec nginx nginx -s reload`.
 - **`APP_KEY`**: generate once with
   `docker compose -f docker-compose.prod.yml run --rm api php artisan key:generate --show`
   and store it in `.env` — rotating it invalidates all encrypted data/sessions.
-- **Backups**: `db_data`, `redis_data` and `minio_data` are named volumes with
-  no backup job configured yet. Add a scheduled `mysqldump`/`mc mirror` job
-  before relying on this in production.
+- **Backups**: the `Backup` workflow dumps the database (and restores the dump
+  into a scratch database to prove it), archives `storage/app` and the MinIO
+  volume nightly, and copies them off-site once the `BACKUP_*` secrets exist.
+  Redis runs with an append-only file, so queued jobs and sessions survive a
+  restart. See `docs/deployment/backup-restore.md`.
 - **CI test database assumptions**: `.github/workflows/ci.yml` spins up its
   own MySQL/Redis service containers with standard Laravel env var names
   (`DB_HOST`, `DB_DATABASE`, etc.). If `apps/api` ships its own
   `.env.testing`/`phpunit.xml` with different values, reconcile them.
-- **API health checks**: the `api` service's Docker healthcheck only checks
-  that php-fpm accepts TCP connections on 9000 (`nc -z`), not that the app
-  actually boots. Once `apps/api` exposes a real `/api/health` endpoint (see
-  `docs/v2/01-architecture.md#13`), consider a deeper check via `cgi-fcgi`.
+- **API health checks**: `GET /api/health` checks the database, cache, storage
+  and Redis (503 when one fails) plus scheduler and queue heartbeats
+  (`degraded`). The deploy gates on it and rolls back when it fails, and the
+  `Uptime` workflow probes it every 10 minutes.
 - **Zero-downtime deploys**: `docker compose up -d` briefly drops requests to
   a service while its container is replaced (a few seconds). Fine for an
   internal HR tool; revisit (blue/green, Traefik) if that stops being true.

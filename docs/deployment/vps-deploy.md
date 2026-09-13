@@ -145,21 +145,20 @@ Actions.
 
 ## Auto-deploy flow (per push to main)
 
-1. **CI runs** (api-tests + web-build). If it fails, deploy never fires.
-2. **Deploy job triggers** via `workflow_run` and SSH's into the VPS:
-   - Verifies `.env` is git-ignored — aborts if not.
-   - Backs up current `.env` to `.env.pre-deploy.TIMESTAMP`.
-   - `git fetch && git reset --hard origin/main` — never touches ignored files.
-   - If `composer.json` changed but `composer.lock` didn't, regenerates the lock via `composer:2` container image.
-   - `docker compose build --pull api web`.
-   - `docker compose up -d --force-recreate api web queue scheduler reverb` — db/redis/minio never touched.
-   - `docker compose restart nginx` — resolves the fresh api container IP.
-   - Waits up to 60s for the api container to be ready.
-   - `php artisan migrate --force` — additive only, no `migrate:fresh`, no seed.
-   - Rebuilds Laravel caches for production.
-   - Verifies every expected container is `running`; fails loudly if not.
-   - Prunes dangling images older than 60 minutes.
-3. **Post-deploy health check** hits `/health` from the runner side — final gate.
+1. **CI runs** (api-tests, web-build, infra-scripts). If it fails, deploy never fires.
+2. **Deploy job triggers** via `workflow_run`, prepares the SSH key (`.github/actions/vps-ssh`) and runs `infra/scripts/vps-deploy.sh` on the VPS through `infra/scripts/run-on-vps.sh`:
+   1. Verifies `.env` is git-ignored, backs it up to `.env.pre-deploy.TIMESTAMP`, then `git fetch && git reset --hard origin/main`.
+   2. Regenerates `composer.lock` via the `composer:2` image if `composer.json` changed without it.
+   3. Tags the images of the running `taqat_api` / `taqat_web` containers as `taqat-api:previous` / `taqat-web:previous`.
+   4. `docker compose build --pull api web`. A build failure restores the previous checkout; nothing else changes.
+   5. **Runs `php artisan migrate --force` in a one-off container from the new image while the old release keeps serving.** A migration failure stops here, restores the previous checkout, and leaves the running containers untouched.
+   6. Recreates `api web queue scheduler reverb`, applies backing-service changes (`db redis minio meilisearch`), restarts nginx. Before Redis is recreated with a new command, its append-only file is switched on live so sessions and queued jobs survive.
+   7. Rebuilds Laravel caches.
+   8. **Health gate:** every service must be `running` and `GET /api/health` (through nginx) must answer 200.
+   9. Prunes dangling images and trims the build cache.
+3. **Anything that fails in steps 6–8 rolls back automatically**: the checkout returns to the previous commit, the `:previous` images are re-tagged as `:local`, the app containers are recreated and the health gate runs again. The workflow run is still marked failed, so the failure is visible.
+
+The script is linted in CI (`bash -n` + shellcheck) because it runs on production with no second chance.
 
 ## What the deploy will NEVER do
 
@@ -173,19 +172,9 @@ Actions.
 
 ## Rolling back
 
-```bash
-# List recent images
-docker images | grep taqat
+Automatic rollback (above) covers failures during a deploy. To go back to an older release after a successful deploy, revert the offending commit on `main` and push: CI and the normal deploy do the rest, with the same health gate.
 
-# Tag the previous image as current
-docker tag taqat-api:local@<SHA_OF_PREVIOUS> taqat-api:local
-
-# Recreate containers with the older image
-docker compose -f docker-compose.simple.yml up -d --force-recreate api queue scheduler reverb
-
-# Roll back migrations if needed
-docker compose -f docker-compose.simple.yml exec -T api php artisan migrate:rollback --step=1
-```
+Database rollbacks are intentionally not automated. Migrations are additive, so older code keeps working on a newer schema; if data itself must be restored, use the `Restore database` workflow described in [backup-restore.md](backup-restore.md).
 
 ## Common failure modes and fixes
 
