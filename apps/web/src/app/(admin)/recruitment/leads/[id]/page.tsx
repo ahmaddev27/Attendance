@@ -11,12 +11,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { LeadStatusBadge } from '@/components/recruitment/status-badges';
 import { LeadFormDialog } from '@/app/(admin)/recruitment/leads/_components/lead-form-dialog';
 import { AddActivityDialog } from '@/app/(admin)/recruitment/leads/_components/add-activity-dialog';
+import { useOptionLists } from '@/hooks/use-option-lists';
 import { leadActivitiesApi, leadsApi } from '@/lib/api/endpoints/recruitment';
 import { formatDate } from '@/lib/attendance-format';
-import {
-  LEAD_ACTIVITY_TYPE_LABELS,
-  LEAD_SOURCE_LABELS,
-} from '@/lib/constants/recruitment-options';
+import { LEAD_ACTIVITY_TYPE_LABELS } from '@/lib/constants/recruitment-options';
 import { hasPermission, useAuthStore } from '@/lib/stores/auth-store';
 import { cn } from '@/lib/utils';
 
@@ -31,6 +29,8 @@ export default function LeadDetailPage() {
   const leadId = Number(params.id);
   const [editOpen, setEditOpen] = React.useState(false);
   const [activityOpen, setActivityOpen] = React.useState(false);
+
+  const { labelOf } = useOptionLists();
 
   const { data: leadRes, isLoading } = useQuery({
     queryKey: ['leads', leadId],
@@ -93,8 +93,8 @@ export default function LeadDetailPage() {
                   {lead.city ? ` — ${lead.city}` : ''}
                 </span>
               )}
-              {lead.industry && <span>{lead.industry}</span>}
-              <span>المصدر: {LEAD_SOURCE_LABELS[lead.source] ?? lead.source}</span>
+              {lead.industry && <span>{labelOf('industries', lead.industry)}</span>}
+              <span>المصدر: {labelOf('lead_sources', lead.source)}</span>
               {lead.owner && (
                 <span className="flex items-center gap-1.5">
                   <User className="h-3.5 w-3.5" /> {lead.owner.name}
@@ -231,7 +231,7 @@ export default function LeadDetailPage() {
             <dl className="space-y-3">
               <MetaRow label="آخر تواصل" value={lead.last_contact_at ? formatDateTime(lead.last_contact_at) : null} isNumber />
               <MetaRow label="متابعة تالية" value={lead.next_followup_at ? formatDateTime(lead.next_followup_at) : null} isNumber />
-              <MetaRow label="حجم الشركة" value={lead.company_size} />
+              <MetaRow label="حجم الشركة" value={labelOf('company_sizes', lead.company_size)} />
               <MetaRow
                 label="موقع الشركة"
                 value={

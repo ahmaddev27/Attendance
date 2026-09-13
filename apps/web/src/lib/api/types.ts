@@ -862,16 +862,11 @@ export type LeadStatus =
   | 'lost'
   | 'on_hold';
 
-export type LeadSource =
-  | 'linkedin'
-  | 'referral'
-  | 'website'
-  | 'existing_client'
-  | 'partner'
-  | 'email'
-  | 'direct_outreach'
-  | 'event'
-  | 'other';
+/**
+ * Code from the admin-editable `lead_sources` picker list. Deliberately
+ * not a closed union: admins add and remove sources from /settings.
+ */
+export type LeadSource = string;
 
 export type ClientStatus = 'active' | 'on_hold' | 'inactive' | 'terminated';
 

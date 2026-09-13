@@ -31,11 +31,10 @@ import {
 } from '@/components/ui/select';
 import { LeadFormDialog } from '@/app/(admin)/recruitment/leads/_components/lead-form-dialog';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { useOptionLists } from '@/hooks/use-option-lists';
 import { leadsApi } from '@/lib/api/endpoints/recruitment';
 import {
   LEAD_KANBAN_STATUSES,
-  LEAD_SOURCE_LABELS,
-  LEAD_SOURCE_OPTIONS,
   LEAD_STATUS_META,
 } from '@/lib/constants/recruitment-options';
 import { hasPermission, useAuthStore } from '@/lib/stores/auth-store';
@@ -53,6 +52,7 @@ export default function LeadsKanbanPage() {
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
   const canManage = hasPermission(user, 'manage-leads');
+  const { options } = useOptionLists();
 
   const [search, setSearch] = React.useState('');
   const [source, setSource] = React.useState<LeadSource | 'all'>('all');
@@ -176,7 +176,7 @@ export default function LeadsKanbanPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">كل المصادر</SelectItem>
-              {LEAD_SOURCE_OPTIONS.map((opt) => (
+              {options('lead_sources').map((opt) => (
                 <SelectItem key={opt.value} value={opt.value}>
                   {opt.label}
                 </SelectItem>
@@ -287,6 +287,8 @@ function KanbanCard({
   onClick?: () => void;
   dragOverlay?: boolean;
 }) {
+  const { labelOf } = useOptionLists();
+
   return (
     <button
       type="button"
@@ -303,7 +305,7 @@ function KanbanCard({
         <span className="num" dir="ltr">
           {card.lead_number}
         </span>
-        <span>{LEAD_SOURCE_LABELS[card.source] ?? card.source}</span>
+        <span>{labelOf('lead_sources', card.source)}</span>
       </div>
       {card.country && <p className="text-[11px] text-ink-2">{card.country}</p>}
       {card.expected_hiring_volume ? (

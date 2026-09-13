@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CaseStatusBadge, ClientStatusBadge, JobStatusBadge } from '@/components/recruitment/status-badges';
 import { ClientFormDialog } from '@/app/(admin)/recruitment/clients/_components/client-form-dialog';
 import { ContactsPanel } from '@/app/(admin)/recruitment/clients/[id]/_components/contacts-panel';
+import { useOptionLists } from '@/hooks/use-option-lists';
 import { clientsApi, jobsApi, recruitmentCasesApi } from '@/lib/api/endpoints/recruitment';
 import { formatDate } from '@/lib/attendance-format';
 import { CLIENT_STATUS_META } from '@/lib/constants/recruitment-options';
@@ -23,6 +24,7 @@ export default function ClientDetailPage() {
   const clientId = Number(params.id);
   const user = useAuthStore((s) => s.user);
   const canManage = hasPermission(user, 'manage-clients');
+  const { labelOf } = useOptionLists();
   const canViewCases = hasPermission(user, 'view-recruitment-cases');
   const canViewJobs = hasPermission(user, 'view-jobs');
   const [editOpen, setEditOpen] = React.useState(false);
@@ -79,7 +81,7 @@ export default function ClientDetailPage() {
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-ink-2">
               {client.country && <span>{client.country}{client.city ? ` — ${client.city}` : ''}</span>}
-              {client.industry && <span>{client.industry}</span>}
+              {client.industry && <span>{labelOf('industries', client.industry)}</span>}
               {client.account_manager && <span>مدير الحساب: {client.account_manager.name}</span>}
               <span>الحالة: {CLIENT_STATUS_META[client.status].label}</span>
             </div>
@@ -105,8 +107,8 @@ export default function ClientDetailPage() {
             <div className="rounded-xl border border-hairline bg-surface p-5">
               <h2 className="mb-3 text-sm font-semibold text-ink">التفاصيل</h2>
               <dl className="space-y-3 text-sm">
-                <Row label="القطاع" value={client.industry} />
-                <Row label="حجم الشركة" value={client.company_size} />
+                <Row label="القطاع" value={labelOf('industries', client.industry)} />
+                <Row label="حجم الشركة" value={labelOf('company_sizes', client.company_size)} />
                 <Row label="العنوان" value={client.address} />
                 <Row label="الرقم الضريبي" value={client.tax_number} />
                 <Row label="شروط الدفع" value={client.payment_terms} />

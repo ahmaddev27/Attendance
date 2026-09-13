@@ -34,6 +34,7 @@ import {
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
+import { OptionSelect } from '@/components/option-lists/option-select';
 import { clientsApi } from '@/lib/api/endpoints/recruitment';
 import { CLIENT_STATUS_OPTIONS } from '@/lib/constants/recruitment-options';
 import type { Client, ClientPayload, ClientStatus } from '@/lib/api/types';
@@ -173,10 +174,10 @@ export function ClientFormDialog({ open, onOpenChange, client }: ClientFormDialo
                 </FormItem>
               )} />
               <FormField control={form.control} name="industry" render={({ field }) => (
-                <FormItem><FormLabel>القطاع</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>القطاع</FormLabel><FormControl><OptionSelect list="industries" ref={field.ref} value={field.value} onValueChange={field.onChange} onBlur={field.onBlur} allowEmpty /></FormControl><FormMessage /></FormItem>
               )} />
               <FormField control={form.control} name="company_size" render={({ field }) => (
-                <FormItem><FormLabel>حجم الشركة</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>حجم الشركة</FormLabel><FormControl><OptionSelect list="company_sizes" ref={field.ref} value={field.value} onValueChange={field.onChange} onBlur={field.onBlur} allowEmpty /></FormControl><FormMessage /></FormItem>
               )} />
               <FormField control={form.control} name="country" render={({ field }) => (
                 <FormItem><FormLabel>الدولة</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>

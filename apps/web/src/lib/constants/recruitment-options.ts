@@ -4,7 +4,6 @@ import type {
   JobEmploymentType,
   JobRequirementStatus,
   LeadActivityType,
-  LeadSource,
   LeadStatus,
   RecruitmentCaseStatus,
   StageOwnerRuleType,
@@ -45,22 +44,6 @@ export const LEAD_KANBAN_STATUSES: LeadStatus[] = [
   'negotiation',
   'on_hold',
 ];
-
-export const LEAD_SOURCE_LABELS: Record<LeadSource, string> = {
-  linkedin: 'لينكدإن',
-  referral: 'إحالة',
-  website: 'الموقع',
-  existing_client: 'عميل حالي',
-  partner: 'شريك',
-  email: 'بريد إلكتروني',
-  direct_outreach: 'تواصل مباشر',
-  event: 'فعالية',
-  other: 'أخرى',
-};
-
-export const LEAD_SOURCE_OPTIONS: { value: LeadSource; label: string }[] = (
-  Object.keys(LEAD_SOURCE_LABELS) as LeadSource[]
-).map((value) => ({ value, label: LEAD_SOURCE_LABELS[value] }));
 
 export const CLIENT_STATUS_META: Record<ClientStatus, { label: string; className: string }> = {
   active: { label: 'نشط', className: 'border-transparent bg-success-soft text-success' },

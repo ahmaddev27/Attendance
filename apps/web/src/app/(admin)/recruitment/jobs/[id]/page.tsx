@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { JobStatusBadge } from '@/components/recruitment/status-badges';
 import { JobFormDialog } from '@/app/(admin)/recruitment/jobs/_components/job-form-dialog';
 import { AdvanceStageDialog } from '@/app/(admin)/recruitment/jobs/[id]/_components/advance-stage-dialog';
+import { useOptionLists } from '@/hooks/use-option-lists';
 import { jobsApi, recruitmentPipelinesApi } from '@/lib/api/endpoints/recruitment';
 import { formatDate } from '@/lib/attendance-format';
 import {
@@ -29,6 +30,7 @@ export default function JobDetailPage() {
   const user = useAuthStore((s) => s.user);
   const canManage = hasPermission(user, 'manage-jobs');
   const canAdvance = hasPermission(user, 'advance-job-stage');
+  const { labelOf } = useOptionLists();
   const [editOpen, setEditOpen] = React.useState(false);
   const [advanceOpen, setAdvanceOpen] = React.useState(false);
 
@@ -180,7 +182,7 @@ export default function JobDetailPage() {
                 }
               />
               <Row label="سنوات الخبرة" value={job.required_experience_years} isNumber />
-              <Row label="المستوى التعليمي" value={job.education_level} />
+              <Row label="المستوى التعليمي" value={labelOf('education_levels', job.education_level)} />
               <Row label="آخر موعد للتقديم" value={job.application_deadline ? formatDate(job.application_deadline) : null} isNumber />
               <Row label="تاريخ البدء المستهدف" value={job.target_start_date ? formatDate(job.target_start_date) : null} isNumber />
               <Row

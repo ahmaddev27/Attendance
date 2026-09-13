@@ -34,8 +34,10 @@ import {
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
+import { OptionSelect } from '@/components/option-lists/option-select';
+import { useOptionLists } from '@/hooks/use-option-lists';
 import { leadsApi } from '@/lib/api/endpoints/recruitment';
-import { LEAD_SOURCE_OPTIONS, LEAD_STATUS_OPTIONS } from '@/lib/constants/recruitment-options';
+import { LEAD_STATUS_OPTIONS } from '@/lib/constants/recruitment-options';
 import type { Lead, LeadPayload, LeadSource, LeadStatus } from '@/lib/api/types';
 
 const leadFormSchema = z.object({
@@ -140,6 +142,8 @@ export function LeadFormDialog({ open, onOpenChange, lead }: LeadFormDialogProps
   const queryClient = useQueryClient();
   const isEdit = !!lead;
   const [forceDuplicate, setForceDuplicate] = React.useState(false);
+  const { options } = useOptionLists();
+  const sourceOptions = options('lead_sources');
 
   const form = useForm<LeadFormValues>({
     resolver: zodResolver(leadFormSchema),
@@ -153,6 +157,16 @@ export function LeadFormDialog({ open, onOpenChange, lead }: LeadFormDialogProps
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, lead?.id]);
+
+  // A new lead starts on the built-in default source; if an admin removed
+  // it from the list, fall back to the first configured source instead
+  // of submitting a value the API will reject.
+  React.useEffect(() => {
+    if (!open || isEdit || sourceOptions.length === 0) return;
+    if (!sourceOptions.some((option) => option.value === form.getValues('source'))) {
+      form.setValue('source', sourceOptions[0].value);
+    }
+  }, [open, isEdit, sourceOptions, form]);
 
   const mutation = useMutation({
     mutationFn: (values: LeadFormValues) => {
@@ -213,7 +227,14 @@ export function LeadFormDialog({ open, onOpenChange, lead }: LeadFormDialogProps
                   <FormItem>
                     <FormLabel>القطاع</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="مثال: تقنية، صناعة" />
+                      <OptionSelect
+                        list="industries"
+                        ref={field.ref}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        onBlur={field.onBlur}
+                        allowEmpty
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -226,7 +247,14 @@ export function LeadFormDialog({ open, onOpenChange, lead }: LeadFormDialogProps
                   <FormItem>
                     <FormLabel>حجم الشركة</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="مثال: 51-200" />
+                      <OptionSelect
+                        list="company_sizes"
+                        ref={field.ref}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        onBlur={field.onBlur}
+                        allowEmpty
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -348,20 +376,15 @@ export function LeadFormDialog({ open, onOpenChange, lead }: LeadFormDialogProps
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>المصدر</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {LEAD_SOURCE_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <OptionSelect
+                        list="lead_sources"
+                        ref={field.ref}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        onBlur={field.onBlur}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

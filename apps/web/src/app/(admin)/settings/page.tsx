@@ -6,9 +6,11 @@ import {
   AtSign,
   Bell,
   Bot,
+  ListChecks,
   Loader2,
   MessageCircle,
   MessageSquareText,
+  PlugZap,
   Save,
   Send,
   Settings,
@@ -20,6 +22,8 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { OptionListsPanel } from '@/components/option-lists/option-lists-panel';
 import {
   settingsApi,
   type SettingField,
@@ -27,6 +31,12 @@ import {
 } from '@/lib/api/endpoints/settings';
 
 type TestKind = 'mail' | 'sms' | 'whatsapp';
+
+type SettingsTab = 'integrations' | 'lists';
+
+const SETTINGS_TABS: readonly string[] = ['integrations', 'lists'] satisfies SettingsTab[];
+
+const isSettingsTab = (value: string): value is SettingsTab => SETTINGS_TABS.includes(value);
 
 /**
  * Runtime-editable system settings. Backend groups the fields for us
@@ -46,6 +56,21 @@ export default function SettingsPage() {
   const queryClient = useQueryClient();
   const [saving, setSaving] = React.useState(false);
   const [formState, setFormState] = React.useState<Record<string, Record<string, string>>>({});
+
+  // The active tab lives in the URL hash so /settings#lists deep-links
+  // straight to the picker lists.
+  const [tab, setTab] = React.useState<SettingsTab>('integrations');
+
+  React.useEffect(() => {
+    const fromHash = window.location.hash.slice(1);
+    if (isSettingsTab(fromHash)) setTab(fromHash);
+  }, []);
+
+  const changeTab = (value: string) => {
+    if (!isSettingsTab(value)) return;
+    setTab(value);
+    window.history.replaceState(null, '', `#${value}`);
+  };
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin', 'settings'],
@@ -93,116 +118,137 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold text-ink">
-            <Settings className="h-6 w-6 text-brand" /> إعدادات النظام
-          </h1>
-          <p className="mt-1 text-sm text-muted">
-            اربط خدمات البريد و SMS و واتساب و AI. الحقول الحساسة مشفّرة قبل التخزين.
-          </p>
-        </div>
-        <Button
-          type="button"
-          onClick={handleSave}
-          disabled={saving || isLoading || !data}
-          className="bg-brand hover:bg-brand-hover text-white"
-        >
-          {saving ? <Loader2 className="me-1 h-4 w-4 animate-spin" /> : <Save className="me-1 h-4 w-4" />}
-          حفظ التغييرات
-        </Button>
+      <div>
+        <h1 className="flex items-center gap-2 text-2xl font-bold text-ink">
+          <Settings className="h-6 w-6 text-brand" /> إعدادات النظام
+        </h1>
+        <p className="mt-1 text-sm text-muted">
+          اربط الخدمات الخارجية وأدِر قوائم الاختيار التي تظهر في النماذج.
+        </p>
       </div>
 
-      {isError && (
-        <Card className="border-danger-soft bg-danger-soft/40 p-4 text-sm text-danger">
-          تعذّر تحميل الإعدادات.{' '}
-          <button onClick={() => refetch()} className="font-semibold underline">
-            إعادة المحاولة
-          </button>
-        </Card>
-      )}
+      <Tabs value={tab} onValueChange={changeTab}>
+        <TabsList>
+          <TabsTrigger value="integrations" className="gap-1.5">
+            <PlugZap className="h-4 w-4" /> الخدمات والتكاملات
+          </TabsTrigger>
+          <TabsTrigger value="lists" className="gap-1.5">
+            <ListChecks className="h-4 w-4" /> قوائم الاختيار
+          </TabsTrigger>
+        </TabsList>
 
-      {isLoading || !data ? (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-64 w-full" />
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {'mail' in data && (
-            <SettingsGroup
-              title="البريد الإلكتروني (Resend)"
-              description="إعدادات إرسال الإيميلات عبر خدمة Resend."
-              icon={<AtSign className="h-4 w-4 text-brand" />}
-              fields={data.mail}
-              values={formState.mail ?? {}}
-              onChange={(k, v) => setValue('mail', k, v)}
-              test={{
-                kind: 'mail',
-                label: 'أرسل بريد اختبار',
-                inputLabel: 'عنوان البريد المستقبِل',
-                inputPlaceholder: 'name@example.com',
-                inputType: 'email',
-              }}
-            />
+        <TabsContent value="integrations" className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted">
+              اربط خدمات البريد و SMS و واتساب و AI. الحقول الحساسة مشفّرة قبل التخزين.
+            </p>
+            <Button
+              type="button"
+              onClick={handleSave}
+              disabled={saving || isLoading || !data}
+              className="bg-brand hover:bg-brand-hover text-white"
+            >
+              {saving ? <Loader2 className="me-1 h-4 w-4 animate-spin" /> : <Save className="me-1 h-4 w-4" />}
+              حفظ التغييرات
+            </Button>
+          </div>
+
+          {isError && (
+            <Card className="border-danger-soft bg-danger-soft/40 p-4 text-sm text-danger">
+              تعذّر تحميل الإعدادات.{' '}
+              <button onClick={() => refetch()} className="font-semibold underline">
+                إعادة المحاولة
+              </button>
+            </Card>
           )}
-          {'sms' in data && (
-            <SettingsGroup
-              title="الرسائل النصية (MTC SMS)"
-              description="بيانات الاعتماد لبوابة MTC Jordan."
-              icon={<MessageSquareText className="h-4 w-4 text-brand" />}
-              fields={data.sms}
-              values={formState.sms ?? {}}
-              onChange={(k, v) => setValue('sms', k, v)}
-              test={{
-                kind: 'sms',
-                label: 'أرسل SMS اختبار',
-                inputLabel: 'رقم الجوّال (مثال: 962791234567)',
-                inputPlaceholder: '9627XXXXXXXX',
-                inputType: 'tel',
-              }}
-            />
+
+          {isLoading || !data ? (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-64 w-full" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              {'mail' in data && (
+                <SettingsGroup
+                  title="البريد الإلكتروني (Resend)"
+                  description="إعدادات إرسال الإيميلات عبر خدمة Resend."
+                  icon={<AtSign className="h-4 w-4 text-brand" />}
+                  fields={data.mail}
+                  values={formState.mail ?? {}}
+                  onChange={(k, v) => setValue('mail', k, v)}
+                  test={{
+                    kind: 'mail',
+                    label: 'أرسل بريد اختبار',
+                    inputLabel: 'عنوان البريد المستقبِل',
+                    inputPlaceholder: 'name@example.com',
+                    inputType: 'email',
+                  }}
+                />
+              )}
+              {'sms' in data && (
+                <SettingsGroup
+                  title="الرسائل النصية (MTC SMS)"
+                  description="بيانات الاعتماد لبوابة MTC Jordan."
+                  icon={<MessageSquareText className="h-4 w-4 text-brand" />}
+                  fields={data.sms}
+                  values={formState.sms ?? {}}
+                  onChange={(k, v) => setValue('sms', k, v)}
+                  test={{
+                    kind: 'sms',
+                    label: 'أرسل SMS اختبار',
+                    inputLabel: 'رقم الجوّال (مثال: 962791234567)',
+                    inputPlaceholder: '9627XXXXXXXX',
+                    inputType: 'tel',
+                  }}
+                />
+              )}
+              {'whatsapp' in data && (
+                <SettingsGroup
+                  title="واتساب (Meta Cloud API)"
+                  description="إعدادات إرسال رسائل واتساب من الحساب التجاري."
+                  icon={<MessageCircle className="h-4 w-4 text-brand" />}
+                  fields={data.whatsapp}
+                  values={formState.whatsapp ?? {}}
+                  onChange={(k, v) => setValue('whatsapp', k, v)}
+                  test={{
+                    kind: 'whatsapp',
+                    label: 'أرسل رسالة واتساب اختبار',
+                    inputLabel: 'رقم الواتساب (مثال: 962791234567)',
+                    inputPlaceholder: '9627XXXXXXXX',
+                    inputType: 'tel',
+                  }}
+                />
+              )}
+              {'ai' in data && (
+                <SettingsGroup
+                  title="الذكاء الاصطناعي (Claude)"
+                  description="مفتاح Anthropic لتوليد الرسائل التحفيزية."
+                  icon={<Bot className="h-4 w-4 text-brand" />}
+                  fields={data.ai}
+                  values={formState.ai ?? {}}
+                  onChange={(k, v) => setValue('ai', k, v)}
+                />
+              )}
+              {'push' in data && (
+                <SettingsGroup
+                  title="إشعارات Push (Expo)"
+                  description="Access token اختياري لإشعارات تطبيق الجوّال."
+                  icon={<Bell className="h-4 w-4 text-brand" />}
+                  fields={data.push}
+                  values={formState.push ?? {}}
+                  onChange={(k, v) => setValue('push', k, v)}
+                />
+              )}
+            </div>
           )}
-          {'whatsapp' in data && (
-            <SettingsGroup
-              title="واتساب (Meta Cloud API)"
-              description="إعدادات إرسال رسائل واتساب من الحساب التجاري."
-              icon={<MessageCircle className="h-4 w-4 text-brand" />}
-              fields={data.whatsapp}
-              values={formState.whatsapp ?? {}}
-              onChange={(k, v) => setValue('whatsapp', k, v)}
-              test={{
-                kind: 'whatsapp',
-                label: 'أرسل رسالة واتساب اختبار',
-                inputLabel: 'رقم الواتساب (مثال: 962791234567)',
-                inputPlaceholder: '9627XXXXXXXX',
-                inputType: 'tel',
-              }}
-            />
-          )}
-          {'ai' in data && (
-            <SettingsGroup
-              title="الذكاء الاصطناعي (Claude)"
-              description="مفتاح Anthropic لتوليد الرسائل التحفيزية."
-              icon={<Bot className="h-4 w-4 text-brand" />}
-              fields={data.ai}
-              values={formState.ai ?? {}}
-              onChange={(k, v) => setValue('ai', k, v)}
-            />
-          )}
-          {'push' in data && (
-            <SettingsGroup
-              title="إشعارات Push (Expo)"
-              description="Access token اختياري لإشعارات تطبيق الجوّال."
-              icon={<Bell className="h-4 w-4 text-brand" />}
-              fields={data.push}
-              values={formState.push ?? {}}
-              onChange={(k, v) => setValue('push', k, v)}
-            />
-          )}
-        </div>
-      )}
+        </TabsContent>
+
+        <TabsContent value="lists">
+          <OptionListsPanel />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

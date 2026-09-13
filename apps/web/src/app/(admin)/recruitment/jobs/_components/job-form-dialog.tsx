@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
+import { OptionSelect } from '@/components/option-lists/option-select';
 import {
   jobsApi,
   recruitmentCasesApi,
@@ -280,7 +281,7 @@ export function JobFormDialog({ open, onOpenChange, job, defaultCaseId }: Props)
             </div>
             <div>
               <Label className="text-xs font-semibold text-ink-2">عملة الراتب</Label>
-              <Input className="mt-1.5" value={values.salary_currency} onChange={(e) => setValues({ ...values, salary_currency: e.target.value.toUpperCase().slice(0, 3) })} />
+              <OptionSelect list="currencies" className="mt-1.5" value={values.salary_currency} onValueChange={(v) => setValues({ ...values, salary_currency: v })} allowEmpty showValue />
             </div>
             <div>
               <Label className="text-xs font-semibold text-ink-2">سنوات الخبرة</Label>
@@ -288,7 +289,7 @@ export function JobFormDialog({ open, onOpenChange, job, defaultCaseId }: Props)
             </div>
             <div>
               <Label className="text-xs font-semibold text-ink-2">المستوى التعليمي</Label>
-              <Input className="mt-1.5" value={values.education_level} onChange={(e) => setValues({ ...values, education_level: e.target.value })} />
+              <OptionSelect list="education_levels" className="mt-1.5" value={values.education_level} onValueChange={(v) => setValues({ ...values, education_level: v })} allowEmpty />
             </div>
             <div>
               <Label className="text-xs font-semibold text-ink-2">رقم المالك (user id)</Label>

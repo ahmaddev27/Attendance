@@ -20,6 +20,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
+import { OptionSelect } from '@/components/option-lists/option-select';
 import { clientsApi, leadsApi } from '@/lib/api/endpoints/recruitment';
 import {
   CASE_PRIORITY_OPTIONS,
@@ -279,10 +280,10 @@ export default function ConvertLeadPage() {
                 <Input value={clientDraft.city} onChange={(e) => setClientDraft({ ...clientDraft, city: e.target.value })} />
               </FieldLabel>
               <FieldLabel label="القطاع">
-                <Input value={clientDraft.industry} onChange={(e) => setClientDraft({ ...clientDraft, industry: e.target.value })} />
+                <OptionSelect list="industries" value={clientDraft.industry} onValueChange={(v) => setClientDraft({ ...clientDraft, industry: v })} allowEmpty />
               </FieldLabel>
               <FieldLabel label="حجم الشركة">
-                <Input value={clientDraft.company_size} onChange={(e) => setClientDraft({ ...clientDraft, company_size: e.target.value })} />
+                <OptionSelect list="company_sizes" value={clientDraft.company_size} onValueChange={(v) => setClientDraft({ ...clientDraft, company_size: v })} allowEmpty />
               </FieldLabel>
               <FieldLabel label="الموقع">
                 <Input value={clientDraft.company_website} onChange={(e) => setClientDraft({ ...clientDraft, company_website: e.target.value })} placeholder="https://" />
@@ -426,7 +427,7 @@ export default function ConvertLeadPage() {
                   <Input type="number" min={0} value={job.salary_max} onChange={(e) => updateJob(index, { salary_max: e.target.value })} />
                 </FieldLabel>
                 <FieldLabel label="عملة الراتب">
-                  <Input value={job.salary_currency} onChange={(e) => updateJob(index, { salary_currency: e.target.value.toUpperCase().slice(0, 3) })} />
+                  <OptionSelect list="currencies" value={job.salary_currency} onValueChange={(v) => updateJob(index, { salary_currency: v })} allowEmpty showValue />
                 </FieldLabel>
               </div>
               <FieldLabel label="الوصف">

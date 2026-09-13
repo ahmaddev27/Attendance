@@ -30,13 +30,10 @@ import { DataTable, type DataTableColumn } from '@/components/data-table/data-ta
 import { LeadStatusBadge } from '@/components/recruitment/status-badges';
 import { LeadFormDialog } from '@/app/(admin)/recruitment/leads/_components/lead-form-dialog';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { useOptionLists } from '@/hooks/use-option-lists';
 import { leadsApi } from '@/lib/api/endpoints/recruitment';
 import { formatDate } from '@/lib/attendance-format';
-import {
-  LEAD_SOURCE_LABELS,
-  LEAD_SOURCE_OPTIONS,
-  LEAD_STATUS_OPTIONS,
-} from '@/lib/constants/recruitment-options';
+import { LEAD_STATUS_OPTIONS } from '@/lib/constants/recruitment-options';
 import { hasPermission, useAuthStore } from '@/lib/stores/auth-store';
 import type { Lead, LeadSource, LeadStatus } from '@/lib/api/types';
 
@@ -49,6 +46,7 @@ export default function LeadsPage() {
   const user = useAuthStore((s) => s.user);
   const canManage = hasPermission(user, 'manage-leads');
   const canExport = hasPermission(user, 'export-recruitment-data');
+  const { options, labelOf } = useOptionLists();
 
   const [page, setPage] = React.useState(1);
   const [search, setSearch] = React.useState('');
@@ -160,7 +158,7 @@ export default function LeadsPage() {
       header: 'الدولة',
       cell: (l) => <span className="text-sm text-ink-2">{l.country ?? '—'}</span>,
     },
-    { key: 'source', header: 'المصدر', cell: (l) => <span className="text-sm text-ink-2">{LEAD_SOURCE_LABELS[l.source] ?? l.source}</span> },
+    { key: 'source', header: 'المصدر', cell: (l) => <span className="text-sm text-ink-2">{labelOf('lead_sources', l.source)}</span> },
     { key: 'status', header: 'الحالة', cell: (l) => <LeadStatusBadge status={l.status} /> },
     {
       key: 'owner',
@@ -254,7 +252,7 @@ export default function LeadsPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">كل المصادر</SelectItem>
-              {LEAD_SOURCE_OPTIONS.map((opt) => (
+              {options('lead_sources').map((opt) => (
                 <SelectItem key={opt.value} value={opt.value}>
                   {opt.label}
                 </SelectItem>

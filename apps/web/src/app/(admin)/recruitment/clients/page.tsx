@@ -30,6 +30,7 @@ import { DataTable, type DataTableColumn } from '@/components/data-table/data-ta
 import { ClientStatusBadge } from '@/components/recruitment/status-badges';
 import { ClientFormDialog } from '@/app/(admin)/recruitment/clients/_components/client-form-dialog';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { useOptionLists } from '@/hooks/use-option-lists';
 import { clientsApi } from '@/lib/api/endpoints/recruitment';
 import { CLIENT_STATUS_OPTIONS } from '@/lib/constants/recruitment-options';
 import { hasPermission, useAuthStore } from '@/lib/stores/auth-store';
@@ -42,6 +43,7 @@ export default function ClientsPage() {
   const qc = useQueryClient();
   const user = useAuthStore((s) => s.user);
   const canManage = hasPermission(user, 'manage-clients');
+  const { labelOf } = useOptionLists();
 
   const [page, setPage] = React.useState(1);
   const [search, setSearch] = React.useState('');
@@ -116,7 +118,7 @@ export default function ClientsPage() {
       ),
     },
     { key: 'country', header: 'الدولة', cell: (c) => <span className="text-sm text-ink-2">{c.country ?? '—'}</span> },
-    { key: 'industry', header: 'القطاع', cell: (c) => <span className="text-sm text-ink-2">{c.industry ?? '—'}</span> },
+    { key: 'industry', header: 'القطاع', cell: (c) => <span className="text-sm text-ink-2">{labelOf('industries', c.industry) ?? '—'}</span> },
     { key: 'status', header: 'الحالة', cell: (c) => <ClientStatusBadge status={c.status} /> },
     {
       key: 'account_manager',
