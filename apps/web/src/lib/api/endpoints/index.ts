@@ -18,3 +18,14 @@ export { tasksApi, myTasksApi } from '@/lib/api/endpoints/tasks';
 export { taskCommentsApi } from '@/lib/api/endpoints/task-comments';
 export { taskAttachmentsApi } from '@/lib/api/endpoints/task-attachments';
 export { taskStatusesApi, taskPrioritiesApi, taskTagsApi } from '@/lib/api/endpoints/task-config';
+export {
+  leadsApi,
+  leadActivitiesApi,
+  clientsApi,
+  clientContactsApi,
+  recruitmentCasesApi,
+  jobsApi,
+  recruitmentPipelinesApi,
+  recruitmentPipelineStagesApi,
+  recruitmentDashboardApi,
+} from '@/lib/api/endpoints/recruitment';

@@ -818,3 +818,568 @@ export type RequestForwardPayload = {
   forwarded_to_id: number;
   comment?: string;
 };
+
+// ---------------------------------------------------------------------------
+// Recruitment (M8) — Leads, Clients, Cases, Jobs, Pipelines, Dashboard
+// ---------------------------------------------------------------------------
+
+/**
+ * Trimmed User shape used by every Recruitment resource for owner /
+ * account-manager / reviewer projections. Backend ships id + name +
+ * email under `owner` / `account_manager` / etc. — keep as a shared
+ * alias so consumers don't reinvent it per module.
+ */
+export type UserMini = {
+  id: number;
+  name: string;
+  email?: string;
+};
+
+// -- enums -------------------------------------------------------------------
+
+export type LeadStatus =
+  | 'new'
+  | 'contacted'
+  | 'meeting_scheduled'
+  | 'meeting_completed'
+  | 'qualified'
+  | 'proposal_sent'
+  | 'negotiation'
+  | 'converted'
+  | 'lost'
+  | 'on_hold';
+
+export type LeadSource =
+  | 'linkedin'
+  | 'referral'
+  | 'website'
+  | 'existing_client'
+  | 'partner'
+  | 'email'
+  | 'direct_outreach'
+  | 'event'
+  | 'other';
+
+export type ClientStatus = 'active' | 'on_hold' | 'inactive' | 'terminated';
+
+export type RecruitmentCaseStatus = 'draft' | 'active' | 'on_hold' | 'completed' | 'cancelled';
+
+export type JobRequirementStatus = 'draft' | 'active' | 'on_hold' | 'filled' | 'cancelled';
+
+export type CasePriority = 'low' | 'normal' | 'high' | 'urgent';
+
+export type JobEmploymentType = 'full_time' | 'part_time' | 'contract' | 'intern' | 'temporary';
+
+export type WorkMode = 'remote' | 'onsite' | 'hybrid';
+
+export type LeadActivityType = 'call' | 'meeting' | 'email' | 'note';
+
+export type StageOwnerRuleType =
+  | 'role'
+  | 'specific'
+  | 'case_owner'
+  | 'job_owner'
+  | 'previous_stage_owner'
+  | 'none';
+
+// -- Lead --------------------------------------------------------------------
+
+export type Lead = {
+  id: number;
+  lead_number: string;
+
+  company_name: string;
+  company_website: string | null;
+  industry: string | null;
+  company_size: string | null;
+  country: string | null;
+  city: string | null;
+
+  contact_person: string | null;
+  contact_position: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  linkedin_url: string | null;
+
+  source: LeadSource;
+  status: LeadStatus;
+
+  owner_id: number | null;
+  owner?: UserMini | null;
+
+  expected_hiring_volume: number | null;
+  notes: string | null;
+
+  last_contact_at: string | null;
+  next_followup_at: string | null;
+
+  converted_at: string | null;
+  converted_client_id: number | null;
+  converted_client?: { id: number; client_number: string; company_name: string } | null;
+
+  lost_at: string | null;
+  lost_reason: string | null;
+
+  created_at: string;
+  updated_at: string;
+};
+
+export type LeadSummary = {
+  id: number;
+  lead_number: string;
+  company_name: string;
+  country: string | null;
+  status: LeadStatus;
+  source: LeadSource;
+  owner_id: number | null;
+  expected_hiring_volume: number | null;
+  next_followup_at: string | null;
+};
+
+export type LeadPayload = {
+  company_name: string;
+  company_website?: string | null;
+  industry?: string | null;
+  company_size?: string | null;
+  country?: string | null;
+  city?: string | null;
+  contact_person?: string | null;
+  contact_position?: string | null;
+  contact_email?: string | null;
+  contact_phone?: string | null;
+  linkedin_url?: string | null;
+  source: LeadSource;
+  status?: LeadStatus;
+  owner_id?: number;
+  expected_hiring_volume?: number | null;
+  notes?: string | null;
+  last_contact_at?: string | null;
+  next_followup_at?: string | null;
+  lost_reason?: string | null;
+  force?: boolean;
+};
+
+export type LeadListParams = {
+  page?: number;
+  per_page?: number;
+  owner_id?: number;
+  status?: LeadStatus;
+  source?: LeadSource;
+  country?: string;
+  industry?: string;
+  search?: string;
+  followup_from?: string;
+  followup_to?: string;
+  active_only?: boolean;
+};
+
+/** GET /leads/kanban → `{ data: { [status]: LeadSummary[] } }`. */
+export type LeadKanbanData = Partial<Record<LeadStatus, LeadSummary[]>>;
+
+export type LeadActivity = {
+  id: number;
+  lead_id: number;
+  type: LeadActivityType;
+  subject: string | null;
+  body: string | null;
+  occurred_at: string | null;
+  metadata: Record<string, unknown> | null;
+  user_id: number | null;
+  user?: { id: number; name: string } | null;
+  created_at: string;
+};
+
+export type LeadActivityPayload = {
+  type: LeadActivityType;
+  subject?: string | null;
+  body?: string | null;
+  occurred_at: string;
+};
+
+// -- Client ------------------------------------------------------------------
+
+export type ClientContact = {
+  id: number;
+  client_id: number;
+  full_name: string;
+  position: string | null;
+  email: string | null;
+  phone: string | null;
+  linkedin_url: string | null;
+  is_primary: boolean;
+  notes: string | null;
+  created_at: string;
+};
+
+export type ClientContactPayload = {
+  full_name: string;
+  position?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  linkedin_url?: string | null;
+  is_primary?: boolean;
+  notes?: string | null;
+};
+
+export type Client = {
+  id: number;
+  client_number: string;
+  company_name: string;
+  company_website: string | null;
+  industry: string | null;
+  company_size: string | null;
+  country: string | null;
+  city: string | null;
+  address: string | null;
+  tax_number: string | null;
+  payment_terms: string | null;
+  payment_terms_notes: string | null;
+  status: ClientStatus;
+  account_manager_id: number | null;
+  account_manager?: UserMini | null;
+  source_lead_id: number | null;
+  source_lead?: { id: number; lead_number: string; company_name: string } | null;
+  primary_contact?: ClientContact | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ClientSummary = {
+  id: number;
+  client_number: string;
+  company_name: string;
+  country: string | null;
+  status: ClientStatus;
+};
+
+export type ClientPayload = {
+  company_name: string;
+  company_website?: string | null;
+  industry?: string | null;
+  company_size?: string | null;
+  country?: string | null;
+  city?: string | null;
+  address?: string | null;
+  tax_number?: string | null;
+  payment_terms?: string | null;
+  payment_terms_notes?: string | null;
+  status?: ClientStatus;
+  account_manager_id?: number | null;
+  notes?: string | null;
+  force?: boolean;
+};
+
+export type ClientListParams = {
+  page?: number;
+  per_page?: number;
+  search?: string;
+  status?: ClientStatus;
+  account_manager_id?: number;
+  country?: string;
+  industry?: string;
+};
+
+export type ClientProfile = Client & {
+  contacts?: ClientContact[];
+  cases_summary?: {
+    total: number;
+    open_count: number;
+    latest: Array<{
+      id: number;
+      case_number: string;
+      title: string;
+      status: RecruitmentCaseStatus;
+      created_at: string;
+    }>;
+  };
+};
+
+// -- Recruitment Case --------------------------------------------------------
+
+export type RecruitmentCase = {
+  id: number;
+  case_number: string;
+  client_id: number;
+  client?: ClientSummary | null;
+  source_lead_id: number | null;
+  source_lead?: LeadSummary | null;
+  title: string;
+  description: string | null;
+  owner_id: number;
+  owner?: UserMini | null;
+  priority: CasePriority;
+  status: RecruitmentCaseStatus;
+  target_hires: number | null;
+  started_at: string | null;
+  deadline: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RecruitmentCasePayload = {
+  client_id: number;
+  source_lead_id?: number | null;
+  title: string;
+  description?: string | null;
+  owner_id: number;
+  priority?: CasePriority;
+  status?: RecruitmentCaseStatus;
+  target_hires?: number | null;
+  started_at?: string | null;
+  deadline?: string | null;
+};
+
+export type RecruitmentCaseListParams = {
+  page?: number;
+  per_page?: number;
+  search?: string;
+  status?: RecruitmentCaseStatus;
+  priority?: CasePriority;
+  client_id?: number;
+  owner_id?: number;
+  open_only?: boolean;
+};
+
+// -- Recruitment Pipelines / Stages -----------------------------------------
+
+export type RecruitmentPipelineStage = {
+  id: number;
+  pipeline_id: number;
+  display_order: number;
+  code: string;
+  name: string;
+  description: string | null;
+  owner_rule_type: StageOwnerRuleType;
+  owner_rule_value: string | null;
+  sla_hours: number | null;
+  auto_generate_task: boolean;
+  task_title_template: string | null;
+  task_priority: CasePriority | null;
+  requires_fields: string[];
+  is_terminal: boolean;
+};
+
+export type RecruitmentPipelineStagePayload = {
+  code: string;
+  name: string;
+  description?: string | null;
+  display_order?: number;
+  owner_rule_type: StageOwnerRuleType;
+  owner_rule_value?: string | null;
+  sla_hours?: number | null;
+  auto_generate_task?: boolean;
+  task_title_template?: string | null;
+  task_priority?: CasePriority | null;
+  requires_fields?: string[] | null;
+  is_terminal?: boolean;
+};
+
+export type RecruitmentPipeline = {
+  id: number;
+  name: string;
+  code: string;
+  description: string | null;
+  is_default: boolean;
+  is_active: boolean;
+  stages?: RecruitmentPipelineStage[];
+  created_at: string;
+  updated_at: string;
+};
+
+export type RecruitmentPipelinePayload = {
+  name: string;
+  code: string;
+  description?: string | null;
+  is_default?: boolean;
+  is_active?: boolean;
+};
+
+// -- Job Requirement --------------------------------------------------------
+
+export type JobRequirement = {
+  id: number;
+  job_number: string;
+  recruitment_case_id: number;
+  recruitment_case?: {
+    id: number;
+    case_number: string;
+    title: string;
+    client: ClientSummary | null;
+  } | null;
+  pipeline_id: number;
+  pipeline?: { id: number; code: string; name: string } | null;
+  current_stage_id: number | null;
+  current_stage?: RecruitmentPipelineStage | null;
+  owner_id: number;
+  owner?: UserMini | null;
+  title: string;
+  department: string | null;
+  openings: number;
+  employment_type: JobEmploymentType;
+  work_mode: WorkMode;
+  location: string | null;
+  salary_min: number | null;
+  salary_max: number | null;
+  salary_currency: string | null;
+  required_experience_years: number | null;
+  education_level: string | null;
+  required_skills: string[] | null;
+  nice_to_have_skills: string[] | null;
+  required_languages: string[] | null;
+  description: string | null;
+  responsibilities: string | null;
+  publication_url: string | null;
+  published_at: string | null;
+  application_deadline: string | null;
+  target_start_date: string | null;
+  status: JobRequirementStatus;
+  stage_entered_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type JobRequirementPayload = {
+  recruitment_case_id: number;
+  pipeline_id?: number | null;
+  owner_id: number;
+  title: string;
+  department?: string | null;
+  openings: number;
+  employment_type: JobEmploymentType;
+  work_mode: WorkMode;
+  location?: string | null;
+  salary_min?: number | null;
+  salary_max?: number | null;
+  salary_currency?: string | null;
+  required_experience_years?: number | null;
+  education_level?: string | null;
+  required_skills?: string[] | null;
+  nice_to_have_skills?: string[] | null;
+  required_languages?: string[] | null;
+  description?: string | null;
+  responsibilities?: string | null;
+  application_deadline?: string | null;
+  target_start_date?: string | null;
+  status?: JobRequirementStatus;
+};
+
+/** PATCH — every field optional, plus publication_url. */
+export type JobRequirementUpdatePayload = Partial<Omit<JobRequirementPayload, 'recruitment_case_id' | 'pipeline_id'>> & {
+  publication_url?: string | null;
+};
+
+export type JobRequirementListParams = {
+  page?: number;
+  per_page?: number;
+  search?: string;
+  status?: JobRequirementStatus;
+  recruitment_case_id?: number;
+  client_id?: number;
+  pipeline_id?: number;
+  current_stage_id?: number;
+  owner_id?: number;
+  employment_type?: JobEmploymentType;
+  work_mode?: WorkMode;
+  open_only?: boolean;
+};
+
+export type AdvanceJobStagePayload = {
+  target_stage_id?: number;
+  fields?: {
+    publication_url?: string;
+    shortlist_ids?: number[];
+    contract_terms?: string;
+  };
+  handoff_note?: string | null;
+};
+
+// -- Lead conversion --------------------------------------------------------
+
+export type ConvertLeadJobPayload = {
+  title: string;
+  department?: string | null;
+  openings: number;
+  employment_type: JobEmploymentType;
+  work_mode: WorkMode;
+  location?: string | null;
+  salary_min?: number | null;
+  salary_max?: number | null;
+  salary_currency?: string | null;
+  required_experience_years?: number | null;
+  education_level?: string | null;
+  required_skills?: string[] | null;
+  nice_to_have_skills?: string[] | null;
+  required_languages?: string[] | null;
+  description?: string | null;
+  responsibilities?: string | null;
+  application_deadline?: string | null;
+  target_start_date?: string | null;
+  pipeline_id?: number | null;
+  owner_id?: number | null;
+};
+
+export type ConvertLeadPayload = {
+  reuse_client_id?: number | null;
+  client?: {
+    company_name: string;
+    country?: string | null;
+    city?: string | null;
+    industry?: string | null;
+    company_size?: string | null;
+    company_website?: string | null;
+    address?: string | null;
+    tax_number?: string | null;
+    payment_terms?: string | null;
+    account_manager_id?: number | null;
+    force?: boolean;
+  };
+  case: {
+    title: string;
+    description?: string | null;
+    owner_id?: number | null;
+    priority?: CasePriority;
+    target_hires?: number | null;
+    started_at?: string | null;
+    deadline?: string | null;
+  };
+  jobs?: ConvertLeadJobPayload[];
+};
+
+export type ConvertLeadResult = {
+  lead: Lead;
+  client: Client;
+  case: RecruitmentCase;
+  jobs: JobRequirement[];
+};
+
+// -- Dashboard --------------------------------------------------------------
+
+export type RecruitmentDashboardKpis = {
+  leads_active: number;
+  leads_converted: number;
+  leads_lost: number;
+  clients_active: number;
+  cases_open: number;
+  jobs_open: number;
+  jobs_filled_this_month: number;
+};
+
+export type RecruitmentDashboardFunnel = {
+  leads_by_status: Record<LeadStatus, number>;
+  jobs_by_stage: Record<string, number>;
+};
+
+export type RecruitmentLeaderboardRow = {
+  owner_id: number;
+  owner_name: string | null;
+  owner_email: string | null;
+  conversions: number;
+};
+
+export type RecruitmentLeaderboard = {
+  data: RecruitmentLeaderboardRow[];
+  meta: { quarter_started_at: string };
+};
