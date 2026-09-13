@@ -1,0 +1,241 @@
+name: Deploy rehearsal
+
+# Rehearses the production scripts on a throwaway Linux runner before they ever
+# touch the VPS. The runner plays the VPS: sshd on localhost, a git remote with
+# a `main` branch, and the real docker-compose.simple.yml stack.
+#
+#   1. Start the release currently on origin/main (old pipeline, old compose).
+#   2. Deploy this branch over SSH with run-on-vps.sh → must succeed, keep Redis
+#      data across the Redis recreate, and pass the health gate.
+#   3. Deploy a commit whose /api/health always answers 503 → must roll back to
+#      step 2's release and exit non-zero.
+#   4. Deploy a commit with a failing migration → must stop before switching,
+#      leave the running containers untouched and exit non-zero.
+#   5. Run the backup, then a restore (wrong confirmation first) → data written
+#      after the backup must be gone and the app healthy again.
+#
+# Push a branch named rehearsal/<anything> or run it manually. Everything here
+# is dummy data; the repository is public, so never add real secrets.
+on:
+  push:
+    branches: ['rehearsal/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-rehearsal-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rehearse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      ORIGIN: ${{ runner.temp }}/origin.git
+      APP: ${{ runner.temp }}/app
+      COMPOSE: docker compose -f docker-compose.simple.yml
+      REDIS_PASSWORD: rehearsal-redis-pass
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Play the VPS — sshd on localhost for the runner user
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq openssh-server > /dev/null
+          sudo sed -i 's/^#\?StrictModes.*/StrictModes no/' /etc/ssh/sshd_config
+          sudo systemctl restart ssh
+          ssh-keygen -q -t ed25519 -N '' -f "$RUNNER_TEMP/rehearsal_key"
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          cat "$RUNNER_TEMP/rehearsal_key.pub" >> ~/.ssh/authorized_keys
+          chmod 600 ~/.ssh/authorized_keys
+          echo "REHEARSAL_KEY_B64=$(base64 -w 0 "$RUNNER_TEMP/rehearsal_key")" >> "$GITHUB_ENV"
+
+      - name: Prepare SSH key (same action the real workflows use)
+        uses: ./.github/actions/vps-ssh
+        with:
+          ssh-key: ${{ env.REHEARSAL_KEY_B64 }}
+          host: localhost
+          port: '22'
+
+      - name: Start the release currently on main
+        run: |
+          set -euo pipefail
+          git config --global user.email rehearsal@example.com
+          git config --global user.name rehearsal
+          git init -q --bare -b main "$ORIGIN"
+          git push -q "$ORIGIN" origin/main:refs/heads/main
+          git clone -q "$ORIGIN" "$APP"
+
+          cat > "$APP/.env" <<ENV
+          APP_NAME=TAQAT
+          APP_ENV=production
+          APP_DEBUG=false
+          APP_KEY=base64:$(openssl rand -base64 32)
+          APP_URL=http://127.0.0.1:8180
+          DB_CONNECTION=mysql
+          DB_HOST=db
+          DB_PORT=3306
+          DB_DATABASE=taqat
+          DB_USERNAME=taqat
+          DB_PASSWORD=rehearsal-db-pass
+          DB_ROOT_PASSWORD=rehearsal-root-pass
+          REDIS_CLIENT=predis
+          REDIS_HOST=redis
+          REDIS_PORT=6379
+          REDIS_PASSWORD=$REDIS_PASSWORD
+          CACHE_STORE=redis
+          QUEUE_CONNECTION=redis
+          SESSION_DRIVER=redis
+          BROADCAST_CONNECTION=reverb
+          REVERB_APP_ID=taqat-app
+          REVERB_APP_KEY=rehearsal-reverb-key
+          REVERB_APP_SECRET=rehearsal-reverb-secret
+          REVERB_HOST=reverb
+          REVERB_PORT=8080
+          REVERB_SCHEME=http
+          SCOUT_DRIVER=null
+          MEILISEARCH_HOST=http://meilisearch:7700
+          MEILISEARCH_KEY=rehearsal-meili-master-key-000000
+          MINIO_ROOT_USER=rehearsal
+          MINIO_ROOT_PASSWORD=rehearsal-minio-pass
+          FILESYSTEM_DISK=local
+          MAIL_MAILER=log
+          ENV
+          sed -i 's/^[[:space:]]*//' "$APP/.env"
+
+          cd "$APP"
+          $COMPOSE build api web
+          $COMPOSE up -d
+          for i in $(seq 1 90); do
+            if $COMPOSE exec -T api php artisan migrate --force > /dev/null 2>&1; then break; fi
+            sleep 2
+          done
+          $COMPOSE exec -T api php artisan migrate:status | tail -n 3
+          docker exec -e REDISCLI_AUTH="$REDIS_PASSWORD" taqat_redis redis-cli SET rehearsal:marker survives-recreate
+          $COMPOSE ps
+
+      - name: Helpers
+        run: |
+          cat > "$RUNNER_TEMP/helpers.sh" <<'SH'
+          run_remote() {
+            VPS_HOST=localhost VPS_USER="$(id -un)" VPS_SSH_PORT=22 \
+              bash "$GITHUB_WORKSPACE/infra/scripts/run-on-vps.sh" \
+              "$GITHUB_WORKSPACE/infra/scripts/lib/vps-common.sh" "$@"
+          }
+          deploy() {
+            APP_PATH="$APP" NO_CACHE=false REMOTE_ENV="APP_PATH NO_CACHE" \
+              run_remote "$GITHUB_WORKSPACE/infra/scripts/vps-deploy.sh"
+          }
+          health_code() {
+            curl -s -o "$RUNNER_TEMP/health.json" -w '%{http_code}' --max-time 10 http://127.0.0.1:8180/api/health || true
+          }
+          expect() {
+            if [ "$1" != "$2" ]; then echo "::error::$3 — expected '$2', got '$1'"; exit 1; fi
+            echo "✓ $3"
+          }
+          publish() {
+            git -C "$GITHUB_WORKSPACE" push -q -f "$ORIGIN" "$1:refs/heads/main"
+          }
+          SH
+          sed -i 's/^          //' "$RUNNER_TEMP/helpers.sh"
+
+      - name: "Rehearsal 1 — deploy this branch (expected: success)"
+        run: |
+          set -euo pipefail
+          . "$RUNNER_TEMP/helpers.sh"
+          publish HEAD
+          deploy
+          expect "$(health_code)" 200 "health answers 200 after deploy"
+          cat "$RUNNER_TEMP/health.json"; echo
+          expect "$(jq -r '.checks.database' "$RUNNER_TEMP/health.json")" ok "database check is ok"
+          expect "$(docker exec -e REDISCLI_AUTH="$REDIS_PASSWORD" taqat_redis redis-cli GET rehearsal:marker)" survives-recreate "redis data survived the recreate"
+          expect "$(docker exec -e REDISCLI_AUTH="$REDIS_PASSWORD" taqat_redis redis-cli CONFIG GET appendonly | tail -n 1)" yes "redis append-only file is on"
+          docker image inspect taqat-api:previous > /dev/null && echo "✓ previous api image recorded"
+          echo "GOOD_SHA=$(git -C "$APP" rev-parse HEAD)" >> "$GITHUB_ENV"
+          echo "GOOD_IMAGE=$(docker inspect --format '{{.Image}}' taqat_api)" >> "$GITHUB_ENV"
+
+      - name: "Rehearsal 2 — health gate fails (expected: automatic rollback)"
+        run: |
+          set -uo pipefail
+          . "$RUNNER_TEMP/helpers.sh"
+          git checkout -q -b rehearsal-broken-health "$GOOD_SHA"
+          sed -i "s/\$httpStatus = \$report\['status'\] === HealthCheckService::STATUS_DOWN ? 503 : 200;/\$httpStatus = 503;/" \
+            apps/api/app/Modules/System/Controllers/HealthController.php
+          grep -q 'httpStatus = 503;' apps/api/app/Modules/System/Controllers/HealthController.php \
+            || { echo "::error::could not break the health endpoint — rehearsal setup is stale"; exit 1; }
+          git commit -qam "rehearsal: health always 503"
+          publish HEAD
+          deploy; status=$?
+          expect "$([ "$status" -ne 0 ] && echo failed || echo succeeded)" failed "deploy reports failure"
+          expect "$(git -C "$APP" rev-parse HEAD)" "$GOOD_SHA" "checkout rolled back"
+          expect "$(docker inspect --format '{{.Image}}' taqat_api)" "$GOOD_IMAGE" "api container runs the previous image"
+          expect "$(health_code)" 200 "health answers 200 after rollback"
+
+      - name: "Rehearsal 3 — migration fails (expected: stop before switching)"
+        run: |
+          set -uo pipefail
+          . "$RUNNER_TEMP/helpers.sh"
+          git checkout -q -b rehearsal-broken-migration "$GOOD_SHA"
+          cat > apps/api/database/migrations/2099_01_01_000000_rehearsal_failing_migration.php <<'PHP'
+          <?php
+
+          use Illuminate\Database\Migrations\Migration;
+
+          return new class extends Migration
+          {
+              public function up(): void
+              {
+                  throw new RuntimeException('rehearsal: this migration always fails');
+              }
+
+              public function down(): void {}
+          };
+          PHP
+          sed -i 's/^          //' apps/api/database/migrations/2099_01_01_000000_rehearsal_failing_migration.php
+          git add apps/api/database/migrations/2099_01_01_000000_rehearsal_failing_migration.php
+          git commit -qm "rehearsal: failing migration"
+          publish HEAD
+          container_before="$(docker inspect --format '{{.Id}}' taqat_api)"
+          deploy; status=$?
+          expect "$([ "$status" -ne 0 ] && echo failed || echo succeeded)" failed "deploy reports failure"
+          expect "$(docker inspect --format '{{.Id}}' taqat_api)" "$container_before" "api container was never replaced"
+          expect "$(git -C "$APP" rev-parse HEAD)" "$GOOD_SHA" "checkout restored"
+          expect "$(docker image inspect --format '{{.Id}}' taqat-api:local)" "$GOOD_IMAGE" ":local points at the running release again"
+          expect "$(health_code)" 200 "health still answers 200"
+
+      - name: "Rehearsal 4 — backup, then restore"
+        run: |
+          set -uo pipefail
+          . "$RUNNER_TEMP/helpers.sh"
+          publish "$GOOD_SHA"
+
+          APP_PATH="$APP" REMOTE_ENV="APP_PATH" run_remote "$GITHUB_WORKSPACE/infra/scripts/vps-backup.sh"
+          expect "$?" 0 "backup succeeds"
+          ls -l ~/taqat-backups
+          expect "$(find ~/taqat-backups -name 'db-*.sql.gz' | wc -l | tr -d ' ')" 1 "one database dump written"
+
+          docker exec taqat_db sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot "$MYSQL_DATABASE" -e "INSERT INTO settings (\`key\`, value, encrypted, \`group\`, created_at, updated_at) VALUES (\"rehearsal.after_backup\", \"1\", 0, \"general\", NOW(), NOW())"'
+
+          APP_PATH="$APP" RESTORE_BACKUP=latest RESTORE_CONFIRM="yes please" REMOTE_ENV="APP_PATH RESTORE_BACKUP RESTORE_CONFIRM" \
+            run_remote "$GITHUB_WORKSPACE/infra/scripts/vps-restore.sh"
+          expect "$?" 1 "restore refuses a wrong confirmation"
+
+          APP_PATH="$APP" RESTORE_BACKUP=latest RESTORE_CONFIRM="restore production database" REMOTE_ENV="APP_PATH RESTORE_BACKUP RESTORE_CONFIRM" \
+            run_remote "$GITHUB_WORKSPACE/infra/scripts/vps-restore.sh"
+          expect "$?" 0 "restore succeeds"
+
+          rows="$(docker exec taqat_db sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot -N -B "$MYSQL_DATABASE" -e "SELECT COUNT(*) FROM settings WHERE \`key\` = \"rehearsal.after_backup\""')"
+          expect "$rows" 0 "data written after the backup is gone"
+          expect "$(health_code)" 200 "health answers 200 after restore"
+
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          cd "$APP" 2>/dev/null || exit 0
+          $COMPOSE ps || true
+          $COMPOSE logs --tail=80 api nginx queue scheduler reverb redis || true
