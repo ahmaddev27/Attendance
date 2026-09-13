@@ -7,8 +7,13 @@ import type {
   MonthlyAttendanceSummary,
   PaginatedResponse,
   ScanDeviceInfo,
+  ScanPinIssueResult,
+  ScanPinResetResult,
+  ScanPinSummary,
   ScanResponse,
   ScanStatus,
+  UpdateMyScanPinPayload,
+  UpdateScanPinEnforcementPayload,
 } from '../types';
 
 export type AttendanceListParams = {
@@ -68,8 +73,16 @@ export const attendanceApi = {
 export type ScanCheckPayload = {
   employee_number: number;
   qr_token: string;
+  /** Only sent while the device reports `pin_required`. */
+  pin?: string;
   latitude?: number;
   longitude?: number;
+};
+
+export type ScanStatusPayload = {
+  qr_token: string;
+  employee_number: number;
+  pin?: string;
 };
 
 /**
@@ -94,8 +107,36 @@ export const scanApi = {
    * (check-in OR check-out) instead of two-and-a-guess. State is
    * derived from today's attendance row on the server.
    */
-  status: (payload: { qr_token: string; employee_number: number }) =>
+  status: (payload: ScanStatusPayload) =>
     publicApiClient
       .post<{ data: ScanStatus }>('/scan/status', payload)
       .then((r) => r.data.data),
+};
+
+/**
+ * Attendance PIN rollout (admin, `manage-users`) plus the employee's own
+ * PIN change. `reset` is the only call that ever returns a plaintext PIN.
+ */
+export const scanPinsApi = {
+  summary: () =>
+    apiClient
+      .get<ApiResource<ScanPinSummary>>('/admin/attendance/scan-pins')
+      .then((r) => r.data.data),
+
+  issueMissing: () =>
+    apiClient
+      .post<ApiResource<ScanPinIssueResult>>('/admin/attendance/scan-pins/issue-missing')
+      .then((r) => r.data.data),
+
+  updateEnforcement: (payload: UpdateScanPinEnforcementPayload) =>
+    apiClient
+      .put<ApiResource<ScanPinSummary>>('/admin/attendance/scan-pins/enforcement', payload)
+      .then((r) => r.data.data),
+
+  reset: (employeeId: number) =>
+    apiClient
+      .post<ApiResource<ScanPinResetResult>>(`/employees/${employeeId}/scan-pin`)
+      .then((r) => r.data.data),
+
+  updateMine: (payload: UpdateMyScanPinPayload) => apiClient.put<void>('/me/scan-pin', payload),
 };

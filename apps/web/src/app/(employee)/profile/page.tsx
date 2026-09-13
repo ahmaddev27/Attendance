@@ -3,13 +3,14 @@
 import * as React from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { KeyRound, Loader2, ShieldCheck, User as UserIcon } from 'lucide-react';
+import { KeyRound, Loader2, QrCode, ShieldCheck, User as UserIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { scanPinsApi } from '@/lib/api/endpoints/attendance';
 import { myProfileApi } from '@/lib/api/endpoints/employees';
 import { cn } from '@/lib/utils';
 
@@ -34,6 +35,14 @@ function extractApiError(err: unknown): {
   };
 }
 
+function firstErrorPerField(bag: Record<string, string[]> | null): FieldErrors {
+  const fieldErrors: FieldErrors = {};
+  for (const [key, messages] of Object.entries(bag ?? {})) {
+    if (messages[0]) fieldErrors[key] = messages[0];
+  }
+  return fieldErrors;
+}
+
 /**
  * `/profile` — employee self-service.
  *
@@ -44,6 +53,10 @@ function extractApiError(err: unknown): {
  * Section 2 rotates the password. The backend verifies `current_password`
  * server-side and revokes every OTHER Sanctum token on success, so a
  * password change also signs the employee out of any other device.
+ *
+ * Section 3 sets the attendance PIN typed with the employee number on the
+ * kiosk scan page. It also asks for the current password so a hijacked
+ * open session cannot quietly set a PIN the attacker knows.
  */
 export default function EmployeeProfilePage() {
   const queryClient = useQueryClient();
@@ -78,6 +91,8 @@ export default function EmployeeProfilePage() {
       />
 
       <PasswordSection />
+
+      {data?.employee && <ScanPinSection />}
     </div>
   );
 }
@@ -272,13 +287,7 @@ function PasswordSection() {
     },
     onError: (err: unknown) => {
       const { message, errors: bag } = extractApiError(err);
-      const next: FieldErrors = {};
-      if (bag) {
-        for (const [key, msgs] of Object.entries(bag)) {
-          if (msgs[0]) next[key] = msgs[0];
-        }
-      }
-      setErrors(next);
+      setErrors(firstErrorPerField(bag));
       setApiError(message ?? 'تعذّر تحديث كلمة السر.');
     },
   });
@@ -396,6 +405,162 @@ function PasswordSection() {
           >
             {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
             تحديث كلمة السر
+          </Button>
+        </div>
+      </form>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Section 3 — attendance scan PIN
+// ---------------------------------------------------------------------------
+
+const SCAN_PIN_PATTERN = /^\d{4}$/;
+
+const EMPTY_SCAN_PIN_FORM = { current_password: '', pin: '', pin_confirmation: '' };
+
+function onlyPinDigits(value: string): string {
+  return value.replace(/[^0-9]/g, '').slice(0, 4);
+}
+
+function ScanPinSection() {
+  const [values, setValues] = React.useState(EMPTY_SCAN_PIN_FORM);
+  const [errors, setErrors] = React.useState<FieldErrors>({});
+  const [apiError, setApiError] = React.useState<string | null>(null);
+
+  const reset = () => {
+    setValues(EMPTY_SCAN_PIN_FORM);
+    setErrors({});
+    setApiError(null);
+  };
+
+  const mutation = useMutation({
+    mutationFn: () => scanPinsApi.updateMine(values),
+    onSuccess: () => {
+      toast.success('تم تحديث رمز الحضور بنجاح');
+      reset();
+    },
+    onError: (err: unknown) => {
+      const { message, errors: bag } = extractApiError(err);
+      setErrors(firstErrorPerField(bag));
+      setApiError(message ?? 'تعذّر تحديث رمز الحضور.');
+    },
+  });
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setApiError(null);
+    setErrors({});
+
+    // Mirrors the format rules only; weak-PIN detection stays server-side so
+    // the blocklist lives in one place.
+    const next: FieldErrors = {};
+    if (!values.current_password) next.current_password = 'الرجاء إدخال كلمة السر الحالية.';
+    if (!SCAN_PIN_PATTERN.test(values.pin)) next.pin = 'رمز الحضور يجب أن يتكون من 4 أرقام.';
+    if (values.pin !== values.pin_confirmation)
+      next.pin_confirmation = 'تأكيد رمز الحضور لا يطابق الرمز الجديد.';
+
+    if (Object.keys(next).length > 0) {
+      setErrors(next);
+      return;
+    }
+
+    mutation.mutate();
+  };
+
+  return (
+    <Card className="border-hairline bg-surface p-5">
+      <SectionHeader
+        icon={<QrCode className="h-4 w-4 text-brand" />}
+        title="تغيير رمز الحضور"
+        description="رمز من 4 أرقام تُدخله مع رقمك الوظيفي عند مسح رمز QR. لا تشاركه مع أحد."
+      />
+
+      <form onSubmit={submit} className="space-y-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="scan_pin_current_password">كلمة السر الحالية</Label>
+            <Input
+              id="scan_pin_current_password"
+              type="password"
+              autoComplete="current-password"
+              value={values.current_password}
+              onChange={(e) => setValues((v) => ({ ...v, current_password: e.target.value }))}
+              aria-invalid={errors.current_password ? true : undefined}
+              aria-describedby={errors.current_password ? 'scan-pin-current-password-error' : undefined}
+            />
+            {errors.current_password && (
+              <p id="scan-pin-current-password-error" className="text-xs font-medium text-danger">
+                {errors.current_password}
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="scan_pin">رمز الحضور الجديد</Label>
+            <Input
+              id="scan_pin"
+              type="password"
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={4}
+              dir="ltr"
+              className="num tracking-[0.4em]"
+              value={values.pin}
+              onChange={(e) => setValues((v) => ({ ...v, pin: onlyPinDigits(e.target.value) }))}
+              aria-invalid={errors.pin ? true : undefined}
+              aria-describedby={errors.pin ? 'scan-pin-error' : undefined}
+            />
+            {errors.pin && (
+              <p id="scan-pin-error" className="text-xs font-medium text-danger">
+                {errors.pin}
+              </p>
+            )}
+            <p className="text-[11px] text-muted">
+              4 أرقام — تجنّب الأرقام المتسلسلة أو المكررة مثل 1234 أو 0000.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="scan_pin_confirmation">تأكيد رمز الحضور</Label>
+            <Input
+              id="scan_pin_confirmation"
+              type="password"
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={4}
+              dir="ltr"
+              className="num tracking-[0.4em]"
+              value={values.pin_confirmation}
+              onChange={(e) =>
+                setValues((v) => ({ ...v, pin_confirmation: onlyPinDigits(e.target.value) }))
+              }
+              aria-invalid={errors.pin_confirmation ? true : undefined}
+              aria-describedby={errors.pin_confirmation ? 'scan-pin-confirmation-error' : undefined}
+            />
+            {errors.pin_confirmation && (
+              <p id="scan-pin-confirmation-error" className="text-xs font-medium text-danger">
+                {errors.pin_confirmation}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {apiError && (
+          <p className="rounded-md border border-danger-soft bg-danger-soft/40 px-3 py-2 text-sm text-danger">
+            {apiError}
+          </p>
+        )}
+
+        <div className="flex items-center justify-end gap-2">
+          <Button
+            type="submit"
+            disabled={mutation.isPending}
+            className="bg-brand text-white hover:bg-brand-hover"
+          >
+            {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            تحديث رمز الحضور
           </Button>
         </div>
       </form>

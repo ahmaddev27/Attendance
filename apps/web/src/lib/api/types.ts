@@ -236,6 +236,11 @@ export type ScanDeviceInfo = {
    */
   enforce_geo?: boolean;
   enforce_ip?: boolean;
+  /**
+   * When true the kiosk must collect the employee's 4-digit attendance PIN
+   * and send it with /scan/status and /scan/check-in|out.
+   */
+  pin_required?: boolean;
 };
 
 export type ScanResponse = {
@@ -260,6 +265,48 @@ export type ScanStatus = {
   check_in_at: string | null;
   check_out_at: string | null;
   device_name: string;
+};
+
+// ---------------------------------------------------------------------------
+// Attendance scan PINs
+// ---------------------------------------------------------------------------
+
+/** `GET /admin/attendance/scan-pins` — rollout coverage across ACTIVE employees. */
+export type ScanPinSummary = {
+  required: boolean;
+  active_employees: number;
+  with_pin: number;
+  without_pin: number;
+  without_pin_and_phone: number;
+};
+
+/** `POST /admin/attendance/scan-pins/issue-missing` */
+export type ScanPinIssueResult = {
+  issued: number;
+  sms_queued: number;
+  without_phone: number;
+};
+
+/**
+ * `POST /employees/{id}/scan-pin` — the only response that ever carries a
+ * plaintext PIN. It cannot be fetched again, so the UI shows it once.
+ */
+export type ScanPinResetResult = {
+  pin: string;
+  sms_queued: boolean;
+};
+
+/** `force` confirms enabling while some active employees still have no PIN. */
+export type UpdateScanPinEnforcementPayload = {
+  required: boolean;
+  force?: boolean;
+};
+
+/** `PUT /me/scan-pin` — Laravel's `confirmed` rule expects `pin_confirmation`. */
+export type UpdateMyScanPinPayload = {
+  current_password: string;
+  pin: string;
+  pin_confirmation: string;
 };
 
 // ---------------------------------------------------------------------------

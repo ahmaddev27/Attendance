@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { CalendarDays, KeyRound, Pencil, Plus, Trash2 } from 'lucide-react';
+import { CalendarDays, KeyRound, Pencil, Plus, QrCode, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { DataTable, type DataTableColumn } from '@/components/data-table/data-table';
@@ -13,6 +13,8 @@ import { EmployeeAvatar } from '@/components/employees/employee-avatar';
 import { DeleteEmployeeDialog } from '@/components/employees/delete-employee-dialog';
 import { EmployeeFormDialog } from '@/components/employees/employee-form-dialog';
 import { ResetPasswordDialog } from '@/components/employees/reset-password-dialog';
+import { ResetScanPinDialog } from '@/components/employees/reset-scan-pin-dialog';
+import { ScanPinsDialog } from '@/components/attendance/scan-pins-dialog';
 import { EmployeeStatusBadge } from '@/components/employees/employee-status-badge';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { departmentsApi } from '@/lib/api/endpoints/departments';
@@ -43,6 +45,8 @@ export default function EmployeesPage() {
   const [editingEmployee, setEditingEmployee] = React.useState<Employee | null>(null);
   const [deletingEmployee, setDeletingEmployee] = React.useState<Employee | null>(null);
   const [resetPasswordEmployee, setResetPasswordEmployee] = React.useState<Employee | null>(null);
+  const [resetScanPinEmployee, setResetScanPinEmployee] = React.useState<Employee | null>(null);
+  const [scanPinsOpen, setScanPinsOpen] = React.useState(false);
 
   const debouncedSearch = useDebouncedValue(search);
 
@@ -147,10 +151,19 @@ export default function EmployeesPage() {
           <p className="text-xs font-medium text-muted">الموظفون</p>
           <h1 className="mt-1 text-2xl font-bold text-ink">قائمة الموظفين</h1>
         </div>
-        <Button onClick={openCreateDialog} className="gap-2 bg-brand text-white hover:bg-brand-hover">
-          <Plus className="h-4 w-4" />
-          موظف جديد
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* The rollout endpoints are gated by `permission:manage-users`. */}
+          {canManageUsers && (
+            <Button variant="outline" onClick={() => setScanPinsOpen(true)} className="gap-2">
+              <QrCode className="h-4 w-4" />
+              رموز الحضور
+            </Button>
+          )}
+          <Button onClick={openCreateDialog} className="gap-2 bg-brand text-white hover:bg-brand-hover">
+            <Plus className="h-4 w-4" />
+            موظف جديد
+          </Button>
+        </div>
       </div>
 
       <FilterBar searchValue={search} onSearchChange={setSearch} searchPlaceholder="بحث بالاسم أو الرقم الوظيفي...">
@@ -202,6 +215,12 @@ export default function EmployeesPage() {
             onClick: setResetPasswordEmployee,
             hidden: () => !canManageUsers,
           },
+          {
+            label: 'إعادة تعيين رمز الحضور',
+            icon: QrCode,
+            onClick: setResetScanPinEmployee,
+            hidden: () => !canManageUsers,
+          },
           { label: 'حذف', icon: Trash2, variant: 'destructive', onClick: setDeletingEmployee },
         ]}
         pagination={data ? { meta: data.meta, onPageChange: setPage } : undefined}
@@ -213,6 +232,12 @@ export default function EmployeesPage() {
         open={!!resetPasswordEmployee}
         onOpenChange={(open) => !open && setResetPasswordEmployee(null)}
       />
+      <ResetScanPinDialog
+        employee={resetScanPinEmployee}
+        open={!!resetScanPinEmployee}
+        onOpenChange={(open) => !open && setResetScanPinEmployee(null)}
+      />
+      <ScanPinsDialog open={scanPinsOpen} onOpenChange={setScanPinsOpen} />
       <DeleteEmployeeDialog
         employee={deletingEmployee}
         open={!!deletingEmployee}
