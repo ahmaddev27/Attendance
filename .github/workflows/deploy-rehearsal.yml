@@ -198,6 +198,14 @@ jobs:
           expect "$(health_code)" 200 "health answers 200 after deploy"
           cat "$RUNNER_TEMP/health.json"; echo
           expect "$(jq -r '.checks.database' "$RUNNER_TEMP/health.json")" ok "database check is ok"
+          # Heartbeats land within a couple of scheduler ticks; the uptime
+          # workflow alerts on anything but ok, so prove it gets there.
+          for attempt in $(seq 1 24); do
+            if [ "$(health_code)" = "200" ] && [ "$(jq -r '.status' "$RUNNER_TEMP/health.json")" = "ok" ]; then break; fi
+            sleep 10
+          done
+          cat "$RUNNER_TEMP/health.json"; echo
+          expect "$(jq -r '.status' "$RUNNER_TEMP/health.json")" ok "scheduler and queue heartbeats arrive"
           expect "$(docker exec -e REDISCLI_AUTH="$REDIS_PASSWORD" taqat_redis redis-cli GET rehearsal:marker)" survives-recreate "redis data survived the recreate"
           expect "$(docker exec -e REDISCLI_AUTH="$REDIS_PASSWORD" taqat_redis redis-cli CONFIG GET appendonly | tail -n 1)" yes "redis append-only file is on"
           docker image inspect taqat-api:previous > /dev/null && echo "✓ previous api image recorded"
@@ -215,7 +223,8 @@ jobs:
             || { echo "::error::could not break the health endpoint — rehearsal setup is stale"; exit 1; }
           git commit -qam "rehearsal: health always 503"
           publish HEAD
-          deploy; status=$?
+          status=0
+          deploy || status=$?
           expect "$([ "$status" -ne 0 ] && echo failed || echo succeeded)" failed "deploy reports failure"
           expect "$(git -C "$APP" rev-parse HEAD)" "$GOOD_SHA" "checkout rolled back"
           expect "$(docker inspect --format '{{.Image}}' taqat_api)" "$GOOD_IMAGE" "api container runs the previous image"
@@ -246,7 +255,8 @@ jobs:
           git commit -qm "rehearsal: failing migration"
           publish HEAD
           container_before="$(docker inspect --format '{{.Id}}' taqat_api)"
-          deploy; status=$?
+          status=0
+          deploy || status=$?
           expect "$([ "$status" -ne 0 ] && echo failed || echo succeeded)" failed "deploy reports failure"
           expect "$(docker inspect --format '{{.Id}}' taqat_api)" "$container_before" "api container was never replaced"
           expect "$(git -C "$APP" rev-parse HEAD)" "$GOOD_SHA" "checkout restored"
@@ -259,20 +269,23 @@ jobs:
           . "$RUNNER_TEMP/helpers.sh"
           publish "$GOOD_SHA"
 
-          APP_PATH="$APP" REMOTE_ENV="APP_PATH" run_remote "$GITHUB_WORKSPACE/infra/scripts/vps-backup.sh"
-          expect "$?" 0 "backup succeeds"
+          rc=0
+          APP_PATH="$APP" REMOTE_ENV="APP_PATH" run_remote "$GITHUB_WORKSPACE/infra/scripts/vps-backup.sh" || rc=$?
+          expect "$rc" 0 "backup succeeds"
           ls -l ~/taqat-backups
           expect "$(find ~/taqat-backups -name 'db-*.sql.gz' | wc -l | tr -d ' ')" 1 "one database dump written"
 
           docker exec taqat_db sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot "$MYSQL_DATABASE" -e "INSERT INTO settings (\`key\`, value, encrypted, \`group\`, created_at, updated_at) VALUES (\"rehearsal.after_backup\", \"1\", 0, \"general\", NOW(), NOW())"'
 
+          rc=0
           APP_PATH="$APP" RESTORE_BACKUP=latest RESTORE_CONFIRM="yes please" REMOTE_ENV="APP_PATH RESTORE_BACKUP RESTORE_CONFIRM" \
-            run_remote "$GITHUB_WORKSPACE/infra/scripts/vps-restore.sh"
-          expect "$?" 1 "restore refuses a wrong confirmation"
+            run_remote "$GITHUB_WORKSPACE/infra/scripts/vps-restore.sh" || rc=$?
+          expect "$rc" 1 "restore refuses a wrong confirmation"
 
+          rc=0
           APP_PATH="$APP" RESTORE_BACKUP=latest RESTORE_CONFIRM="restore production database" REMOTE_ENV="APP_PATH RESTORE_BACKUP RESTORE_CONFIRM" \
-            run_remote "$GITHUB_WORKSPACE/infra/scripts/vps-restore.sh"
-          expect "$?" 0 "restore succeeds"
+            run_remote "$GITHUB_WORKSPACE/infra/scripts/vps-restore.sh" || rc=$?
+          expect "$rc" 0 "restore succeeds"
 
           rows="$(docker exec taqat_db sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot -N -B "$MYSQL_DATABASE" -e "SELECT COUNT(*) FROM settings WHERE \`key\` = \"rehearsal.after_backup\""')"
           expect "$rows" 0 "data written after the backup is gone"
