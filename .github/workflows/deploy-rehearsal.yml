@@ -137,6 +137,24 @@ jobs:
 
           cd "$APP"
           $COMPOSE build api web
+
+          # Docker Hub no longer serves minio/minio anonymously. The app keeps
+          # its files on the local disk, so a stub that simply stays up keeps
+          # the stack the same shape (a taqat_minio container with a /data
+          # volume for the backup script to archive).
+          mkdir -p "$RUNNER_TEMP/minio-stub"
+          cat > "$RUNNER_TEMP/minio-stub/Dockerfile" <<'DOCKERFILE'
+          FROM alpine:3.20
+          ENTRYPOINT ["sh", "-c", "exec sleep infinity", "--"]
+          DOCKERFILE
+          docker build -q -t minio/minio:latest "$RUNNER_TEMP/minio-stub"
+
+          # Fail here, in one place, if any other image the stack or the backup
+          # and off-site scripts rely on can no longer be pulled.
+          for image in mysql:8.4 redis:7-alpine getmeili/meilisearch:v1.10 nginx:alpine alpine:3.20 amazon/aws-cli:2.17.0; do
+            docker pull -q "$image" > /dev/null || { echo "::error::cannot pull $image"; exit 1; }
+          done
+
           $COMPOSE up -d
           for i in $(seq 1 90); do
             if $COMPOSE exec -T api php artisan migrate --force > /dev/null 2>&1; then break; fi
