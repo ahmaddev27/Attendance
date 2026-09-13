@@ -45,6 +45,21 @@ function makeEmployeeWithSchedule(?WorkSchedule $schedule = null): Employee
     return Employee::factory()->create(['work_schedule_id' => $schedule->id]);
 }
 
+function enableScanPinEnforcement(): void
+{
+    app(\App\Modules\Settings\Services\SettingsService::class)
+        ->set('attendance.scan_pin_required', '1', 'attendance');
+}
+
+function issueScanPinFor(Employee $employee, string $pin): void
+{
+    \App\Models\EmployeeScanPin::query()->create([
+        'employee_id' => $employee->id,
+        'pin_hash' => \Illuminate\Support\Facades\Hash::make($pin),
+        'set_via' => \App\Shared\Enums\ScanPinSource::AdminReset,
+    ]);
+}
+
 /**
  * Authenticates the current test as a fresh super-admin user via the
  * sanctum guard. Ensures the 'super-admin' role and its permissions

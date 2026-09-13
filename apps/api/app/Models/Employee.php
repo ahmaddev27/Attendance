@@ -170,6 +170,17 @@ class Employee extends Model
         return $this->hasMany(Attendance::class);
     }
 
+    /**
+     * Owned by the Attendance module. Lives in its own table so the hash
+     * can never ride along on this model's serialisation or search index.
+     *
+     * @return HasOne<EmployeeScanPin, $this>
+     */
+    public function scanPin(): HasOne
+    {
+        return $this->hasOne(EmployeeScanPin::class);
+    }
+
     public function getFullNameAttribute(): string
     {
         return trim("{$this->first_name} {$this->last_name}");

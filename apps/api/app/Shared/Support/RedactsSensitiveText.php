@@ -33,6 +33,10 @@ trait RedactsSensitiveText
         // English fallback: "password: <secret>" / "Password:<secret>"
         $body = (string) preg_replace('/(password\s*:\s*)\S+/iu', '$1[REDACTED]', $body);
 
+        // Attendance scan PIN: "رمز الحضور ... : 1234". Unlike an OTP it
+        // stays valid until changed, so it must never sit in sms_logs.
+        $body = (string) preg_replace('/(رمز الحضور[^:\n]*:\s*)\d+/u', '$1[REDACTED]', $body);
+
         return $body;
     }
 }

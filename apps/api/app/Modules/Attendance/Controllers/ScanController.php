@@ -9,26 +9,30 @@ use App\Models\Attendance;
 use App\Models\AttendanceDevice;
 use App\Models\Employee;
 use App\Modules\Attendance\Exceptions\AttendanceModuleException;
-use App\Modules\Attendance\Exceptions\InvalidScanCredentialsException;
 use App\Modules\Attendance\Repositories\AttendanceDeviceRepository;
+use App\Modules\Attendance\Requests\ScanIdentityRequest;
 use App\Modules\Attendance\Requests\ScanRequest;
+use App\Modules\Attendance\Requests\ScanStatusRequest;
 use App\Modules\Attendance\Resources\AttendanceResource;
 use App\Modules\Attendance\Services\AttendanceService;
 use App\Modules\Attendance\Services\QrTokenService;
-use App\Shared\Enums\EmployeeStatus;
+use App\Modules\Attendance\Services\ScanIdentityService;
+use App\Modules\Attendance\Services\ScanPinService;
 use Illuminate\Http\JsonResponse;
 
 /**
- * Public, unauthenticated endpoints hit by the kiosk/mobile scan flow. The
- * QR token (device credential) plus employee_number (employee credential)
- * stand in for auth:sanctum here — see FraudGuardService and
- * QrTokenService for how each is verified.
+ * Public endpoints hit by the kiosk page and the mobile app. The QR token is
+ * the device credential; the employee is proven either by a bearer token
+ * (mobile) or by employee number plus scan PIN (kiosk) — see
+ * ScanIdentityService, QrTokenService and FraudGuardService.
  */
 class ScanController extends Controller
 {
     public function __construct(
         private readonly AttendanceService $attendanceService,
         private readonly QrTokenService $qrTokens,
+        private readonly ScanIdentityService $scanIdentity,
+        private readonly ScanPinService $scanPins,
         private readonly AttendanceDeviceRepository $devices,
     ) {}
 
@@ -65,25 +69,16 @@ class ScanController extends Controller
      *                        friendly "done for today" message
      *
      * The frontend uses this to auto-pick the correct button instead of
-     * asking the employee to guess. QR token + employee_number are the
-     * same auth as check-in/out — no session, kiosk-mode by design.
+     * asking the employee to guess.
      */
-    public function status(\App\Modules\Attendance\Requests\ScanStatusRequest $request): JsonResponse
+    public function status(ScanStatusRequest $request): JsonResponse
     {
         try {
             $device = $this->qrTokens->resolveDevice($request->qrToken());
-
-            $employee = Employee::query()
-                ->where('employee_number', $request->employeeNumber())
-                ->where('status', EmployeeStatus::Active)
-                ->first();
-
-            if (! $employee) {
-                throw new InvalidScanCredentialsException('Unknown employee number.');
-            }
+            $employee = $this->resolveEmployee($request);
 
             $today = now()->toDateString();
-            $attendance = \App\Models\Attendance::query()
+            $attendance = Attendance::query()
                 ->where('employee_id', $employee->id)
                 ->where('date', $today)
                 ->first();
@@ -95,12 +90,11 @@ class ScanController extends Controller
             };
 
             // NB: deliberately do NOT return the employee's full_name here.
-            // /scan/status is a public, unauthenticated endpoint gated only
-            // by (qr_token, employee_number); returning the name would let
-            // anyone holding a valid kiosk QR walk the employee_number
-            // space and enumerate the entire staff directory. The FE
-            // reveals the name only AFTER a successful check-in POST,
-            // which additionally passes the FraudGuard checks.
+            // /scan/status is a public, unauthenticated endpoint; returning
+            // the name would let anyone holding a valid kiosk QR walk the
+            // employee_number space and enumerate the entire staff
+            // directory. The FE reveals the name only AFTER a successful
+            // check-in POST, which additionally passes the FraudGuard checks.
             return response()->json([
                 'data' => [
                     'state' => $state,
@@ -143,13 +137,16 @@ class ScanController extends Controller
             // and then discarding the answer is a noisy UX.
             'enforce_geo' => (bool) $device->enforce_geo,
             'enforce_ip' => (bool) $device->enforce_ip,
+            // Lets the kiosk keep its PIN-less layout until an admin
+            // switches enforcement on.
+            'pin_required' => $this->scanPins->isRequired(),
         ]);
     }
 
     /**
      * Shared plumbing for check-in/check-out: resolve the device from the
-     * QR token, resolve the employee from their number, run the given
-     * action, and translate any module exception into its HTTP response.
+     * QR token, resolve the employee, run the given action, and translate
+     * any module exception into its HTTP response.
      *
      * @param  \Closure(Employee, AttendanceDevice): Attendance  $action
      */
@@ -157,29 +154,7 @@ class ScanController extends Controller
     {
         try {
             $device = $this->qrTokens->resolveDevice($request->qrToken());
-
-            // Only ACTIVE employees may scan. A terminated/inactive/on-leave
-            // employee whose card is still floating around should NOT be
-            // able to stamp attendance rows. The status filter is applied
-            // in-query so we don't leak "this number exists but isn't
-            // active" via a distinguishable second error.
-            $employee = Employee::query()
-                ->where('employee_number', $request->employeeNumber())
-                ->where('status', EmployeeStatus::Active)
-                ->first();
-
-            if (! $employee) {
-                throw new InvalidScanCredentialsException('Unknown employee number.');
-            }
-
-            // Merged with "unknown number" to avoid an enumeration oracle:
-            // an attacker with a valid kiosk QR token would otherwise be
-            // able to walk `employee_number` and distinguish
-            // "no such number" (200/422) from "number exists but disabled"
-            // (403), enumerating the terminated-employee directory.
-            if ($employee->user && ! $employee->user->is_active) {
-                throw new InvalidScanCredentialsException('Unknown employee number.');
-            }
+            $employee = $this->resolveEmployee($request);
 
             $attendance = $action($employee, $device);
 
@@ -194,5 +169,14 @@ class ScanController extends Controller
         } catch (AttendanceModuleException $exception) {
             return response()->json(['message' => $exception->getMessage()], $exception->statusCode());
         }
+    }
+
+    /**
+     * Runs after the QR token is resolved so a caller without a valid kiosk
+     * QR can never burn an employee's PIN attempts.
+     */
+    private function resolveEmployee(ScanIdentityRequest $request): Employee
+    {
+        return $this->scanIdentity->resolve($request->bearerToken(), $request->employeeNumber(), $request->pin());
     }
 }

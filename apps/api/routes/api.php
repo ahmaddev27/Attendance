@@ -3,7 +3,9 @@
 use App\Modules\Attendance\Controllers\AttendanceController;
 use App\Modules\Attendance\Controllers\AttendanceDeviceController;
 use App\Modules\Attendance\Controllers\HolidayController;
+use App\Modules\Attendance\Controllers\MyScanPinController;
 use App\Modules\Attendance\Controllers\ScanController;
+use App\Modules\Attendance\Controllers\ScanPinController;
 use App\Modules\Attendance\Controllers\WorkScheduleController;
 use App\Modules\Auth\Controllers\AuthController;
 use App\Modules\Auth\Controllers\PasswordResetController;
@@ -115,6 +117,11 @@ Route::middleware('auth:sanctum')->group(function () {
         // enumerate passwords or grind through every employee row.
         Route::post('/employees/{employee}/reset-password', [EmployeeController::class, 'resetPassword'])
             ->middleware('throttle:reset-password');
+
+        // Returns the new attendance PIN once. Throttled so a stolen admin
+        // session cannot rotate every employee's PIN in one burst.
+        Route::post('/employees/{employee}/scan-pin', [ScanPinController::class, 'reset'])
+            ->middleware('throttle:10,1');
     });
 });
 
@@ -154,6 +161,19 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('work-schedules', WorkScheduleController::class)
             ->parameters(['work-schedules' => 'schedule']);
     });
+
+    // Scan PIN rollout. manage-users rather than manage-departments because
+    // issuing a PIN hands out an employee credential.
+    Route::middleware('permission:manage-users')
+        ->prefix('admin/attendance/scan-pins')
+        ->group(function () {
+            Route::get('/', [ScanPinController::class, 'summary']);
+            // One bcrypt hash and one SMS per employee — expensive, and
+            // re-running it within the hour is never needed.
+            Route::post('/issue-missing', [ScanPinController::class, 'issueMissing'])
+                ->middleware('throttle:3,60');
+            Route::put('/enforcement', [ScanPinController::class, 'updateEnforcement']);
+        });
 });
 
 // M4 — Leaves: types + balances + requests.
@@ -406,6 +426,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/me/profile', [MyProfileController::class, 'update']);
     Route::post('/me/password', [MyProfileController::class, 'updatePassword'])
         ->middleware('throttle:login');
+    // Also verifies current_password, so it gets its own tight bucket.
+    Route::put('/me/scan-pin', [MyScanPinController::class, 'update'])
+        ->middleware('throttle:5,1');
 
     // Notifications (M7). Every user sees only their own inbox — the
     // controller uses $request->user()->notifications, not a global list.

@@ -6,6 +6,7 @@ namespace App\Modules\Employees\Repositories;
 
 use App\Models\Employee;
 use App\Models\User;
+use App\Shared\Enums\EmployeeStatus;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -51,6 +52,15 @@ class EmployeeRepository
     public function findByNumber(int $employeeNumber): ?Employee
     {
         return Employee::query()->where('employee_number', $employeeNumber)->first();
+    }
+
+    public function findActiveByNumber(int $employeeNumber): ?Employee
+    {
+        return Employee::query()
+            ->with('user')
+            ->where('employee_number', $employeeNumber)
+            ->where('status', EmployeeStatus::Active)
+            ->first();
     }
 
     public function findOrFail(int $id): Employee
