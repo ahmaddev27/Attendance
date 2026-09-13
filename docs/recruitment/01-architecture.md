@@ -372,17 +372,25 @@ React Query hooks في `apps/web/src/lib/api/recruitment.ts` (نفس نمط `lea
 
 | Setting | جدول | UI Location |
 |---------|------|-------------|
-| Lead Sources | `settings` (json array) | /admin/settings#recruitment |
-| Lead Statuses (pipeline stages للـ Lead) | `settings` (json array) | /admin/settings#recruitment |
+| Currencies | `settings` key `general.currencies` | /settings#lists (قسم عام) |
+| Lead Sources | `settings` key `recruitment.lead_sources` | /settings#lists (قسم التوظيف) |
+| Industries / Company Sizes / Education Levels | `settings` keys `recruitment.*` | /settings#lists (قسم التوظيف) |
 | Job Pipelines | `recruitment_pipelines` | /recruitment/pipelines |
 | Pipeline Stages | `recruitment_pipeline_stages` | /recruitment/pipelines/{id} |
 | Stage Owners (default) | حقول على stage | نفس المكان |
 | SLA per stage (hours) | `sla_hours` على stage | نفس المكان |
 | Required fields per stage | `requires_fields` json على stage | نفس المكان |
-| Job Types / Employment Types / Work Modes | `settings` (json) | /admin/settings#recruitment |
-| Currencies | `settings` (json) | /admin/settings (global) |
 
 **قاعدة:** أي قائمة يُتوقع أن يعدّلها Admin أكثر من مرة في السنة → لا تكون Enum ثابت في PHP.
+
+**كيف تعمل القوائم (مُنفّذ):**
+- `App\Shared\Enums\OptionList` يحمل لكل قائمة: مفتاح الإعداد، القيم الافتراضية بتسميات عربية، ونمط الرمز المسموح.
+- كل عنصر `{value, label}`. الرمز ثابت ويُخزَّن على السجلات، والاسم الظاهر للعرض فقط.
+- إن لم يوجد صف في `settings` (أو كان تالفاً) تُستخدم القيم الافتراضية من الكود، فلا تحتاج القوائم أي seeder.
+- `GET /api/option-lists` للنماذج (أي مستخدم مسجّل)، و `GET|PUT|DELETE /api/admin/option-lists/{list}` للتعديل (`manage-settings`).
+- حذف رمز من القائمة لا يكسر السجلات القديمة: الواجهة تعرض القيمة كما هي، وتعديل الـ lead يقبل مصدره الحالي.
+
+**قرار: قوائم تبقى في الكود وليست قابلة للتعديل:** Lead Statuses و Employment Types و Work Modes. الكانبان وتدفق التحويل والـ validation تعتمد على قيمها الحرفية (`converted`، `lost`، ...)، فإعادة تسميتها أو حذفها من الإعدادات تكسر السلوك وليس العرض فقط.
 
 ---
 

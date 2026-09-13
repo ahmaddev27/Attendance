@@ -360,17 +360,22 @@ Schedule::command('recruitment:scan-stale-leads')
 
 ### 10.1 Forward
 
-```bash
-# GitHub Actions يشغّل تلقائياً:
-php artisan migrate --path=database/migrations/2026_10_01_*
-php artisan db:seed --class=RecruitmentPipelineSeeder
-php artisan db:seed --class=RecruitmentPermissionSeeder
-php artisan db:seed --class=RecruitmentSettingsSeeder
+الـ deploy (`.github/workflows/deploy.yml`) يشغّل `php artisan migrate --force` فقط ولا يشغّل أي seeder، ولا أحد يدخل السيرفر يدوياً. لذلك البيانات المرجعية تصل للإنتاج عبر migration:
+
+```text
+2026_10_01_100001 … 100010   → الجداول + tasks.entity_type/entity_id
+2026_10_01_100011            → RecruitmentPermissionSeeder (16 صلاحية + منحها لـ super-admin)
+                               + RecruitmentPipelineSeeder (فقط إن لم يوجد مسار بالرمز standard)
 ```
+
+- المسار الافتراضي لا يأخذ `is_default` إن كان هناك مسار افتراضي آخر اختاره الـ Admin.
+- قوائم الاختيار (العملات، المصادر، القطاعات، …) لا تحتاج seeding: قيمها الافتراضية في `App\Shared\Enums\OptionList`. `RecruitmentSettingsSeeder` حُذف.
 
 ### 10.2 Rollback
 
-كل migration فيها `down()` — رجوع نظيف للحالة السابقة. اختبار الـ down مدرج في `Q5` أعلاه.
+كل migration فيها `down()` — رجوع نظيف للحالة السابقة. `100011` له `down()` فارغ عمداً: حذف الصلاحيات يُسقط منحها لأدوار عدّلها الـ Admin.
+
+اختبار Q5 مُنفّذ في `tests/Feature/Recruitment/RecruitmentMigrationsReversibleTest.php`: يعمل `migrate:rollback --path` للـ 11 migration، يتحقق من حذف الجداول وأعمدة `tasks`، ثم `migrate --path` ويتحقق من رجوعها ومن إعادة زرع المسار والصلاحيات. يمر على SQLite و MySQL 8.4.
 
 **تحذير:** لا يمكن rollback بعد إنشاء بيانات production. الـ rollback فقط للـ CI/staging.
 
