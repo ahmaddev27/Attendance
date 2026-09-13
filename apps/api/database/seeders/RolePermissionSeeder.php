@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 class RolePermissionSeeder extends Seeder
 {
@@ -45,6 +46,20 @@ class RolePermissionSeeder extends Seeder
         'manage-settings',
     ];
 
+    /**
+     * Approved defaults for the roles below super-admin. Attendance is not
+     * scoped to a team yet, so department managers deliberately see
+     * company-wide attendance. Grants are additive: a re-run never strips
+     * something an admin granted by hand.
+     *
+     * @var array<string, list<string>>
+     */
+    public const ROLE_PERMISSIONS = [
+        'management' => ['view-all-attendance', 'view-reports', 'view-audit-logs'],
+        'department-manager' => ['approve-leaves', 'view-all-attendance', 'view-reports', 'create-tasks'],
+        'team-leader' => ['create-tasks'],
+    ];
+
     public function run(): void
     {
         foreach (self::PERMISSIONS as $permission) {
@@ -61,6 +76,12 @@ class RolePermissionSeeder extends Seeder
         // Permission::all() — no lower role should ever receive it.
         Role::findByName('super-admin')
             ->syncPermissions(Permission::all());
+
+        foreach (self::ROLE_PERMISSIONS as $roleName => $permissions) {
+            Role::findByName($roleName)->givePermissionTo($permissions);
+        }
+
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
 
         // Bind the super-admin role to a stable identity — the seeded
         // admin email — rather than an employee_number sentinel. Any
