@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Leaves\Repositories;
 
+use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\LeaveType;
+use App\Shared\Enums\EmployeeStatus;
+use Closure;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -116,5 +119,52 @@ class LeaveBalanceRepository
         }
 
         return $query->first();
+    }
+
+    /**
+     * Terminated staff get no new leave year; people on leave or temporarily
+     * inactive keep their entitlement history.
+     *
+     * @param  Closure(list<int>): void  $callback
+     */
+    public function chunkEmployeeIdsOnStaff(int $size, Closure $callback): void
+    {
+        Employee::query()
+            ->where('status', '!=', EmployeeStatus::Terminated->value)
+            ->select('id')
+            ->chunkById($size, fn ($employees) => $callback(
+                $employees->pluck('id')->map(fn ($id) => (int) $id)->all(),
+            ));
+    }
+
+    /**
+     * @param  list<int>  $employeeIds
+     * @param  list<int>  $leaveTypeIds
+     * @return Collection<string, LeaveBalance> keyed by "employee_id:leave_type_id"
+     */
+    public function balancesForYear(array $employeeIds, array $leaveTypeIds, int $year): Collection
+    {
+        return LeaveBalance::query()
+            ->whereIn('employee_id', $employeeIds)
+            ->whereIn('leave_type_id', $leaveTypeIds)
+            ->where('year', $year)
+            ->get()
+            ->keyBy(fn (LeaveBalance $balance) => $balance->employee_id.':'.$balance->leave_type_id);
+    }
+
+    /**
+     * Inserts missing rows and, for rows that already exist, updates only the
+     * carried amount: entitlement, used and pending of an open year are never
+     * overwritten.
+     *
+     * @param  list<array{employee_id: int, leave_type_id: int, year: int, entitlement: float, carry_over_from_previous: float}>  $rows
+     */
+    public function upsertCarryOver(array $rows): void
+    {
+        LeaveBalance::query()->upsert(
+            $rows,
+            ['employee_id', 'leave_type_id', 'year'],
+            ['carry_over_from_previous'],
+        );
     }
 }

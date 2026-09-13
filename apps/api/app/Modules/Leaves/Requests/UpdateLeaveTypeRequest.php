@@ -28,6 +28,7 @@ class UpdateLeaveTypeRequest extends FormRequest
             'is_paid' => ['sometimes', 'boolean'],
             'is_balance_based' => ['sometimes', 'boolean'],
             'default_annual_entitlement' => ['sometimes', 'numeric', 'min:0', 'max:999.99'],
+            'carry_over_max_days' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:999.99'],
             'allow_negative_balance' => ['sometimes', 'boolean'],
             'requires_attachment' => ['sometimes', 'boolean'],
             'max_consecutive_days' => ['nullable', 'integer', 'min:1'],

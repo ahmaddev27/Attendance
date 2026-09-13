@@ -17,6 +17,8 @@ use Illuminate\Support\Facades\Log;
 
 class LeaveBalanceService
 {
+    private const ROLLOVER_CHUNK_SIZE = 200;
+
     public function __construct(
         private readonly LeaveBalanceRepository $balances,
     ) {}
@@ -60,6 +62,56 @@ class LeaveBalanceService
                     carryOver: 0.0,
                 ));
         });
+    }
+
+    /**
+     * Opens `$year` for every employee still on staff: one row per active,
+     * balance-based leave type, carrying min(last year's remaining, the
+     * type's cap). Existing rows keep their entitlement, used and pending;
+     * only the carried amount is recomputed, which is what makes a re-run
+     * after a late decision on last year's leave correct.
+     *
+     * @return array{employees: int, balances: int, carried_days: float}
+     */
+    public function rollOverYear(int $year): array
+    {
+        $summary = ['employees' => 0, 'balances' => 0, 'carried_days' => 0.0];
+        $leaveTypes = LeaveType::query()->active()->balanceBased()->get()->keyBy('id');
+
+        if ($leaveTypes->isEmpty()) {
+            return $summary;
+        }
+
+        $this->balances->chunkEmployeeIdsOnStaff(
+            self::ROLLOVER_CHUNK_SIZE,
+            function (array $employeeIds) use ($year, $leaveTypes, &$summary): void {
+                $previous = $this->balances->balancesForYear($employeeIds, $leaveTypes->keys()->all(), $year - 1);
+                $rows = [];
+
+                foreach ($employeeIds as $employeeId) {
+                    foreach ($leaveTypes as $leaveType) {
+                        $carried = $this->carriedOver($previous->get($employeeId.':'.$leaveType->id), $leaveType);
+                        $rows[] = [
+                            'employee_id' => $employeeId,
+                            'leave_type_id' => $leaveType->id,
+                            'year' => $year,
+                            'entitlement' => (float) $leaveType->default_annual_entitlement,
+                            'carry_over_from_previous' => $carried,
+                        ];
+                        $summary['carried_days'] += $carried;
+                    }
+                }
+
+                DB::transaction(fn () => $this->balances->upsertCarryOver($rows));
+
+                $summary['employees'] += count($employeeIds);
+                $summary['balances'] += count($rows);
+            },
+        );
+
+        $summary['carried_days'] = round($summary['carried_days'], 2);
+
+        return $summary;
     }
 
     /**
@@ -133,5 +185,14 @@ class LeaveBalanceService
 
             return $balance->refresh();
         });
+    }
+
+    private function carriedOver(?LeaveBalance $previous, LeaveType $leaveType): float
+    {
+        if ($previous === null || $leaveType->carry_over_max_days === null) {
+            return 0.0;
+        }
+
+        return round(max(0.0, min($previous->remaining, (float) $leaveType->carry_over_max_days)), 2);
     }
 }

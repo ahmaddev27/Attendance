@@ -44,6 +44,7 @@ const leaveTypeFormSchema = z.object({
   is_paid: z.boolean(),
   is_balance_based: z.boolean(),
   default_annual_entitlement: z.number().min(0, 'القيمة يجب أن تكون صفر أو أكثر'),
+  carry_over_max_days: z.number().min(0, 'القيمة يجب أن تكون صفر أو أكثر').nullable(),
   allow_negative_balance: z.boolean(),
   requires_attachment: z.boolean(),
   max_consecutive_days: z.number().min(1, 'القيمة يجب أن تكون أكبر من صفر').nullable(),
@@ -63,6 +64,7 @@ function buildDefaultValues(leaveType?: LeaveType | null): LeaveTypeFormValues {
       is_paid: true,
       is_balance_based: true,
       default_annual_entitlement: 0,
+      carry_over_max_days: null,
       allow_negative_balance: false,
       requires_attachment: false,
       max_consecutive_days: null,
@@ -78,6 +80,7 @@ function buildDefaultValues(leaveType?: LeaveType | null): LeaveTypeFormValues {
     is_paid: leaveType.is_paid,
     is_balance_based: leaveType.is_balance_based,
     default_annual_entitlement: leaveType.default_annual_entitlement,
+    carry_over_max_days: leaveType.carry_over_max_days,
     allow_negative_balance: leaveType.allow_negative_balance,
     requires_attachment: leaveType.requires_attachment,
     max_consecutive_days: leaveType.max_consecutive_days,
@@ -192,7 +195,7 @@ export function LeaveTypeFormDialog({ open, onOpenChange, leaveType }: LeaveType
               )}
             />
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FormField
                 control={form.control}
                 name="default_annual_entitlement"
@@ -207,6 +210,28 @@ export function LeaveTypeFormDialog({ open, onOpenChange, leaveType }: LeaveType
                         className="num text-right"
                         value={field.value}
                         onChange={(e) => field.onChange(Number(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="carry_over_max_days"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>أقصى أيام تُرحَّل للسنة التالية (اختياري)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.5"
+                        dir="ltr"
+                        className="num text-right"
+                        value={field.value ?? ''}
+                        placeholder="بدون ترحيل"
+                        onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
                       />
                     </FormControl>
                     <FormMessage />

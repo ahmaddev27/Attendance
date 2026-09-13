@@ -207,3 +207,21 @@ Schedule::command('recruitment:scan-sla')
 Schedule::command('recruitment:scan-stale-leads')
     ->dailyAt('09:00')
     ->withoutOverlapping();
+
+/*
+|--------------------------------------------------------------------------
+| Annual leave rollover
+|--------------------------------------------------------------------------
+|
+| Opens the new leave year five minutes into 1 January (Amman time):
+| a balance row per employee still on staff, with unused days carried
+| over up to each leave type's cap. Re-running it later only recomputes
+| the carried amount, so a missed tick is fixed with
+| `php artisan leaves:annual-rollover --year=YYYY`.
+*/
+Schedule::command('leaves:annual-rollover')
+    ->yearlyOn(1, 1, '00:05')
+    ->timezone('Asia/Amman')
+    ->onOneServer()
+    ->withoutOverlapping()
+    ->name('leaves:annual-rollover');

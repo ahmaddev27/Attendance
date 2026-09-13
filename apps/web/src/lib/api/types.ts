@@ -488,6 +488,8 @@ export type LeaveType = {
   is_paid: boolean;
   is_balance_based: boolean;
   default_annual_entitlement: number;
+  /** Unused days that may roll into next year; null carries nothing. */
+  carry_over_max_days: number | null;
   allow_negative_balance: boolean;
   requires_attachment: boolean;
   max_consecutive_days: number | null;

@@ -25,6 +25,7 @@ class LeaveTypeResource extends JsonResource
             'is_paid' => $this->is_paid,
             'is_balance_based' => $this->is_balance_based,
             'default_annual_entitlement' => (float) $this->default_annual_entitlement,
+            'carry_over_max_days' => $this->carry_over_max_days === null ? null : (float) $this->carry_over_max_days,
             'allow_negative_balance' => $this->allow_negative_balance,
             'requires_attachment' => $this->requires_attachment,
             'max_consecutive_days' => $this->max_consecutive_days,
