@@ -19,16 +19,9 @@ import { List, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { FilterBar } from '@/components/data-table/filter-bar';
+import { FilterSelect } from '@/components/data-table/filter-select';
 import { LeadFormDialog } from '@/app/(admin)/recruitment/leads/_components/lead-form-dialog';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useOptionLists } from '@/hooks/use-option-lists';
@@ -55,7 +48,7 @@ export default function LeadsKanbanPage() {
   const { options } = useOptionLists();
 
   const [search, setSearch] = React.useState('');
-  const [source, setSource] = React.useState<LeadSource | 'all'>('all');
+  const [source, setSource] = React.useState<LeadSource | undefined>();
   const [activeCard, setActiveCard] = React.useState<LeadSummary | null>(null);
   const [formOpen, setFormOpen] = React.useState(false);
 
@@ -63,7 +56,7 @@ export default function LeadsKanbanPage() {
 
   const filters = {
     search: debouncedSearch || undefined,
-    source: source === 'all' ? undefined : source,
+    source,
   };
 
   const { data, isLoading } = useQuery({
@@ -158,33 +151,15 @@ export default function LeadsKanbanPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 rounded-xl border border-hairline bg-surface p-4 sm:grid-cols-3">
-        <div className="sm:col-span-2">
-          <Label className="text-xs font-semibold text-ink-2">بحث</Label>
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="ابحث باسم الشركة..."
-            className="mt-1.5"
-          />
-        </div>
-        <div>
-          <Label className="text-xs font-semibold text-ink-2">المصدر</Label>
-          <Select value={source} onValueChange={(v) => setSource(v as LeadSource | 'all')}>
-            <SelectTrigger className="mt-1.5">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">كل المصادر</SelectItem>
-              {options('lead_sources').map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+      <FilterBar searchValue={search} onSearchChange={setSearch} searchPlaceholder="ابحث باسم الشركة...">
+        <FilterSelect
+          value={source}
+          onChange={(value) => setSource(value as LeadSource | undefined)}
+          options={options('lead_sources')}
+          placeholder="المصدر"
+          allLabel="كل المصادر"
+        />
+      </FilterBar>
 
       {isLoading ? (
         <div className="flex gap-4 overflow-x-auto pb-2">

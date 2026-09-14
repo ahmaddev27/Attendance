@@ -174,10 +174,10 @@ export function ClientFormDialog({ open, onOpenChange, client }: ClientFormDialo
                 </FormItem>
               )} />
               <FormField control={form.control} name="industry" render={({ field }) => (
-                <FormItem><FormLabel>القطاع</FormLabel><FormControl><OptionSelect list="industries" ref={field.ref} value={field.value} onValueChange={field.onChange} onBlur={field.onBlur} allowEmpty /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>القطاع</FormLabel><FormControl><OptionSelect dir="rtl" list="industries" ref={field.ref} value={field.value} onValueChange={field.onChange} onBlur={field.onBlur} allowEmpty /></FormControl><FormMessage /></FormItem>
               )} />
               <FormField control={form.control} name="company_size" render={({ field }) => (
-                <FormItem><FormLabel>حجم الشركة</FormLabel><FormControl><OptionSelect list="company_sizes" ref={field.ref} value={field.value} onValueChange={field.onChange} onBlur={field.onBlur} allowEmpty /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>حجم الشركة</FormLabel><FormControl><OptionSelect dir="rtl" list="company_sizes" ref={field.ref} value={field.value} onValueChange={field.onChange} onBlur={field.onBlur} allowEmpty /></FormControl><FormMessage /></FormItem>
               )} />
               <FormField control={form.control} name="country" render={({ field }) => (
                 <FormItem><FormLabel>الدولة</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
@@ -200,7 +200,7 @@ export function ClientFormDialog({ open, onOpenChange, client }: ClientFormDialo
               <FormField control={form.control} name="status" render={({ field }) => (
                 <FormItem>
                   <FormLabel>الحالة</FormLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
+                  <Select dir="rtl" value={field.value} onValueChange={field.onChange}>
                     <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                     <SelectContent>
                       {CLIENT_STATUS_OPTIONS.map((opt) => (

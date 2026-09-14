@@ -17,16 +17,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { DataTable, type DataTableColumn } from '@/components/data-table/data-table';
+import { FilterBar } from '@/components/data-table/filter-bar';
+import { FilterSelect } from '@/components/data-table/filter-select';
 import { CaseStatusBadge } from '@/components/recruitment/status-badges';
 import { CaseFormDialog } from '@/app/(admin)/recruitment/cases/_components/case-form-dialog';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
@@ -49,7 +43,7 @@ export default function CasesPage() {
 
   const [page, setPage] = React.useState(1);
   const [search, setSearch] = React.useState('');
-  const [status, setStatus] = React.useState<RecruitmentCaseStatus | 'all'>('all');
+  const [status, setStatus] = React.useState<RecruitmentCaseStatus | undefined>();
   const [openOnly, setOpenOnly] = React.useState(true);
 
   const [formOpen, setFormOpen] = React.useState(false);
@@ -66,7 +60,7 @@ export default function CasesPage() {
     page,
     per_page: PER_PAGE,
     search: debouncedSearch || undefined,
-    status: status === 'all' ? undefined : status,
+    status,
     open_only: openOnly || undefined,
   };
 
@@ -146,35 +140,19 @@ export default function CasesPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-3 rounded-xl border border-hairline bg-surface p-4 sm:grid-cols-4">
-        <div className="sm:col-span-2">
-          <Label className="text-xs font-semibold text-ink-2">بحث</Label>
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ابحث بعنوان الحملة..." className="mt-1.5" />
-        </div>
-        <div>
-          <Label className="text-xs font-semibold text-ink-2">الحالة</Label>
-          <Select value={status} onValueChange={(v) => setStatus(v as RecruitmentCaseStatus | 'all')}>
-            <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">كل الحالات</SelectItem>
-              {CASE_STATUS_OPTIONS.map((o) => (
-                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex items-end">
-          <label className="flex items-center gap-2 text-sm text-ink">
-            <input
-              type="checkbox"
-              checked={openOnly}
-              onChange={(e) => setOpenOnly(e.target.checked)}
-              className="h-4 w-4 rounded border-hairline"
-            />
-            الحملات المفتوحة فقط
-          </label>
-        </div>
-      </div>
+      <FilterBar searchValue={search} onSearchChange={setSearch} searchPlaceholder="ابحث بعنوان الحملة...">
+        <FilterSelect
+          value={status}
+          onChange={(value) => setStatus(value as RecruitmentCaseStatus | undefined)}
+          options={CASE_STATUS_OPTIONS}
+          placeholder="الحالة"
+          allLabel="كل الحالات"
+        />
+        <label className="flex cursor-pointer items-center gap-2 whitespace-nowrap text-sm text-ink">
+          <Checkbox checked={openOnly} onCheckedChange={(checked) => setOpenOnly(checked === true)} />
+          الحملات المفتوحة فقط
+        </label>
+      </FilterBar>
 
       <DataTable
         columns={columns}

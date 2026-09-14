@@ -18,15 +18,9 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { DataTable, type DataTableColumn } from '@/components/data-table/data-table';
+import { FilterBar } from '@/components/data-table/filter-bar';
+import { FilterSelect } from '@/components/data-table/filter-select';
 import { ClientStatusBadge } from '@/components/recruitment/status-badges';
 import { ClientFormDialog } from '@/app/(admin)/recruitment/clients/_components/client-form-dialog';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
@@ -47,7 +41,7 @@ export default function ClientsPage() {
 
   const [page, setPage] = React.useState(1);
   const [search, setSearch] = React.useState('');
-  const [status, setStatus] = React.useState<ClientStatus | 'all'>('all');
+  const [status, setStatus] = React.useState<ClientStatus | undefined>();
   const [country, setCountry] = React.useState('');
 
   const [formOpen, setFormOpen] = React.useState(false);
@@ -65,7 +59,7 @@ export default function ClientsPage() {
     page,
     per_page: PER_PAGE,
     search: debouncedSearch || undefined,
-    status: status === 'all' ? undefined : status,
+    status,
     country: debouncedCountry || undefined,
   };
 
@@ -148,28 +142,22 @@ export default function ClientsPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-3 rounded-xl border border-hairline bg-surface p-4 sm:grid-cols-4">
-        <div className="sm:col-span-2">
-          <Label className="text-xs font-semibold text-ink-2">بحث</Label>
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ابحث باسم الشركة..." className="mt-1.5" />
-        </div>
-        <div>
-          <Label className="text-xs font-semibold text-ink-2">الحالة</Label>
-          <Select value={status} onValueChange={(v) => setStatus(v as ClientStatus | 'all')}>
-            <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">كل الحالات</SelectItem>
-              {CLIENT_STATUS_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label className="text-xs font-semibold text-ink-2">الدولة</Label>
-          <Input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="مثال: الأردن" className="mt-1.5" />
-        </div>
-      </div>
+      <FilterBar searchValue={search} onSearchChange={setSearch} searchPlaceholder="ابحث باسم الشركة...">
+        <FilterSelect
+          value={status}
+          onChange={(value) => setStatus(value as ClientStatus | undefined)}
+          options={CLIENT_STATUS_OPTIONS}
+          placeholder="الحالة"
+          allLabel="كل الحالات"
+        />
+        <Input
+          value={country}
+          onChange={(e) => setCountry(e.target.value)}
+          placeholder="الدولة (مثال: الأردن)"
+          aria-label="الدولة"
+          className="w-full sm:w-44"
+        />
+      </FilterBar>
 
       <DataTable
         columns={columns}

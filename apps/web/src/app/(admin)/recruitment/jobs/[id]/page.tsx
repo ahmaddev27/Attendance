@@ -7,6 +7,16 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, Ban, Check, ChevronRight, Circle, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { JobStatusBadge } from '@/components/recruitment/status-badges';
@@ -23,6 +33,10 @@ import { hasPermission, useAuthStore } from '@/lib/stores/auth-store';
 import { cn } from '@/lib/utils';
 import type { RecruitmentPipelineStage } from '@/lib/api/types';
 
+// BrightGaza's own codes, as stored in external_payload.
+const CONTRACT_TIME_TYPE_LABELS: Record<string, string> = { '1': 'بالساعة', '2': 'سعر ثابت' };
+const EXPERIENCE_LEVEL_LABELS: Record<string, string> = { '1': 'مبتدئ', '2': 'متوسط', '3': 'خبير' };
+
 export default function JobDetailPage() {
   const params = useParams<{ id: string }>();
   const jobId = Number(params.id);
@@ -33,6 +47,7 @@ export default function JobDetailPage() {
   const { labelOf } = useOptionLists();
   const [editOpen, setEditOpen] = React.useState(false);
   const [advanceOpen, setAdvanceOpen] = React.useState(false);
+  const [cancelOpen, setCancelOpen] = React.useState(false);
 
   const { data: jobRes, isLoading } = useQuery({
     queryKey: ['jobs', jobId],
@@ -50,6 +65,7 @@ export default function JobDetailPage() {
     mutationFn: () => jobsApi.cancel(jobId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['jobs'] });
+      setCancelOpen(false);
       toast.success('تم إلغاء الوظيفة');
     },
     onError: () => toast.error('تعذر الإلغاء'),
@@ -78,6 +94,11 @@ export default function JobDetailPage() {
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-ink">{job.title}</h1>
               <JobStatusBadge status={job.status} />
+              {job.external && (
+                <span className="rounded bg-brand-soft px-2 py-0.5 text-xs font-medium text-brand-ink">
+                  مسحوبة من BrightGaza
+                </span>
+              )}
             </div>
             <p className="mt-1 num text-xs text-muted" dir="ltr">{job.job_number}</p>
             <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-ink-2">
@@ -115,7 +136,7 @@ export default function JobDetailPage() {
                 type="button"
                 variant="outline"
                 className="gap-2 text-danger hover:bg-danger-soft"
-                onClick={() => cancelMutation.mutate()}
+                onClick={() => setCancelOpen(true)}
                 disabled={cancelMutation.isPending}
               >
                 <Ban className="h-4 w-4" /> إلغاء الوظيفة
@@ -239,11 +260,57 @@ export default function JobDetailPage() {
               {job.completed_at && <Row label="اكتملت في" value={formatDate(job.completed_at)} isNumber />}
             </dl>
           </SectionCard>
+          {job.external && (
+            <SectionCard title="بيانات BrightGaza">
+              <dl className="space-y-3">
+                <Row label="رقم الوظيفة هناك" value={job.external.id} isNumber />
+                <Row
+                  label="الحالة هناك"
+                  value={job.external.status === 'not_listed' ? 'لم تعد معروضة على BrightGaza' : job.external.status}
+                />
+                <Row label="عدد المتقدمين" value={job.external.details.proposal_count} isNumber />
+                <Row label="آخر تقديم" value={job.external.details.last_proposal_at} isNumber />
+                <Row
+                  label="التصنيف"
+                  value={[job.external.details.category, job.external.details.sub_category].filter(Boolean).join(' / ') || null}
+                />
+                <Row label="نوع العقد" value={CONTRACT_TIME_TYPE_LABELS[job.external.details.contract_time_type ?? ''] ?? null} />
+                <Row label="مستوى الخبرة" value={EXPERIENCE_LEVEL_LABELS[job.external.details.experience_level ?? ''] ?? null} />
+                <Row label="الناشر" value={job.external.details.poster} />
+                <Row label="نُشرت هناك" value={job.external.details.posted_at} isNumber />
+                <Row label="آخر سحب" value={job.external.synced_at ? formatDate(job.external.synced_at) : null} isNumber />
+              </dl>
+            </SectionCard>
+          )}
         </aside>
       </div>
 
       <JobFormDialog open={editOpen} onOpenChange={setEditOpen} job={job} />
       {advanceOpen && <AdvanceStageDialog open={advanceOpen} onOpenChange={setAdvanceOpen} job={job} />}
+
+      <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>إلغاء الوظيفة</AlertDialogTitle>
+            <AlertDialogDescription>
+              ستنتقل الوظيفة إلى مرحلة «ملغاة» وتُغلق مهامها المفتوحة، ولا يمكن نقلها بعد ذلك.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>تراجع</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-danger text-white hover:bg-danger/90"
+              disabled={cancelMutation.isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                cancelMutation.mutate();
+              }}
+            >
+              إلغاء الوظيفة
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

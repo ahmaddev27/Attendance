@@ -228,6 +228,7 @@ export function LeadFormDialog({ open, onOpenChange, lead }: LeadFormDialogProps
                     <FormLabel>القطاع</FormLabel>
                     <FormControl>
                       <OptionSelect
+                        dir="rtl"
                         list="industries"
                         ref={field.ref}
                         value={field.value}
@@ -248,6 +249,7 @@ export function LeadFormDialog({ open, onOpenChange, lead }: LeadFormDialogProps
                     <FormLabel>حجم الشركة</FormLabel>
                     <FormControl>
                       <OptionSelect
+                        dir="rtl"
                         list="company_sizes"
                         ref={field.ref}
                         value={field.value}
@@ -378,6 +380,7 @@ export function LeadFormDialog({ open, onOpenChange, lead }: LeadFormDialogProps
                     <FormLabel>المصدر</FormLabel>
                     <FormControl>
                       <OptionSelect
+                        dir="rtl"
                         list="lead_sources"
                         ref={field.ref}
                         value={field.value}
@@ -395,7 +398,7 @@ export function LeadFormDialog({ open, onOpenChange, lead }: LeadFormDialogProps
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>الحالة</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    <Select dir="rtl" value={field.value} onValueChange={field.onChange}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue />

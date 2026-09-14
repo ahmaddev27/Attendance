@@ -25,6 +25,7 @@ import {
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import { OptionSelect } from '@/components/option-lists/option-select';
+import { UserSelect, toSelectedUser, type SelectedUser } from '@/components/recruitment/user-select';
 import {
   jobsApi,
   recruitmentCasesApi,
@@ -51,10 +52,10 @@ type Props = {
   defaultCaseId?: number;
 };
 
-const emptyValues = (ownerId?: number, caseId?: number) => ({
+const emptyValues = (owner?: SelectedUser | null, caseId?: number) => ({
   recruitment_case_id: caseId ?? 0,
   pipeline_id: '',
-  owner_id: ownerId ?? 0,
+  owner: owner ?? null,
   title: '',
   department: '',
   openings: '1',
@@ -80,8 +81,8 @@ export function JobFormDialog({ open, onOpenChange, job, defaultCaseId }: Props)
   const qc = useQueryClient();
   const user = useAuthStore((s) => s.user);
   const isEdit = !!job;
-  const [values, setValues] = React.useState(() => emptyValues(user?.id, defaultCaseId));
-  const [ownerInput, setOwnerInput] = React.useState('');
+  // A new job starts owned by whoever creates it.
+  const [values, setValues] = React.useState(() => emptyValues(toSelectedUser(user), defaultCaseId));
 
   const { data: cases } = useQuery({
     queryKey: ['recruitment-cases-picker'],
@@ -103,7 +104,7 @@ export function JobFormDialog({ open, onOpenChange, job, defaultCaseId }: Props)
         setValues({
           recruitment_case_id: job.recruitment_case_id,
           pipeline_id: job.pipeline_id ? String(job.pipeline_id) : '',
-          owner_id: job.owner_id,
+          owner: toSelectedUser(job.owner),
           title: job.title,
           department: job.department ?? '',
           openings: String(job.openings),
@@ -124,10 +125,8 @@ export function JobFormDialog({ open, onOpenChange, job, defaultCaseId }: Props)
           target_start_date: job.target_start_date ?? '',
           status: job.status,
         });
-        setOwnerInput(String(job.owner_id));
       } else {
-        setValues(emptyValues(user?.id, defaultCaseId));
-        setOwnerInput(user?.id ? String(user.id) : '');
+        setValues(emptyValues(toSelectedUser(user), defaultCaseId));
       }
     }
   }, [open, job, defaultCaseId, user?.id]);
@@ -138,12 +137,12 @@ export function JobFormDialog({ open, onOpenChange, job, defaultCaseId }: Props)
   };
 
   const mutation = useMutation({
-    mutationFn: () => {
+    mutationFn: (ownerId: number) => {
       const nz = (v: string | undefined) => (v && v.trim() !== '' ? v.trim() : null);
       const payload: JobRequirementPayload = {
         recruitment_case_id: values.recruitment_case_id,
         pipeline_id: values.pipeline_id ? Number(values.pipeline_id) : null,
-        owner_id: Number(ownerInput) || values.owner_id,
+        owner_id: ownerId,
         title: values.title.trim(),
         department: nz(values.department),
         openings: Number(values.openings || '1'),
@@ -186,7 +185,7 @@ export function JobFormDialog({ open, onOpenChange, job, defaultCaseId }: Props)
   const canSubmit =
     values.title.trim().length > 0 &&
     !!values.recruitment_case_id &&
-    !!Number(ownerInput) &&
+    !!values.owner &&
     Number(values.openings) > 0;
 
   return (
@@ -199,7 +198,7 @@ export function JobFormDialog({ open, onOpenChange, job, defaultCaseId }: Props)
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (canSubmit) mutation.mutate();
+            if (canSubmit && values.owner) mutation.mutate(values.owner.id);
           }}
           className="space-y-3"
         >
@@ -208,6 +207,7 @@ export function JobFormDialog({ open, onOpenChange, job, defaultCaseId }: Props)
               <div>
                 <Label className="text-xs font-semibold text-ink-2">الحملة</Label>
                 <Select
+                  dir="rtl"
                   value={values.recruitment_case_id ? String(values.recruitment_case_id) : ''}
                   onValueChange={(v) => setValues({ ...values, recruitment_case_id: Number(v) })}
                 >
@@ -225,7 +225,7 @@ export function JobFormDialog({ open, onOpenChange, job, defaultCaseId }: Props)
             {!isEdit && (
               <div>
                 <Label className="text-xs font-semibold text-ink-2">المسار</Label>
-                <Select value={values.pipeline_id} onValueChange={(v) => setValues({ ...values, pipeline_id: v })}>
+                <Select dir="rtl" value={values.pipeline_id} onValueChange={(v) => setValues({ ...values, pipeline_id: v })}>
                   <SelectTrigger className="mt-1.5"><SelectValue placeholder="مسار افتراضي" /></SelectTrigger>
                   <SelectContent>
                     {(pipelines ?? []).map((p) => (
@@ -251,7 +251,7 @@ export function JobFormDialog({ open, onOpenChange, job, defaultCaseId }: Props)
             </div>
             <div>
               <Label className="text-xs font-semibold text-ink-2">نوع التوظيف</Label>
-              <Select value={values.employment_type} onValueChange={(v) => setValues({ ...values, employment_type: v as JobEmploymentType })}>
+              <Select dir="rtl" value={values.employment_type} onValueChange={(v) => setValues({ ...values, employment_type: v as JobEmploymentType })}>
                 <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {EMPLOYMENT_TYPE_OPTIONS.map((o) => (<SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>))}
@@ -260,7 +260,7 @@ export function JobFormDialog({ open, onOpenChange, job, defaultCaseId }: Props)
             </div>
             <div>
               <Label className="text-xs font-semibold text-ink-2">نمط العمل</Label>
-              <Select value={values.work_mode} onValueChange={(v) => setValues({ ...values, work_mode: v as WorkMode })}>
+              <Select dir="rtl" value={values.work_mode} onValueChange={(v) => setValues({ ...values, work_mode: v as WorkMode })}>
                 <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {WORK_MODE_OPTIONS.map((o) => (<SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>))}
@@ -281,7 +281,7 @@ export function JobFormDialog({ open, onOpenChange, job, defaultCaseId }: Props)
             </div>
             <div>
               <Label className="text-xs font-semibold text-ink-2">عملة الراتب</Label>
-              <OptionSelect list="currencies" className="mt-1.5" value={values.salary_currency} onValueChange={(v) => setValues({ ...values, salary_currency: v })} allowEmpty showValue />
+              <OptionSelect dir="rtl" list="currencies" className="mt-1.5" value={values.salary_currency} onValueChange={(v) => setValues({ ...values, salary_currency: v })} allowEmpty showValue />
             </div>
             <div>
               <Label className="text-xs font-semibold text-ink-2">سنوات الخبرة</Label>
@@ -289,15 +289,22 @@ export function JobFormDialog({ open, onOpenChange, job, defaultCaseId }: Props)
             </div>
             <div>
               <Label className="text-xs font-semibold text-ink-2">المستوى التعليمي</Label>
-              <OptionSelect list="education_levels" className="mt-1.5" value={values.education_level} onValueChange={(v) => setValues({ ...values, education_level: v })} allowEmpty />
+              <OptionSelect dir="rtl" list="education_levels" className="mt-1.5" value={values.education_level} onValueChange={(v) => setValues({ ...values, education_level: v })} allowEmpty />
             </div>
             <div>
-              <Label className="text-xs font-semibold text-ink-2">رقم المالك (user id)</Label>
-              <Input className="mt-1.5" value={ownerInput} onChange={(e) => setOwnerInput(e.target.value.replace(/[^0-9]/g, ''))} dir="ltr" />
+              <Label className="text-xs font-semibold text-ink-2">مالك الوظيفة</Label>
+              <UserSelect
+                className="mt-1.5"
+                value={values.owner}
+                onChange={(owner) => setValues({ ...values, owner })}
+                placeholder="اختر المالك"
+                aria-label="مالك الوظيفة"
+                clearable={false}
+              />
             </div>
             <div>
               <Label className="text-xs font-semibold text-ink-2">الحالة</Label>
-              <Select value={values.status} onValueChange={(v) => setValues({ ...values, status: v as JobRequirementStatus })}>
+              <Select dir="rtl" value={values.status} onValueChange={(v) => setValues({ ...values, status: v as JobRequirementStatus })}>
                 <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {JOB_STATUS_OPTIONS.map((o) => (<SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>))}

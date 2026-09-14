@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { Download, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -17,16 +17,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { DataTable, type DataTableColumn } from '@/components/data-table/data-table';
+import { FilterBar } from '@/components/data-table/filter-bar';
+import { FilterSelect } from '@/components/data-table/filter-select';
 import { JobStatusBadge } from '@/components/recruitment/status-badges';
 import { JobFormDialog } from '@/app/(admin)/recruitment/jobs/_components/job-form-dialog';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
@@ -50,8 +44,8 @@ export default function JobsPage() {
 
   const [page, setPage] = React.useState(1);
   const [search, setSearch] = React.useState('');
-  const [status, setStatus] = React.useState<JobRequirementStatus | 'all'>('all');
-  const [workMode, setWorkMode] = React.useState<WorkMode | 'all'>('all');
+  const [status, setStatus] = React.useState<JobRequirementStatus | undefined>();
+  const [workMode, setWorkMode] = React.useState<WorkMode | undefined>();
   const [openOnly, setOpenOnly] = React.useState(true);
 
   const [formOpen, setFormOpen] = React.useState(false);
@@ -68,8 +62,8 @@ export default function JobsPage() {
     page,
     per_page: PER_PAGE,
     search: debouncedSearch || undefined,
-    status: status === 'all' ? undefined : status,
-    work_mode: workMode === 'all' ? undefined : workMode,
+    status,
+    work_mode: workMode,
     open_only: openOnly || undefined,
   };
 
@@ -87,6 +81,18 @@ export default function JobsPage() {
       setDeleteTarget(null);
     },
     onError: () => toast.error('تعذر الحذف'),
+  });
+
+  const importMutation = useMutation({
+    mutationFn: async () => (await jobsApi.importFromBrightGaza()).data,
+    onSuccess: (result) => {
+      toast.success(result.message);
+      qc.invalidateQueries({ queryKey: ['jobs'] });
+    },
+    onError: (err: unknown) => {
+      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(message || 'تعذر السحب من BrightGaza');
+    },
   });
 
   const columns: DataTableColumn<JobRequirement>[] = [
@@ -108,14 +114,21 @@ export default function JobsPage() {
       key: 'title',
       header: 'المسمى',
       cell: (j) => (
-        <button
-          type="button"
-          onClick={() => router.push(`/recruitment/jobs/${j.id}`)}
-          className="max-w-[240px] truncate text-start font-medium text-ink hover:underline"
-          title={j.title}
-        >
-          {j.title}
-        </button>
+        <div className="flex max-w-[300px] items-center gap-2">
+          <button
+            type="button"
+            onClick={() => router.push(`/recruitment/jobs/${j.id}`)}
+            className="truncate text-start font-medium text-ink hover:underline"
+            title={j.title}
+          >
+            {j.title}
+          </button>
+          {j.external && (
+            <span className="shrink-0 rounded bg-brand-soft px-1.5 py-0.5 text-[10px] font-medium text-brand-ink">
+              BrightGaza
+            </span>
+          )}
+        </div>
       ),
     },
     { key: 'client', header: 'العميل', cell: (j) => j.recruitment_case?.client?.company_name ?? '—' },
@@ -138,55 +151,50 @@ export default function JobsPage() {
           <h1 className="mt-1 text-2xl font-bold text-ink">الوظائف</h1>
         </div>
         {canManage && (
-          <Button
-            onClick={() => {
-              setEditing(null);
-              setFormOpen(true);
-            }}
-            className="gap-2 bg-brand text-white hover:bg-brand-hover"
-          >
-            <Plus className="h-4 w-4" /> وظيفة جديدة
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="gap-2"
+              onClick={() => importMutation.mutate()}
+              disabled={importMutation.isPending}
+            >
+              <Download className="h-4 w-4" />
+              {importMutation.isPending ? 'جارٍ السحب…' : 'سحب من BrightGaza'}
+            </Button>
+            <Button
+              onClick={() => {
+                setEditing(null);
+                setFormOpen(true);
+              }}
+              className="gap-2 bg-brand text-white hover:bg-brand-hover"
+            >
+              <Plus className="h-4 w-4" /> وظيفة جديدة
+            </Button>
+          </div>
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-3 rounded-xl border border-hairline bg-surface p-4 sm:grid-cols-4">
-        <div className="sm:col-span-2">
-          <Label className="text-xs font-semibold text-ink-2">بحث</Label>
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ابحث بمسمى الوظيفة..." className="mt-1.5" />
-        </div>
-        <div>
-          <Label className="text-xs font-semibold text-ink-2">الحالة</Label>
-          <Select value={status} onValueChange={(v) => setStatus(v as JobRequirementStatus | 'all')}>
-            <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">كل الحالات</SelectItem>
-              {JOB_STATUS_OPTIONS.map((o) => (<SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label className="text-xs font-semibold text-ink-2">نمط العمل</Label>
-          <Select value={workMode} onValueChange={(v) => setWorkMode(v as WorkMode | 'all')}>
-            <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">الكل</SelectItem>
-              {WORK_MODE_OPTIONS.map((o) => (<SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex items-end">
-          <label className="flex items-center gap-2 text-sm text-ink">
-            <input
-              type="checkbox"
-              checked={openOnly}
-              onChange={(e) => setOpenOnly(e.target.checked)}
-              className="h-4 w-4 rounded border-hairline"
-            />
-            الوظائف المفتوحة فقط
-          </label>
-        </div>
-      </div>
+      <FilterBar searchValue={search} onSearchChange={setSearch} searchPlaceholder="ابحث بمسمى الوظيفة...">
+        <FilterSelect
+          value={status}
+          onChange={(value) => setStatus(value as JobRequirementStatus | undefined)}
+          options={JOB_STATUS_OPTIONS}
+          placeholder="الحالة"
+          allLabel="كل الحالات"
+        />
+        <FilterSelect
+          value={workMode}
+          onChange={(value) => setWorkMode(value as WorkMode | undefined)}
+          options={WORK_MODE_OPTIONS}
+          placeholder="نمط العمل"
+          allLabel="كل أنماط العمل"
+        />
+        <label className="flex cursor-pointer items-center gap-2 whitespace-nowrap text-sm text-ink">
+          <Checkbox checked={openOnly} onCheckedChange={(checked) => setOpenOnly(checked === true)} />
+          الوظائف المفتوحة فقط
+        </label>
+      </FilterBar>
 
       <DataTable
         columns={columns}

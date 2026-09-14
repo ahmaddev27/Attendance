@@ -1,6 +1,7 @@
 import { apiClient } from '@/lib/api/client';
 import type {
   AdvanceJobStagePayload,
+  BrightGazaImportSummary,
   ApiResource,
   Client,
   ClientContact,
@@ -31,6 +32,7 @@ import type {
   RecruitmentPipelinePayload,
   RecruitmentPipelineStage,
   RecruitmentPipelineStagePayload,
+  RecruitmentUserOption,
 } from '@/lib/api/types';
 
 /**
@@ -121,6 +123,9 @@ export const jobsApi = {
   advanceStage: (id: number, payload: AdvanceJobStagePayload) =>
     apiClient.post<ApiResource<JobRequirement>>(`/jobs/${id}/advance-stage`, payload),
   cancel: (id: number) => apiClient.post<ApiResource<JobRequirement>>(`/jobs/${id}/cancel`),
+  /** Pulls the jobs listed on BrightGaza's public board (upsert on BrightGaza's id). */
+  importFromBrightGaza: () =>
+    apiClient.post<{ message: string; data: BrightGazaImportSummary }>('/recruitment/brightgaza/jobs/import'),
   listForCase: (caseId: number, params?: { page?: number; per_page?: number }) =>
     apiClient.get<PaginatedResponse<JobRequirement>>(`/recruitment-cases/${caseId}/jobs`, { params }),
 };
@@ -162,4 +167,10 @@ export const recruitmentDashboardApi = {
   kpis: () => apiClient.get<ApiResource<RecruitmentDashboardKpis>>('/recruitment/dashboard/kpis'),
   funnel: () => apiClient.get<ApiResource<RecruitmentDashboardFunnel>>('/recruitment/dashboard/funnel'),
   leaderboard: () => apiClient.get<RecruitmentLeaderboard>('/recruitment/dashboard/leaderboard'),
+};
+
+/** Owner pickers: active users holding any recruitment permission, name-ordered, at most 50. */
+export const recruitmentUsersApi = {
+  list: (params?: { search?: string }) =>
+    apiClient.get<{ data: RecruitmentUserOption[] }>('/recruitment/users', { params }),
 };

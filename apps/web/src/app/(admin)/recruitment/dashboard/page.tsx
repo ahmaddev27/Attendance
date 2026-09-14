@@ -57,11 +57,11 @@ export default function RecruitmentDashboardPage() {
       </div>
 
       {kpis.isLoading ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {Array.from({ length: 7 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
         </div>
       ) : kpis.data ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <KpiCard label="عملاء محتملون نشطون" value={kpis.data.leads_active} icon={Target} tone="brand" />
           <KpiCard label="تم تحويلهم" value={kpis.data.leads_converted} icon={Trophy} tone="success" />
           <KpiCard label="خاسرون" value={kpis.data.leads_lost} icon={XCircle} tone="danger" />

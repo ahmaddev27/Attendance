@@ -1294,8 +1294,42 @@ export type JobRequirement = {
   status: JobRequirementStatus;
   stage_entered_at: string | null;
   completed_at: string | null;
+  /** Set when the job was pulled from an outside board (BrightGaza). */
+  external: JobRequirementExternal | null;
   created_at: string;
   updated_at: string;
+};
+
+export type JobRequirementExternal = {
+  source: string;
+  id: string;
+  /** The board's own status, or `not_listed` once the job left the board. */
+  status: string | null;
+  synced_at: string | null;
+  details: {
+    category: string | null;
+    sub_category: string | null;
+    job_type: string | null;
+    contract_time_type: string | null;
+    weekly_hours: number | null;
+    experience_level: string | null;
+    duration: string | null;
+    proposal_count: number | null;
+    last_proposal_at: string | null;
+    posted_at: string | null;
+    poster: string | null;
+    poster_country: string | null;
+    employer_type: string | null;
+    is_open: boolean | null;
+  };
+};
+
+export type BrightGazaImportSummary = {
+  fetched: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  not_listed: number;
 };
 
 export type JobRequirementPayload = {
@@ -1439,4 +1473,13 @@ export type RecruitmentLeaderboardRow = {
 export type RecruitmentLeaderboard = {
   data: RecruitmentLeaderboardRow[];
   meta: { quarter_started_at: string };
+};
+
+// -- Owner picker -----------------------------------------------------------
+
+/** A user recruitment work can be assigned to, as listed by GET /recruitment/users. */
+export type RecruitmentUserOption = {
+  id: number;
+  name: string;
+  employee_number: number | null;
 };

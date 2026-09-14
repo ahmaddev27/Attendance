@@ -127,7 +127,7 @@ export function AddActivityDialog({ open, onOpenChange, leadId }: AddActivityDia
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>النوع</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    <Select dir="rtl" value={field.value} onValueChange={field.onChange}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue />

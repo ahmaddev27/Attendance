@@ -7,15 +7,6 @@ import { Download, LayoutGrid, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,7 +18,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { DataTable, type DataTableColumn } from '@/components/data-table/data-table';
+import { FilterBar } from '@/components/data-table/filter-bar';
+import { FilterSelect } from '@/components/data-table/filter-select';
 import { LeadStatusBadge } from '@/components/recruitment/status-badges';
+import { UserSelect } from '@/components/recruitment/user-select';
 import { LeadFormDialog } from '@/app/(admin)/recruitment/leads/_components/lead-form-dialog';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useOptionLists } from '@/hooks/use-option-lists';
@@ -35,7 +29,7 @@ import { leadsApi } from '@/lib/api/endpoints/recruitment';
 import { formatDate } from '@/lib/attendance-format';
 import { LEAD_STATUS_OPTIONS } from '@/lib/constants/recruitment-options';
 import { hasPermission, useAuthStore } from '@/lib/stores/auth-store';
-import type { Lead, LeadSource, LeadStatus } from '@/lib/api/types';
+import type { Lead, LeadSource, LeadStatus, RecruitmentUserOption } from '@/lib/api/types';
 
 const PER_PAGE = 25;
 
@@ -50,9 +44,9 @@ export default function LeadsPage() {
 
   const [page, setPage] = React.useState(1);
   const [search, setSearch] = React.useState('');
-  const [status, setStatus] = React.useState<LeadStatus | 'all'>('all');
-  const [source, setSource] = React.useState<LeadSource | 'all'>('all');
-  const [ownerId, setOwnerId] = React.useState('');
+  const [status, setStatus] = React.useState<LeadStatus | undefined>();
+  const [source, setSource] = React.useState<LeadSource | undefined>();
+  const [owner, setOwner] = React.useState<RecruitmentUserOption | null>(null);
   const [country, setCountry] = React.useState('');
 
   const [formOpen, setFormOpen] = React.useState(false);
@@ -60,20 +54,19 @@ export default function LeadsPage() {
   const [deleteTarget, setDeleteTarget] = React.useState<Lead | null>(null);
 
   const debouncedSearch = useDebouncedValue(search);
-  const debouncedOwner = useDebouncedValue(ownerId);
   const debouncedCountry = useDebouncedValue(country);
 
   React.useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, status, source, debouncedOwner, debouncedCountry]);
+  }, [debouncedSearch, status, source, owner?.id, debouncedCountry]);
 
   const filters = {
     page,
     per_page: PER_PAGE,
     search: debouncedSearch || undefined,
-    status: status === 'all' ? undefined : status,
-    source: source === 'all' ? undefined : source,
-    owner_id: debouncedOwner ? Number(debouncedOwner) : undefined,
+    status,
+    source,
+    owner_id: owner?.id,
     country: debouncedCountry || undefined,
   };
 
@@ -218,59 +211,33 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 rounded-xl border border-hairline bg-surface p-4 sm:grid-cols-2 lg:grid-cols-5">
-        <div className="lg:col-span-2">
-          <Label className="text-xs font-semibold text-ink-2">بحث</Label>
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="ابحث باسم الشركة أو جهة الاتصال..."
-            className="mt-1.5"
-          />
-        </div>
-        <div>
-          <Label className="text-xs font-semibold text-ink-2">الحالة</Label>
-          <Select value={status} onValueChange={(v) => setStatus(v as LeadStatus | 'all')}>
-            <SelectTrigger className="mt-1.5">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">كل الحالات</SelectItem>
-              {LEAD_STATUS_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label className="text-xs font-semibold text-ink-2">المصدر</Label>
-          <Select value={source} onValueChange={(v) => setSource(v as LeadSource | 'all')}>
-            <SelectTrigger className="mt-1.5">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">كل المصادر</SelectItem>
-              {options('lead_sources').map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label className="text-xs font-semibold text-ink-2">رقم المالك</Label>
-          <Input
-            value={ownerId}
-            onChange={(e) => setOwnerId(e.target.value.replace(/[^0-9]/g, ''))}
-            placeholder="user id"
-            className="mt-1.5"
-            dir="ltr"
-          />
-        </div>
-      </div>
+      <FilterBar
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="ابحث باسم الشركة أو جهة الاتصال..."
+      >
+        <FilterSelect
+          value={status}
+          onChange={(value) => setStatus(value as LeadStatus | undefined)}
+          options={LEAD_STATUS_OPTIONS}
+          placeholder="الحالة"
+          allLabel="كل الحالات"
+        />
+        <FilterSelect
+          value={source}
+          onChange={(value) => setSource(value as LeadSource | undefined)}
+          options={options('lead_sources')}
+          placeholder="المصدر"
+          allLabel="كل المصادر"
+        />
+        <UserSelect
+          value={owner}
+          onChange={setOwner}
+          placeholder="كل المالكين"
+          aria-label="المالك"
+          className="w-full sm:w-52"
+        />
+      </FilterBar>
 
       <DataTable
         columns={columns}

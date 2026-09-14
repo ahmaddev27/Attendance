@@ -33,10 +33,17 @@ type Props = {
   job: JobRequirement;
 };
 
+const REQUIRED_FIELD_LABELS: Record<string, string> = {
+  publication_url: 'رابط الإعلان المنشور',
+  shortlist_ids: 'أرقام المرشحين في القائمة المختصرة (مفصولة بفواصل)',
+  contract_terms: 'شروط العقد',
+};
+
 /**
- * Advance a job to its next pipeline stage. Loads the stages of the
- * job's pipeline so the user can pick the target stage; any
- * `requires_fields` on the target stage surface as extra inputs.
+ * Advance a job to a later pipeline stage. The API moves jobs forward only
+ * and checks the `requires_fields` of the stage being LEFT (e.g. the
+ * publication link when leaving "publish"), so those are the inputs shown,
+ * prefilled with whatever the job already has.
  */
 export function AdvanceStageDialog({ open, onOpenChange, job }: Props) {
   const qc = useQueryClient();
@@ -56,18 +63,27 @@ export function AdvanceStageDialog({ open, onOpenChange, job }: Props) {
   );
 
   const currentIndex = stages.findIndex((s) => s.id === job.current_stage_id);
+  const currentStage = currentIndex >= 0 ? stages[currentIndex] : null;
   const defaultNext = currentIndex >= 0 ? stages[currentIndex + 1] : null;
+  const laterStages = currentIndex >= 0 ? stages.slice(currentIndex + 1) : [];
+  const requiredFields = React.useMemo(() => currentStage?.requires_fields ?? [], [currentStage]);
 
   React.useEffect(() => {
     if (open) {
       setTargetStageId(defaultNext ? String(defaultNext.id) : '');
-      setFields({});
+      const jobValues = job as unknown as Record<string, unknown>;
+      setFields(
+        Object.fromEntries(
+          requiredFields.map((key) => {
+            const value = jobValues[key];
+            return [key, Array.isArray(value) ? value.join(', ') : value == null ? '' : String(value)];
+          }),
+        ),
+      );
       setHandoffNote('');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, defaultNext?.id]);
-
-  const targetStage = stages.find((s) => String(s.id) === targetStageId) ?? null;
+  }, [open, defaultNext?.id, currentStage?.id]);
 
   const mutation = useMutation({
     mutationFn: () => {
@@ -76,8 +92,8 @@ export function AdvanceStageDialog({ open, onOpenChange, job }: Props) {
         handoff_note: handoffNote.trim() || null,
       };
       const collected: Record<string, unknown> = {};
-      if (targetStage?.requires_fields?.length) {
-        for (const key of targetStage.requires_fields) {
+      if (requiredFields.length) {
+        for (const key of requiredFields) {
           const raw = fields[key]?.trim();
           if (!raw) continue;
           if (key === 'shortlist_ids') {
@@ -130,8 +146,7 @@ export function AdvanceStageDialog({ open, onOpenChange, job }: Props) {
             <Select value={targetStageId} onValueChange={setTargetStageId}>
               <SelectTrigger className="mt-1.5"><SelectValue placeholder="اختر مرحلة" /></SelectTrigger>
               <SelectContent>
-                {stages
-                  .filter((s) => s.id !== job.current_stage_id)
+                {laterStages
                   .map((s) => (
                     <SelectItem key={s.id} value={String(s.id)}>
                       {s.name}
@@ -141,12 +156,14 @@ export function AdvanceStageDialog({ open, onOpenChange, job }: Props) {
             </Select>
           </div>
 
-          {targetStage?.requires_fields?.length ? (
+          {requiredFields.length ? (
             <div className="space-y-3 rounded-md border border-hairline bg-surface-2 p-3">
-              <p className="text-xs font-semibold text-ink-2">حقول مطلوبة للانتقال</p>
-              {targetStage.requires_fields.map((key) => (
+              <p className="text-xs font-semibold text-ink-2">
+                مطلوب قبل إنهاء مرحلة «{currentStage?.name}»
+              </p>
+              {requiredFields.map((key) => (
                 <div key={key}>
-                  <Label className="text-xs font-semibold text-ink-2">{key}</Label>
+                  <Label className="text-xs font-semibold text-ink-2">{REQUIRED_FIELD_LABELS[key] ?? key}</Label>
                   <Input
                     className="mt-1.5"
                     value={fields[key] ?? ''}

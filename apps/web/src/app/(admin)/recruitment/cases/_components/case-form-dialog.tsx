@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
+import { UserSelect, toSelectedUser, type SelectedUser } from '@/components/recruitment/user-select';
 import { clientsApi, recruitmentCasesApi } from '@/lib/api/endpoints/recruitment';
 import { CASE_PRIORITY_OPTIONS, CASE_STATUS_OPTIONS } from '@/lib/constants/recruitment-options';
 import { useAuthStore } from '@/lib/stores/auth-store';
@@ -42,7 +43,7 @@ type Props = {
   defaultClientId?: number;
 };
 
-const emptyValues = (defaultClientId?: number, ownerId?: number) => ({
+const emptyValues = (defaultClientId?: number, owner?: SelectedUser | null) => ({
   client_id: defaultClientId ?? 0,
   title: '',
   description: '',
@@ -51,7 +52,7 @@ const emptyValues = (defaultClientId?: number, ownerId?: number) => ({
   target_hires: '',
   started_at: '',
   deadline: '',
-  owner_id: ownerId ?? 0,
+  owner: owner ?? null,
 });
 
 export function CaseFormDialog({ open, onOpenChange, caseData, defaultClientId }: Props) {
@@ -59,8 +60,8 @@ export function CaseFormDialog({ open, onOpenChange, caseData, defaultClientId }
   const user = useAuthStore((s) => s.user);
   const isEdit = !!caseData;
 
-  const [values, setValues] = React.useState(() => emptyValues(defaultClientId, user?.id));
-  const [ownerInput, setOwnerInput] = React.useState('');
+  // A new campaign starts owned by whoever creates it.
+  const [values, setValues] = React.useState(() => emptyValues(defaultClientId, toSelectedUser(user)));
 
   const { data: clients } = useQuery({
     queryKey: ['clients-picker'],
@@ -81,18 +82,16 @@ export function CaseFormDialog({ open, onOpenChange, caseData, defaultClientId }
           target_hires: caseData.target_hires?.toString() ?? '',
           started_at: caseData.started_at ?? '',
           deadline: caseData.deadline ?? '',
-          owner_id: caseData.owner_id,
+          owner: toSelectedUser(caseData.owner),
         });
-        setOwnerInput(String(caseData.owner_id));
       } else {
-        setValues(emptyValues(defaultClientId, user?.id));
-        setOwnerInput(user?.id ? String(user.id) : '');
+        setValues(emptyValues(defaultClientId, toSelectedUser(user)));
       }
     }
   }, [open, caseData, defaultClientId, user?.id]);
 
   const mutation = useMutation({
-    mutationFn: () => {
+    mutationFn: (ownerId: number) => {
       const payload: RecruitmentCasePayload | Partial<RecruitmentCasePayload> = {
         client_id: values.client_id,
         title: values.title.trim(),
@@ -102,7 +101,7 @@ export function CaseFormDialog({ open, onOpenChange, caseData, defaultClientId }
         target_hires: values.target_hires ? Number(values.target_hires) : null,
         started_at: values.started_at || null,
         deadline: values.deadline || null,
-        owner_id: Number(ownerInput) || values.owner_id,
+        owner_id: ownerId,
       };
       if (isEdit && caseData) {
         const { client_id: _c, ...patch } = payload as RecruitmentCasePayload;
@@ -122,7 +121,7 @@ export function CaseFormDialog({ open, onOpenChange, caseData, defaultClientId }
     },
   });
 
-  const canSubmit = values.title.trim().length > 0 && !!values.client_id && !!Number(ownerInput);
+  const canSubmit = values.title.trim().length > 0 && !!values.client_id && !!values.owner;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -134,7 +133,7 @@ export function CaseFormDialog({ open, onOpenChange, caseData, defaultClientId }
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (canSubmit) mutation.mutate();
+            if (canSubmit && values.owner) mutation.mutate(values.owner.id);
           }}
           className="space-y-3"
         >
@@ -142,6 +141,7 @@ export function CaseFormDialog({ open, onOpenChange, caseData, defaultClientId }
             <div>
               <Label className="text-xs font-semibold text-ink-2">العميل</Label>
               <Select
+                dir="rtl"
                 value={values.client_id ? String(values.client_id) : ''}
                 onValueChange={(v) => setValues({ ...values, client_id: Number(v) })}
               >
@@ -167,7 +167,7 @@ export function CaseFormDialog({ open, onOpenChange, caseData, defaultClientId }
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div>
               <Label className="text-xs font-semibold text-ink-2">الأولوية</Label>
-              <Select value={values.priority} onValueChange={(v) => setValues({ ...values, priority: v as CasePriority })}>
+              <Select dir="rtl" value={values.priority} onValueChange={(v) => setValues({ ...values, priority: v as CasePriority })}>
                 <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {CASE_PRIORITY_OPTIONS.map((o) => (
@@ -178,7 +178,7 @@ export function CaseFormDialog({ open, onOpenChange, caseData, defaultClientId }
             </div>
             <div>
               <Label className="text-xs font-semibold text-ink-2">الحالة</Label>
-              <Select value={values.status} onValueChange={(v) => setValues({ ...values, status: v as RecruitmentCaseStatus })}>
+              <Select dir="rtl" value={values.status} onValueChange={(v) => setValues({ ...values, status: v as RecruitmentCaseStatus })}>
                 <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {CASE_STATUS_OPTIONS.map((o) => (
@@ -200,8 +200,15 @@ export function CaseFormDialog({ open, onOpenChange, caseData, defaultClientId }
               <Input type="date" className="mt-1.5" value={values.deadline} onChange={(e) => setValues({ ...values, deadline: e.target.value })} />
             </div>
             <div>
-              <Label className="text-xs font-semibold text-ink-2">رقم مالك الحملة (user id)</Label>
-              <Input className="mt-1.5" value={ownerInput} onChange={(e) => setOwnerInput(e.target.value.replace(/[^0-9]/g, ''))} dir="ltr" />
+              <Label className="text-xs font-semibold text-ink-2">مالك الحملة</Label>
+              <UserSelect
+                className="mt-1.5"
+                value={values.owner}
+                onChange={(owner) => setValues({ ...values, owner })}
+                placeholder="اختر المالك"
+                aria-label="مالك الحملة"
+                clearable={false}
+              />
             </div>
           </div>
           <DialogFooter>
