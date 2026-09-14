@@ -22,7 +22,7 @@ import {
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { adminDashboardApi, type AdminDashboardKpis } from '@/lib/api/endpoints/admin-dashboard';
-import { isAdminUser, useAuthStore } from '@/lib/stores/auth-store';
+import { hasPermission, homePathFor, isAdminUser, useAuthStore } from '@/lib/stores/auth-store';
 import { cn } from '@/lib/utils';
 
 // Arabic day/month labels — no Intl dep, no browser locale drift.
@@ -46,9 +46,13 @@ export default function AdminDashboardPage() {
   // redirect misfired, land here — and the admin-only KPIs endpoint
   // returns 403. Redirect them to their own /home page instead of
   // rendering an empty error state.
+  // Recruitment staff without view-reports are sent to their own dashboard
+  // the same way.
   React.useEffect(() => {
-    if (user && !isAdminUser(user)) {
-      router.replace('/home');
+    if (!user) return;
+    const target = homePathFor(user);
+    if (target !== '/dashboard') {
+      router.replace(target);
     }
   }, [user, router]);
 
@@ -57,7 +61,7 @@ export default function AdminDashboardPage() {
     // Only fire the fetch for admin users — a regular employee's request
     // would 403 before the redirect above kicked in on the next tick,
     // adding a spurious error to the console.
-    enabled: user ? isAdminUser(user) : false,
+    enabled: user ? isAdminUser(user) && hasPermission(user, 'view-reports') : false,
     queryFn: async () => (await adminDashboardApi.kpis()).data.data,
     // Refresh every minute so counters like "present today" stay live
     // without hammering the endpoint.

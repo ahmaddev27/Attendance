@@ -103,6 +103,9 @@ export const ROLE_OPTIONS = [
   { value: 'department-manager', label: 'مدير قسم' },
   { value: 'team-leader', label: 'قائد فريق' },
   { value: 'employee', label: 'موظف' },
+  { value: 'sales', label: 'مبيعات' },
+  { value: 'recruiter', label: 'مسؤول توظيف' },
+  { value: 'job-publisher', label: 'مسؤول نشر الوظائف' },
 ];
 
 export const FORM_FIELD_TYPE_LABELS: Record<FormFieldType, string> = {

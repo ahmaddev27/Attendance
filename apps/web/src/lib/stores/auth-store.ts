@@ -97,8 +97,19 @@ export function emitAuthReset(): void {
   window.dispatchEvent(new Event('taqat:auth-reset'));
 }
 
-/** Any of the "administrative" roles that route through /dashboard, not /home. */
-const ADMIN_ROLES = new Set(['super-admin', 'management', 'department-manager', 'team-leader']);
+/** Roles that use the admin area rather than the employee /home. */
+const ADMIN_ROLES = new Set([
+  'super-admin',
+  'management',
+  'department-manager',
+  'team-leader',
+  'sales',
+  'recruiter',
+  'job-publisher',
+]);
+
+/** Either one opens the recruitment dashboard (same gate as its API). */
+const RECRUITMENT_DASHBOARD_PERMISSIONS = ['view-leads', 'view-jobs'];
 
 /**
  * Safely coerce a value that SHOULD be a string array into one.
@@ -139,4 +150,15 @@ export function hasPermission(user: User | null, permission: string): boolean {
 export function hasAnyPermission(user: User | null, permissions: string[]): boolean {
   if (permissions.length === 0) return true; // no gate → everyone
   return permissions.some((p) => hasPermission(user, p));
+}
+
+/**
+ * Where a user lands after login. The admin dashboard needs view-reports,
+ * so recruitment staff without it (sales, recruiters, the publisher) start
+ * on the recruitment dashboard instead of a page full of 403s.
+ */
+export function homePathFor(user: User | null): string {
+  if (isAdminUser(user) && hasPermission(user, 'view-reports')) return '/dashboard';
+  if (hasAnyPermission(user, RECRUITMENT_DASHBOARD_PERMISSIONS)) return '/recruitment/dashboard';
+  return isAdminUser(user) ? '/dashboard' : '/home';
 }

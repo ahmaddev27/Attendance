@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { apiClient, primeCsrfCookie } from '@/lib/api/client';
-import { useAuthStore, isAdminUser, emitAuthReset } from '@/lib/stores/auth-store';
+import { useAuthStore, homePathFor, emitAuthReset } from '@/lib/stores/auth-store';
 import { Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
@@ -44,7 +44,7 @@ export default function LoginPage() {
       toast.success('مرحباً بك مجدداً في TAQAT');
       // Role-based landing: administrative roles go to the admin dashboard,
       // regular employees go to their personal home page.
-      router.push(isAdminUser(data.user) ? '/dashboard' : '/home');
+      router.push(homePathFor(data.user));
     } catch (err: any) {
       const msg = err.response?.data?.message || 'فشل تسجيل الدخول';
       toast.error(msg);
