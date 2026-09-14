@@ -36,6 +36,9 @@ class EmployeeResource extends JsonResource
             // instead of the raw column.
             'avatar_url' => $this->avatar_url,
             'notes' => $this->notes,
+            // Role of the employee's login account (one per account); null when
+            // the employee has no login account yet.
+            'role' => $this->whenLoaded('user', fn () => $this->user?->roles->first()?->name),
             'position' => $this->whenLoaded('position', fn () => $this->position === null ? null : [
                 'id' => $this->position->id,
                 'title' => $this->position->title,

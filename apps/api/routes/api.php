@@ -10,6 +10,7 @@ use App\Modules\Attendance\Controllers\WorkScheduleController;
 use App\Modules\Auth\Controllers\AuthController;
 use App\Modules\Auth\Controllers\PasswordResetController;
 use App\Modules\Employees\Controllers\EmployeeController;
+use App\Modules\Employees\Controllers\EmployeeRoleController;
 use App\Modules\Employees\Controllers\MyProfileController;
 use App\Modules\Leaves\Controllers\EmployeeLeavesController;
 use App\Modules\Leaves\Controllers\LeaveBalanceController;
@@ -126,6 +127,10 @@ Route::middleware('auth:sanctum')->group(function () {
         // enumerate passwords or grind through every employee row.
         Route::post('/employees/{employee}/reset-password', [EmployeeController::class, 'resetPassword'])
             ->middleware('throttle:reset-password');
+
+        // One role per login account; super-admin is granted only by a
+        // super-admin, and the last active super-admin keeps the role.
+        Route::put('/employees/{employee}/role', [EmployeeRoleController::class, 'update']);
 
         // Returns the new attendance PIN once. Throttled so a stolen admin
         // session cannot rotate every employee's PIN in one burst.

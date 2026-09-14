@@ -128,16 +128,13 @@ class EmployeeController extends Controller
      * plaintext is returned ONCE in the response AND enqueued as a
      * welcome SMS to the employee's phone.
      */
-    public function resetPassword(Request $request, Employee $employee): JsonResponse
+    public function resetPassword(Employee $employee): JsonResponse
     {
-        $validated = $request->validate([
-            'role' => ['nullable', 'string'],
-        ]);
-
+        // Roles change only through PUT /employees/{employee}/role, which
+        // validates them; an unchecked `role` here could have granted super-admin.
         $result = $this->employeeService->resetPassword(
             employee: $employee,
             password: null, // always server-generated — never accept client input
-            role: $validated['role'] ?? null,
         );
 
         return response()->json([
