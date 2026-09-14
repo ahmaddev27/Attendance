@@ -31,6 +31,7 @@ use App\Modules\Recruitment\Controllers\RecruitmentCaseController;
 use App\Modules\Recruitment\Controllers\RecruitmentDashboardController;
 use App\Modules\Recruitment\Controllers\RecruitmentPipelineController;
 use App\Modules\Recruitment\Controllers\RecruitmentPipelineStageController;
+use App\Modules\Recruitment\Controllers\RecruitmentUserController;
 use App\Modules\Reports\Controllers\AdminDashboardController;
 use App\Modules\Reports\Controllers\AttendanceReportController;
 use App\Modules\Reports\Controllers\AuditLogController;
@@ -546,6 +547,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/jobs/{job}', [JobRequirementController::class, 'show']);
         Route::get('/recruitment-cases/{case}/jobs', [JobRequirementController::class, 'indexForCase']);
     });
+    // Owner pickers (cases, jobs, leads filter) list recruitment staff by name.
+    Route::get('/recruitment/users', [RecruitmentUserController::class, 'index'])
+        ->middleware('permission:view-leads|view-clients|view-recruitment-cases|view-jobs');
 
     Route::middleware('permission:manage-jobs')->group(function () {
         Route::post('/jobs', [JobRequirementController::class, 'store']);
