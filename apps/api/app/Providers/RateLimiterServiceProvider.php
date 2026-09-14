@@ -123,5 +123,28 @@ class RateLimiterServiceProvider extends ServiceProvider
         RateLimiter::for('recruitment-lead-create', function (Request $request) {
             return Limit::perHour(30)->by(optional($request->user())->id ?: $request->ip());
         });
+
+        // General API budget (docs/v2 NFR), applied to every route in
+        // routes/api.php by throttleApi() in bootstrap/app.php, on top of
+        // the per-route limits above.
+        //   • Signed-in: 120/min per user. The SPA fires several requests per
+        //     page plus 30s notification polling, so the documented 60 left
+        //     too little room for fast navigation; 2 req/s sustained still
+        //     stops scraping. Resolved through the sanctum guard because this
+        //     runs before auth:sanctum and must see bearer tokens (mobile) as
+        //     well as SPA sessions.
+        //   • Guests: 600/min per IP, a flood cap only. A whole office reaches
+        //     us through one public IP, and every public route (login,
+        //     password reset, health) already has its own tighter limit, so
+        //     this is a backstop for public routes added later. Guests on
+        //     protected routes never reach it: auth runs before throttling.
+        //     The kiosk scan routes opt out of this limiter entirely.
+        RateLimiter::for('api', function (Request $request) {
+            $user = $request->user('sanctum');
+
+            return $user
+                ? Limit::perMinute(120)->by('api-user:'.$user->getAuthIdentifier())
+                : Limit::perMinute(600)->by('api-ip:'.$request->ip());
+        });
     }
 }

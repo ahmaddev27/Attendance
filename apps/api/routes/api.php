@@ -133,7 +133,9 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 // M3 — Attendance + Working Hours Engine.
-Route::prefix('scan')->group(function () {
+// The kiosk scan routes skip the general `api` limiter: a whole office scans
+// through one public IP, and each route below already has its own bucket.
+Route::prefix('scan')->withoutMiddleware('throttle:api')->group(function () {
     Route::post('/check-in', [ScanController::class, 'checkIn'])->middleware('throttle:30,1,scan-check-in');
     Route::post('/check-out', [ScanController::class, 'checkOut'])->middleware('throttle:30,1,scan-check-out');
     // Read-only "what's my state?" probe — the kiosk hits this first,

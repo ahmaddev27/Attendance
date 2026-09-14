@@ -33,6 +33,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // so downstream controllers don't need branching.
         $middleware->statefulApi();
 
+        // General rate limit for every route in routes/api.php, using the
+        // named `api` limiter in RateLimiterServiceProvider. The kiosk scan
+        // routes opt out because their own per-route limits already apply.
+        $middleware->throttleApi();
+
         // spatie/laravel-permission ships three middleware but doesn't
         // auto-register them in Laravel 11's slim bootstrap — we do it here
         // so `->middleware('permission:manage-users')` works on any route.
