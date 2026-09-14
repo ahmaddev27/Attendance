@@ -212,6 +212,7 @@ Schedule::command('taqat:notify-open-sessions')
 */
 Schedule::command('recruitment:scan-sla')
     ->hourly()
+    ->onOneServer()
     ->withoutOverlapping()
     ->runInBackground();
 

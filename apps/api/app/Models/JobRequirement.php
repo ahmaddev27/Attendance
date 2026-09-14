@@ -54,6 +54,7 @@ class JobRequirement extends Model
         'target_start_date',
         'status',
         'stage_entered_at',
+        'sla_breach_notified_at',
         'completed_at',
         'external_source',
         'external_id',
@@ -89,6 +90,7 @@ class JobRequirement extends Model
             'application_deadline' => 'date',
             'target_start_date' => 'date',
             'stage_entered_at' => 'datetime',
+            'sla_breach_notified_at' => 'datetime',
             'completed_at' => 'datetime',
             'external_payload' => 'array',
             'external_synced_at' => 'datetime',
@@ -160,8 +162,9 @@ class JobRequirement extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            // The raw board payload and its sync time change on every pull.
-            ->logOnly(array_values(array_diff($this->fillable, ['external_payload', 'external_synced_at'])))
+            // Bookkeeping columns (board payload and sync time, the SLA
+            // announcement stamp) change on every pull or scan.
+            ->logOnly(array_values(array_diff($this->fillable, ['external_payload', 'external_synced_at', 'sla_breach_notified_at'])))
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
             ->useLogName('recruitment.job_requirement');

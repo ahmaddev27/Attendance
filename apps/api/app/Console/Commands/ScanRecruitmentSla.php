@@ -36,6 +36,9 @@ class ScanRecruitmentSla extends Command
 {
     protected $signature = 'recruitment:scan-sla';
 
+    /** How long an open breach stays quiet after it was announced. */
+    private const REPEAT_AFTER_HOURS = 24;
+
     protected $description = 'Notify stage and case owners for every JobRequirement whose current stage has breached its SLA.';
 
     public function __construct(
@@ -107,6 +110,10 @@ class ScanRecruitmentSla extends Command
             $hoursOverdue = 0;
         }
 
+        if ($this->alreadyAnnounced($job, $now)) {
+            return 0;
+        }
+
         $stageOwner = $this->resolveCurrentStageOwner($job);
         $caseOwner = $job->recruitmentCase?->owner;
 
@@ -124,7 +131,26 @@ class ScanRecruitmentSla extends Command
             $this->notifier->stageSlaBreached($job, $stage, $hoursOverdue, $recipient);
         }
 
+        if ($recipients !== []) {
+            $this->jobs->markSlaBreachNotified($job, $now);
+        }
+
         return count($recipients);
+    }
+
+    /**
+     * The scan runs hourly, so without this every breached job notified
+     * (database row, and mail when configured) on every run. A breach is
+     * announced once per stage visit and repeated at most once a day.
+     */
+    private function alreadyAnnounced(JobRequirement $job, Carbon $now): bool
+    {
+        $announcedAt = $job->sla_breach_notified_at;
+
+        return $announcedAt !== null
+            && $job->stage_entered_at !== null
+            && $announcedAt->greaterThanOrEqualTo($job->stage_entered_at)
+            && $announcedAt->greaterThan($now->copy()->subHours(self::REPEAT_AFTER_HOURS));
     }
 
     /**

@@ -105,7 +105,8 @@ class JobRequirementRepository
     {
         return JobRequirement::query()
             ->with([...self::WITH, 'owner'])
-            ->open()
+            // On-hold jobs are paused on purpose, so their SLA is not chased.
+            ->whereIn('status', [JobRequirementStatus::Draft->value, JobRequirementStatus::Active->value])
             ->whereHas('currentStage', fn (Builder $stage) => $stage->whereNotNull('sla_hours'))
             ->get()
             ->filter(function (JobRequirement $job) use ($now): bool {
@@ -242,5 +243,18 @@ class JobRequirementRepository
             ->whereNotIn('external_id', $listedIds)
             ->where(fn (Builder $query) => $query->whereNull('external_status')->orWhere('external_status', '!=', $status))
             ->update(['external_status' => $status, 'updated_at' => now()]);
+    }
+
+    /**
+     * Records when the current stage's breach was announced. A plain column
+     * update: no audit row and no change to updated_at for a scan's
+     * bookkeeping.
+     */
+    public function markSlaBreachNotified(JobRequirement $job, Carbon $at): void
+    {
+        JobRequirement::query()
+            ->whereKey($job->getKey())
+            ->toBase()
+            ->update(['sla_breach_notified_at' => $at]);
     }
 }
