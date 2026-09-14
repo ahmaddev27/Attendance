@@ -6,7 +6,11 @@ import { Check, ChevronDown, ChevronUp } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
-const Select = SelectPrimitive.Root
+// Radix falls back to left-to-right when no direction is given, which put
+// the text left and the chevron right in every select of this Arabic app.
+function Select({ dir = "rtl", ...props }: React.ComponentProps<typeof SelectPrimitive.Root>) {
+  return <SelectPrimitive.Root dir={dir} {...props} />
+}
 
 const SelectGroup = SelectPrimitive.Group
 
