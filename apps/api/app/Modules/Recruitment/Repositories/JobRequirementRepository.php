@@ -6,6 +6,9 @@ namespace App\Modules\Recruitment\Repositories;
 
 use App\Models\JobRequirement;
 use App\Models\RecruitmentCase;
+use App\Models\Task;
+use App\Models\TaskStatus;
+use App\Models\User;
 use App\Shared\Enums\JobRequirementStatus;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -164,5 +167,54 @@ class JobRequirementRepository
                     ->orWhere('department', 'like', "%{$search}%");
             });
         }
+    }
+
+    /**
+     * Pipeline tasks are the system-generated ones (no creator). Leaving a
+     * stage, or cancelling the job, finishes whichever are still open.
+     */
+    public function closeOpenPipelineTasks(JobRequirement $job): void
+    {
+        $doneStatusId = TaskStatus::query()
+            ->where('is_done_state', true)
+            ->orderBy('sort_order')
+            ->value('id');
+
+        $attributes = ['completed_at' => now()];
+
+        if ($doneStatusId !== null) {
+            $attributes['status_id'] = $doneStatusId;
+        }
+
+        $job->tasks()
+            ->whereNull('created_by')
+            ->whereNull('completed_at')
+            ->get()
+            ->each(fn (Task $task) => $task->update($attributes));
+    }
+
+    /**
+     * Users behind the open pipeline tasks of a job, i.e. the people
+     * currently responsible for its stage.
+     *
+     * @return list<int>
+     */
+    public function openPipelineTaskAssigneeUserIds(JobRequirement $job): array
+    {
+        $assigneeIds = $job->tasks()
+            ->whereNull('created_by')
+            ->whereNull('completed_at')
+            ->whereNotNull('assigned_to')
+            ->pluck('assigned_to');
+
+        if ($assigneeIds->isEmpty()) {
+            return [];
+        }
+
+        return User::query()
+            ->whereIn('employee_id', $assigneeIds)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
     }
 }

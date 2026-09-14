@@ -48,7 +48,7 @@ class PipelineTaskGeneratorService
     public function handle(JobRequirementStageAdvanced $event): void
     {
         try {
-            $this->generate($event->job, $event->toStage, $event->fromStage);
+            $this->generate($event->job, $event->toStage, $event->fromStage, $event->handoffNote);
         } catch (\Throwable $e) {
             // Never let a task-generation failure bubble up — the stage
             // has already advanced; surfacing this here would appear to
@@ -63,7 +63,7 @@ class PipelineTaskGeneratorService
         }
     }
 
-    private function generate(JobRequirement $job, RecruitmentPipelineStage $stage, ?RecruitmentPipelineStage $fromStage): void
+    private function generate(JobRequirement $job, RecruitmentPipelineStage $stage, ?RecruitmentPipelineStage $fromStage, ?string $handoffNote = null): void
     {
         if (! $stage->auto_generate_task || $stage->is_terminal) {
             return;
@@ -97,7 +97,7 @@ class PipelineTaskGeneratorService
         $employeeId = $owner->employee_id;
 
         if ($employeeId !== null) {
-            $task = $this->createTask($job, $stage, $employeeId);
+            $task = $this->createTask($job, $stage, $employeeId, $handoffNote);
         } else {
             $task = null;
             Log::info('PipelineTaskGenerator: owner has no linked employee — skipping task, notifying directly', [
@@ -123,9 +123,9 @@ class PipelineTaskGeneratorService
      * context. Every column has a fallback so a stage config missing
      * the optional bits still produces a valid task.
      */
-    private function createTask(JobRequirement $job, RecruitmentPipelineStage $stage, int $employeeId): ?Task
+    private function createTask(JobRequirement $job, RecruitmentPipelineStage $stage, int $employeeId, ?string $handoffNote): ?Task
     {
-        return DB::transaction(function () use ($job, $stage, $employeeId): ?Task {
+        return DB::transaction(function () use ($job, $stage, $employeeId, $handoffNote): ?Task {
             $statusId = TaskStatus::query()->orderBy('sort_order')->value('id');
             $priorityId = $this->resolvePriorityId($stage->task_priority);
 
@@ -139,7 +139,8 @@ class PipelineTaskGeneratorService
 
             return Task::query()->create([
                 'title' => $title,
-                'description' => null,
+                // The previous owner's handoff note, when they left one.
+                'description' => $handoffNote,
                 'status_id' => $statusId,
                 'priority_id' => $priorityId,
                 'created_by' => null,           // system-generated
@@ -208,11 +209,27 @@ class PipelineTaskGeneratorService
                 ? User::query()->find((int) $value)
                 : null,
             StageOwnerRule::Role => $value !== null && $value !== ''
-                ? User::query()->permission($value)->first()
+                ? $this->firstActivePermissionHolder($value)
                 : null,
             StageOwnerRule::PreviousStageOwner => $this->resolvePreviousStageOwner($job, $fromStage),
             default => null,
         };
+    }
+
+    /**
+     * Super-admins hold every permission, so "the first holder" handed every
+     * stage to them. An active staff member with the permission gets the task
+     * first; an active super-admin is only the fallback.
+     */
+    private function firstActivePermissionHolder(string $permission): ?User
+    {
+        $holders = fn () => User::query()
+            ->permission($permission)
+            ->where('is_active', true)
+            ->orderBy('id');
+
+        return $holders()->whereDoesntHave('roles', fn ($roles) => $roles->where('name', 'super-admin'))->first()
+            ?? $holders()->first();
     }
 
     /**

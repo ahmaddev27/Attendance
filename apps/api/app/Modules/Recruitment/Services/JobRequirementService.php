@@ -13,6 +13,8 @@ use App\Modules\Recruitment\Events\JobRequirementSubmitted;
 use App\Modules\Recruitment\Repositories\JobRequirementRepository;
 use App\Modules\Recruitment\Repositories\RecruitmentPipelineRepository;
 use App\Shared\Enums\JobRequirementStatus;
+use App\Shared\Enums\StageOwnerRule;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -106,9 +108,13 @@ class JobRequirementService
 
     /**
      * @param  array<string, mixed>  $payload  target_stage_id / fields / handoff_note
+     *
+     * @throws AuthorizationException when $actor is not responsible for the job right now
      */
-    public function advanceStage(JobRequirement $job, array $payload): JobRequirement
+    public function advanceStage(JobRequirement $job, array $payload, User $actor): JobRequirement
     {
+        $this->assertStillOpen($job);
+
         $fromStage = $job->currentStage;
 
         if ($fromStage === null) {
@@ -122,6 +128,8 @@ class JobRequirementService
                 'current_stage' => 'الوظيفة في مرحلة نهائية ولا يمكن نقلها.',
             ]);
         }
+
+        $this->assertCanAdvance($job, $fromStage, $actor);
 
         // The target: caller-specified (must be in the same pipeline
         // AND downstream), or the next stage in display_order if
@@ -159,6 +167,17 @@ class JobRequirementService
         $updated = DB::transaction(function () use ($job, $target, $fieldPatch, $fromStage) {
             $locked = $this->jobs->findForUpdate($job->id);
 
+            // The checks above ran on the caller's copy of the job. A second
+            // request (a double click) may have moved or closed it since, so
+            // stage and status are checked again under the row lock.
+            if ((int) $locked->current_stage_id !== (int) $fromStage->id) {
+                throw ValidationException::withMessages([
+                    'current_stage' => 'تم نقل هذه الوظيفة إلى مرحلة أخرى للتو — حدّث الصفحة وحاول مجدداً.',
+                ]);
+            }
+
+            $this->assertStillOpen($locked);
+
             $patch = is_array($fieldPatch) ? $fieldPatch : [];
 
             // Stamp side-effect fields ONLY when the stage we're leaving
@@ -179,10 +198,12 @@ class JobRequirementService
                     : JobRequirementStatus::Cancelled->value;
             }
 
+            $this->jobs->closeOpenPipelineTasks($locked);
+
             return $this->jobs->update($locked, $patch);
         });
 
-        JobRequirementStageAdvanced::dispatch($updated, $fromStage, $target);
+        JobRequirementStageAdvanced::dispatch($updated, $fromStage, $target, $payload['handoff_note'] ?? null);
 
         return $updated;
     }
@@ -195,15 +216,65 @@ class JobRequirementService
             ]);
         }
 
-        return $this->jobs->update($job, [
-            'status' => JobRequirementStatus::Cancelled->value,
-            'completed_at' => now(),
-        ]);
+        return DB::transaction(function () use ($job) {
+            $locked = $this->jobs->findForUpdate($job->id);
+            $patch = [
+                'status' => JobRequirementStatus::Cancelled->value,
+                'completed_at' => now(),
+            ];
+
+            // Park the job on the pipeline's cancelled stage so the stage bar,
+            // the funnel and the advance gate all agree that it is closed.
+            $cancelledStage = $this->pipelines->terminalStage((int) $locked->pipeline_id, 'cancelled');
+
+            if ($cancelledStage !== null) {
+                $patch['current_stage_id'] = $cancelledStage->id;
+                $patch['stage_entered_at'] = now();
+            }
+
+            $this->jobs->closeOpenPipelineTasks($locked);
+
+            return $this->jobs->update($locked, $patch);
+        });
     }
 
     public function delete(JobRequirement $job): void
     {
         $job->delete();
+    }
+
+    private function assertStillOpen(JobRequirement $job): void
+    {
+        if (in_array($job->status, [JobRequirementStatus::Filled, JobRequirementStatus::Cancelled], true)) {
+            throw ValidationException::withMessages([
+                'status' => 'لا يمكن نقل وظيفة مغلقة أو ملغاة.',
+            ]);
+        }
+    }
+
+    /**
+     * The route admits anyone holding advance-job-stage; this narrows it to
+     * the people responsible for the job right now: jobs managers, the job
+     * and case owners, holders of the stage's owner permission, and the
+     * assignees of its open pipeline tasks.
+     *
+     * @throws AuthorizationException
+     */
+    private function assertCanAdvance(JobRequirement $job, RecruitmentPipelineStage $stage, User $actor): void
+    {
+        $holdsStagePermission = $stage->owner_rule_type === StageOwnerRule::Role
+            && ! empty($stage->owner_rule_value)
+            && $actor->can($stage->owner_rule_value);
+
+        if ($actor->can('manage-jobs')
+            || (int) $actor->id === (int) $job->owner_id
+            || (int) $actor->id === (int) $job->recruitmentCase?->owner_id
+            || $holdsStagePermission
+            || in_array((int) $actor->id, $this->jobs->openPipelineTaskAssigneeUserIds($job), true)) {
+            return;
+        }
+
+        throw new AuthorizationException('لست مسؤولاً عن هذه المرحلة من الوظيفة، لذلك لا يمكنك نقلها.');
     }
 
     /**

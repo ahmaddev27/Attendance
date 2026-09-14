@@ -104,4 +104,17 @@ class RecruitmentPipelineRepository
             ->orderByDesc('display_order')
             ->first();
     }
+
+    /**
+     * A terminal stage of the pipeline by code (e.g. `cancelled`), or null
+     * when an admin removed or renamed it.
+     */
+    public function terminalStage(int $pipelineId, string $code): ?RecruitmentPipelineStage
+    {
+        return RecruitmentPipelineStage::query()
+            ->where('pipeline_id', $pipelineId)
+            ->where('code', $code)
+            ->where('is_terminal', true)
+            ->first();
+    }
 }

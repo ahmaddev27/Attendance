@@ -79,7 +79,7 @@ class JobRequirementController extends Controller
      */
     public function advanceStage(AdvanceJobStageRequest $request, JobRequirement $job): JobRequirementResource
     {
-        return new JobRequirementResource($this->jobs->advanceStage($job, $request->validated()));
+        return new JobRequirementResource($this->jobs->advanceStage($job, $request->validated(), $request->user()));
     }
 
     public function cancel(JobRequirement $job): JobRequirementResource

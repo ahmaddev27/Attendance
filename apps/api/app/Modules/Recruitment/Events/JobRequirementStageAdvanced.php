@@ -23,5 +23,6 @@ class JobRequirementStageAdvanced
         public readonly JobRequirement $job,
         public readonly ?RecruitmentPipelineStage $fromStage,
         public readonly RecruitmentPipelineStage $toStage,
+        public readonly ?string $handoffNote = null,
     ) {}
 }
