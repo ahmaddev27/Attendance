@@ -45,9 +45,8 @@ class ClientService
         $force = (bool) ($data['force'] ?? false);
         unset($data['force']);
 
-        // Soft dedup on (company_name, country) mirrors LeadService.
-        // The DB UNIQUE constraint is the last line — this branch is the
-        // graceful path that offers the caller a chance to reuse.
+        // Soft dedup on (company_name, country) mirrors LeadService: warn
+        // first, and let the caller force a second client with the same name.
         if (! $force && $this->clients->duplicateExists(
             (string) $data['company_name'],
             $data['country'] ?? null,

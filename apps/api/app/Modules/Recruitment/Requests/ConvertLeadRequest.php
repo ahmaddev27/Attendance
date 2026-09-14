@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Recruitment\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 /**
  * Payload for POST /leads/{lead}/convert — bundles Client, Case, and
@@ -13,8 +14,8 @@ use Illuminate\Foundation\Http\FormRequest;
  *
  * `reuse_client_id` short-circuits Client creation: pick an existing
  * Client (usually surfaced by the FE after the dedup warning) rather
- * than inserting a new one that would collide on
- * UNIQUE (company_name, country).
+ * than inserting a duplicate company. A soft-deleted client cannot be
+ * reused.
  */
 class ConvertLeadRequest extends FormRequest
 {
@@ -31,7 +32,7 @@ class ConvertLeadRequest extends FormRequest
         return [
             // Reuse an existing Client. When set, the client.* fields
             // below are ignored.
-            'reuse_client_id' => ['nullable', 'integer', 'exists:clients,id'],
+            'reuse_client_id' => ['nullable', 'integer', Rule::exists('clients', 'id')->whereNull('deleted_at')],
 
             // New Client payload — required only if reuse_client_id is
             // absent, enforced by required_without.
