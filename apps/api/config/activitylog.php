@@ -11,7 +11,9 @@ return [
      * When the clean-command is executed, all recording activities older than
      * the number of days specified here will be deleted.
      */
-    'delete_records_older_than_days' => 365,
+    // docs/v2 decision 9: two years online. Pruned nightly by the scheduled
+    // activitylog:clean in routes/console.php.
+    'delete_records_older_than_days' => 730,
 
     /*
      * If no log name is passed to the activity() helper

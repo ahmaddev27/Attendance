@@ -106,6 +106,9 @@ Schedule::call(function (): void {
 |     may add later — free hook, cheap when nothing is registered.
 |   - taqat:prune-old-rows  : raw-DELETE sweeper for tables whose Models
 |     live in other waves' ownership (see the command's docblock).
+|   - activitylog:clean     : drop audit rows past the two-year retention
+|     (docs/v2 decision 9). --force because the command otherwise asks for
+|     confirmation in production, which the scheduler cannot give.
 |
 | Every job runs onOneServer() so scaling out the scheduler container
 | doesn't multiply the work; withoutOverlapping() guards a slow run from
@@ -135,6 +138,13 @@ Schedule::command('taqat:prune-old-rows')
     ->onOneServer()
     ->withoutOverlapping()
     ->name('taqat:prune-old-rows');
+
+Schedule::command('activitylog:clean --force')
+    ->dailyAt('03:30')
+    ->timezone('Asia/Amman')
+    ->onOneServer()
+    ->withoutOverlapping()
+    ->name('activitylog:clean');
 
 /*
 |--------------------------------------------------------------------------
