@@ -57,10 +57,15 @@ use App\Modules\Workflow\Controllers\WorkflowStepController;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
 
+// Every unnamed throttle in this file passes its own key prefix (third
+// argument). Laravel otherwise keys all of them by the same user-or-IP
+// signature, so traffic on one route (kiosk polling behind an office IP)
+// spends another route's budget (check-ins at the door).
+
 // Readiness probe for the deploy gate and the uptime workflow. Each call
 // touches the database, cache and disk, so it is throttled like any
 // other public endpoint.
-Route::get('/health', HealthController::class)->middleware('throttle:60,1');
+Route::get('/health', HealthController::class)->middleware('throttle:60,1,health');
 
 // Reverb / Echo channel-auth endpoint. api.php already prefixes '/api',
 // so we DON'T re-add it here — otherwise the route ends up at
@@ -123,23 +128,23 @@ Route::middleware('auth:sanctum')->group(function () {
         // Returns the new attendance PIN once. Throttled so a stolen admin
         // session cannot rotate every employee's PIN in one burst.
         Route::post('/employees/{employee}/scan-pin', [ScanPinController::class, 'reset'])
-            ->middleware('throttle:10,1');
+            ->middleware('throttle:10,1,scan-pin-reset');
     });
 });
 
 // M3 — Attendance + Working Hours Engine.
 Route::prefix('scan')->group(function () {
-    Route::post('/check-in', [ScanController::class, 'checkIn'])->middleware('throttle:30,1');
-    Route::post('/check-out', [ScanController::class, 'checkOut'])->middleware('throttle:30,1');
+    Route::post('/check-in', [ScanController::class, 'checkIn'])->middleware('throttle:30,1,scan-check-in');
+    Route::post('/check-out', [ScanController::class, 'checkOut'])->middleware('throttle:30,1,scan-check-out');
     // Read-only "what's my state?" probe — the kiosk hits this first,
     // then shows a single check-in OR check-out button based on the
     // returned `state`. Higher throttle (60/min) since it's read-only
     // and the kiosk may poll it after a returning employee taps.
-    Route::post('/status', [ScanController::class, 'status'])->middleware('throttle:60,1');
+    Route::post('/status', [ScanController::class, 'status'])->middleware('throttle:60,1,scan-status');
 
     // Kiosk display polling: no employee credential involved, so it gets a
     // more generous limit than the scan actions above.
-    Route::get('/device/{qrToken}', [ScanController::class, 'deviceInfo'])->middleware('throttle:120,1');
+    Route::get('/device/{qrToken}', [ScanController::class, 'deviceInfo'])->middleware('throttle:120,1,scan-device');
 });
 
 Route::middleware('auth:sanctum')->group(function () {
@@ -173,7 +178,7 @@ Route::middleware('auth:sanctum')->group(function () {
             // One bcrypt hash and one SMS per employee — expensive, and
             // re-running it within the hour is never needed.
             Route::post('/issue-missing', [ScanPinController::class, 'issueMissing'])
-                ->middleware('throttle:3,60');
+                ->middleware('throttle:3,60,scan-pin-issue-missing');
             Route::put('/enforcement', [ScanPinController::class, 'updateEnforcement']);
         });
 });
@@ -234,7 +239,7 @@ Route::middleware('auth:sanctum')->group(function () {
         // temp bucket without ever creating a leave request — the write
         // path was otherwise unbounded.
         Route::post('/attachment', [EmployeeLeavesController::class, 'uploadAttachment'])
-            ->middleware('throttle:20,60');
+            ->middleware('throttle:20,60,leave-attachment');
         Route::post('/{leave_request}/cancel', [EmployeeLeavesController::class, 'cancel']);
     });
 });
@@ -402,7 +407,7 @@ Route::middleware('auth:sanctum')->group(function () {
             // right after editing them. Run inline (not queued) so the
             // response reflects the actual send outcome. Rate-limited to
             // discourage using them to spam a phone number.
-            Route::middleware('throttle:10,1')->group(function () {
+            Route::middleware('throttle:10,1,settings-probe')->group(function () {
                 Route::post('/settings/test/mail', [SettingsController::class, 'testMail']);
                 Route::post('/settings/test/sms', [SettingsController::class, 'testSms']);
                 Route::post('/settings/test/whatsapp', [SettingsController::class, 'testWhatsapp']);
@@ -432,7 +437,7 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('throttle:login');
     // Also verifies current_password, so it gets its own tight bucket.
     Route::put('/me/scan-pin', [MyScanPinController::class, 'update'])
-        ->middleware('throttle:5,1');
+        ->middleware('throttle:5,1,my-scan-pin');
 
     // Notifications (M7). Every user sees only their own inbox — the
     // controller uses $request->user()->notifications, not a global list.
