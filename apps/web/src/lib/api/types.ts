@@ -1331,6 +1331,9 @@ export type BrightGazaImportSummary = {
   created: number;
   updated: number;
   skipped: number;
+  /** Listings BrightGaza sent that TAQAT could not save (reason is in the API log). */
+  failed: number;
+  failed_ids: string[];
   not_listed: number;
 };
 

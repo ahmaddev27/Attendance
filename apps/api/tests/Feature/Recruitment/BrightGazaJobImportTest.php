@@ -2,6 +2,7 @@
 
 use App\Models\Client;
 use App\Models\JobRequirement;
+use App\Modules\Recruitment\Repositories\JobRequirementRepository;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Http;
 use Tests\Feature\Recruitment\Concerns\SeedsRecruitmentPermissions;
@@ -149,6 +150,72 @@ test('jobs that disappeared from the board are flagged, not deleted or closed', 
 
     expect($gone->external_status)->toBe('not_listed')
         ->and($gone->status->value)->toBe('active');
+});
+
+test('the board is read 100 jobs a page', function () {
+    $this->actingAsRecruitmentAdmin();
+    $this->seedStandardPipeline();
+    $pages = [[brightGazaListing(601)]];
+    fakeBrightGazaBoard($pages);
+
+    $this->postJson('/api/recruitment/brightgaza/jobs/import')->assertOk();
+
+    Http::assertSent(fn (HttpRequest $request) => str_contains($request->url(), 'per_page=100'));
+});
+
+test('absurd numbers on the board are stored as unknown instead of failing the pull', function () {
+    // Seen in production on 2026-09-14: job 107 listed 1015276301 open
+    // positions, which MySQL rejects for the unsigned smallint column.
+    $this->actingAsRecruitmentAdmin();
+    $this->seedStandardPipeline();
+    $pages = [[brightGazaListing(701, [
+        'number_of_open_positions' => 1015276301,
+        'budget_from' => -5,
+        'budget_to' => 5_000_000_000_000,
+        'created_at' => '0000-00-00 00:00',
+        'status' => ['value' => 9, 'name' => str_repeat('Open ', 20)],
+    ])]];
+    fakeBrightGazaBoard($pages);
+
+    $this->postJson('/api/recruitment/brightgaza/jobs/import')
+        ->assertOk()
+        ->assertJsonPath('data.created', 1)
+        ->assertJsonPath('data.failed', 0);
+
+    $job = JobRequirement::query()->where('external_id', '701')->sole();
+
+    expect($job->openings)->toBe(1)
+        ->and($job->salary_min)->toBeNull()
+        ->and($job->salary_max)->toBeNull()
+        ->and($job->published_at)->toBeNull()
+        ->and(mb_strlen($job->external_status))->toBe(50)
+        ->and($job->external_payload['number_of_open_positions'])->toBe(1015276301);
+});
+
+test('a listing that cannot be saved is reported without stopping the others', function () {
+    $this->actingAsRecruitmentAdmin();
+    $this->seedStandardPipeline();
+    $pages = [[brightGazaListing(801), brightGazaListing(802)]];
+    fakeBrightGazaBoard($pages);
+
+    $this->partialMock(JobRequirementRepository::class, function ($mock) {
+        $mock->shouldReceive('create')->andReturnUsing(function (array $attributes) {
+            if ($attributes['external_id'] === '801') {
+                throw new RuntimeException('simulated database rejection');
+            }
+
+            return JobRequirement::query()->create($attributes);
+        });
+    });
+
+    $this->postJson('/api/recruitment/brightgaza/jobs/import')
+        ->assertOk()
+        ->assertJsonPath('data.created', 1)
+        ->assertJsonPath('data.failed', 1)
+        ->assertJsonPath('data.failed_ids', ['801']);
+
+    expect(JobRequirement::query()->where('external_id', '802')->exists())->toBeTrue()
+        ->and(JobRequirement::query()->where('external_id', '801')->exists())->toBeFalse();
 });
 
 test('pulling from BrightGaza needs manage-jobs', function () {

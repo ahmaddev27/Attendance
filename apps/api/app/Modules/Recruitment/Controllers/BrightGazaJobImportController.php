@@ -33,13 +33,19 @@ class BrightGazaJobImportController extends Controller
             ], 502);
         }
 
+        $message = sprintf(
+            'تم سحب %d وظيفة من BrightGaza: %d جديدة، %d محدّثة.',
+            $summary['fetched'],
+            $summary['created'],
+            $summary['updated'],
+        );
+
+        if ($summary['failed'] > 0) {
+            $message .= sprintf(' تعذر حفظ %d وظيفة وسُجّل السبب في سجل الأخطاء.', $summary['failed']);
+        }
+
         return response()->json([
-            'message' => sprintf(
-                'تم سحب %d وظيفة من BrightGaza: %d جديدة، %d محدّثة.',
-                $summary['fetched'],
-                $summary['created'],
-                $summary['updated'],
-            ),
+            'message' => $message,
             'data' => $summary,
         ]);
     }

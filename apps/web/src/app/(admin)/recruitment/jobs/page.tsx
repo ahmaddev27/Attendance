@@ -86,7 +86,11 @@ export default function JobsPage() {
   const importMutation = useMutation({
     mutationFn: async () => (await jobsApi.importFromBrightGaza()).data,
     onSuccess: (result) => {
-      toast.success(result.message);
+      if (result.data.failed > 0) {
+        toast.warning(result.message);
+      } else {
+        toast.success(result.message);
+      }
       qc.invalidateQueries({ queryKey: ['jobs'] });
     },
     onError: (err: unknown) => {
