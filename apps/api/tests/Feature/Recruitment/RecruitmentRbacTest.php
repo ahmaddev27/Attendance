@@ -134,8 +134,8 @@ test('POST advance-stage without advance-job-stage returns 403', function () {
     $this->postJson("/api/jobs/{$job->id}/advance-stage", [])->assertForbidden();
 });
 
-test('GET /api/recruitment-pipelines without manage-recruitment-pipelines returns 403', function () {
-    $this->actingAsUserWithPermissions(['view-jobs']);
+test('GET /api/recruitment-pipelines without manage-recruitment-pipelines or view-jobs returns 403', function () {
+    $this->actingAsUserWithPermissions(['view-leads']);
 
     $this->getJson('/api/recruitment-pipelines')->assertForbidden();
 });

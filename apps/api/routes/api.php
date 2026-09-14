@@ -560,11 +560,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/jobs/{job}/advance-stage', [JobRequirementController::class, 'advanceStage'])
         ->middleware('permission:advance-job-stage');
 
-    // Pipelines (Admin)
-    Route::middleware('permission:manage-recruitment-pipelines')->group(function () {
+    // Pipelines: anyone who can see jobs reads the stages (job page,
+    // advance-stage dialog, job form); changing a pipeline is admin-only.
+    Route::middleware('permission:view-jobs|manage-recruitment-pipelines')->group(function () {
         Route::get('/recruitment-pipelines', [RecruitmentPipelineController::class, 'index']);
-        Route::post('/recruitment-pipelines', [RecruitmentPipelineController::class, 'store']);
         Route::get('/recruitment-pipelines/{pipeline}', [RecruitmentPipelineController::class, 'show']);
+    });
+
+    Route::middleware('permission:manage-recruitment-pipelines')->group(function () {
+        Route::post('/recruitment-pipelines', [RecruitmentPipelineController::class, 'store']);
         Route::patch('/recruitment-pipelines/{pipeline}', [RecruitmentPipelineController::class, 'update']);
         Route::delete('/recruitment-pipelines/{pipeline}', [RecruitmentPipelineController::class, 'destroy']);
 

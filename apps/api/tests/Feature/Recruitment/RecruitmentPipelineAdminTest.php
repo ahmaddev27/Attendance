@@ -27,8 +27,8 @@ test('an admin can create a pipeline', function () {
     $this->assertDatabaseHas('recruitment_pipelines', ['code' => 'fast-track']);
 });
 
-test('a user without manage-recruitment-pipelines permission cannot list pipelines', function () {
-    $this->actingAsUserWithPermissions(['view-jobs']);
+test('a user who can neither manage pipelines nor view jobs cannot list pipelines', function () {
+    $this->actingAsUserWithPermissions(['view-leads']);
 
     $this->getJson('/api/recruitment-pipelines')->assertForbidden();
 });
