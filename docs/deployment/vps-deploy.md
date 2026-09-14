@@ -146,8 +146,8 @@ Actions.
 ## Auto-deploy flow (per push to main)
 
 1. **CI runs** (api-tests, web-build, infra-scripts). If it fails, deploy never fires.
-2. **Deploy job triggers** via `workflow_run`, prepares the SSH key (`.github/actions/vps-ssh`) and runs `infra/scripts/vps-deploy.sh` on the VPS through `infra/scripts/run-on-vps.sh`:
-   1. Verifies `.env` is git-ignored, backs it up to `.env.pre-deploy.TIMESTAMP`, then `git fetch && git reset --hard origin/main`.
+2. **Deploy job triggers** via `workflow_run` — only for a CI run produced by a push to this repository's `main` (pull-request CI runs, fork PRs included, never reach the build or deploy jobs) — prepares the SSH key (`.github/actions/vps-ssh`) and runs `infra/scripts/vps-deploy.sh` on the VPS through `infra/scripts/run-on-vps.sh`:
+   1. Verifies `.env` is git-ignored, backs it up to `.env.pre-deploy.TIMESTAMP`, then `git fetch` and `git reset --hard` to **the exact commit CI verified** (`DEPLOY_SHA`, which must be on `origin/main`). If a newer commit is already deployed (CI runs finished out of order) it stops without changes.
    2. Regenerates `composer.lock` via the `composer:2` image if `composer.json` changed without it.
    3. Tags the images of the running `taqat_api` / `taqat_web` containers as `taqat-api:previous` / `taqat-web:previous`.
    4. `docker compose build --pull api web`. A build failure restores the previous checkout; nothing else changes.

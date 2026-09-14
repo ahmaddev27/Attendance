@@ -203,7 +203,7 @@ roll_back() {
   return 1
 }
 
-section "1/9  Pulling latest code from origin/main"
+section "1/9  Checking out the verified commit from origin/main"
 realign_git_ownership
 
 # HARD SAFETY: .env is never touched by the deploy path. If someone committed
@@ -220,10 +220,32 @@ fi
 
 git fetch origin main
 
+# The workflow forwards the commit whose CI passed (DEPLOY_SHA). Resetting to
+# the branch tip instead would ship any later commit whose CI is still running
+# or has already failed. Without a SHA (local rehearsal) the tip is deployed.
+TARGET="origin/main"
+if [ -n "${DEPLOY_SHA:-}" ]; then
+  if ! printf '%s' "$DEPLOY_SHA" | grep -Eq '^[0-9a-f]{40}$'; then
+    fail "DEPLOY_SHA is not a full commit hash — refusing to deploy"
+    exit 1
+  fi
+  if ! git merge-base --is-ancestor "$DEPLOY_SHA" origin/main; then
+    fail "commit $DEPLOY_SHA is not on origin/main — refusing to deploy it"
+    exit 1
+  fi
+  # CI runs can finish out of order: never roll the server back to an older
+  # commit after a newer one has gone out.
+  if [ "$(git rev-parse HEAD)" != "$DEPLOY_SHA" ] && git merge-base --is-ancestor "$DEPLOY_SHA" HEAD; then
+    info "a newer commit ($(git rev-parse --short HEAD)) is already deployed — nothing to do"
+    exit 0
+  fi
+  TARGET="$DEPLOY_SHA"
+fi
+
 # git reset --hard refuses to clobber untracked files, so rescue any file
 # that is now tracked upstream but untracked here by renaming it.
 for tracked_upstream in docker-compose.simple.yml infra/docker/nginx/default.conf; do
-  if git ls-tree -r origin/main --name-only | grep -Fxq "$tracked_upstream" \
+  if git ls-tree -r "$TARGET" --name-only | grep -Fxq "$tracked_upstream" \
     && [ -e "$tracked_upstream" ] \
     && ! git ls-files --error-unmatch "$tracked_upstream" > /dev/null 2>&1; then
     rescued="${tracked_upstream}.pre-track.$(date +%Y%m%d-%H%M%S)"
@@ -233,7 +255,7 @@ for tracked_upstream in docker-compose.simple.yml infra/docker/nginx/default.con
 done
 
 BEFORE="$(git rev-parse HEAD)"
-git reset --hard origin/main
+git reset --hard "$TARGET"
 AFTER="$(git rev-parse HEAD)"
 info "$BEFORE → $AFTER"
 

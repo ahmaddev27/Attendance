@@ -45,3 +45,6 @@ Thumbs.db
 # Session/agent artifacts
 .claude/launch.json
 !_v1_artifacts/
+# The v1 dump holds password hashes, sessions and personal data: keep it local,
+# never in this public repository.
+_v1_artifacts/dumps/

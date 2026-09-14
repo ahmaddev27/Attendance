@@ -252,7 +252,7 @@ docker compose -f docker-compose.simple.yml exec -T api php artisan migrate --se
 
 # Open in browser
 open http://localhost:8181
-# Admin: admin@taqat.local / password
+# Admin: admin@taqat.local — AdminUserSeeder prints a one-time random password
 ```
 
 ### Mobile app
@@ -424,7 +424,7 @@ cd apps/web && npx tsc --noEmit
 
 ### Default Admin
 - **Email:** `admin@taqat.local`
-- **Password:** `password`
+- **Password:** random, printed once by `AdminUserSeeder` on the first seed — change it right after the first login
 - **Employee Number:** `1000`
 - **Role:** `super-admin` (all permissions)
 

@@ -26,9 +26,22 @@ jobs:
   # only useful if you later switch to `image:` pulls. Safe to keep — no cost
   # to the deploy path.
   # ---------------------------------------------------------------------------
+  #
+  # Every job below runs only for a manual dispatch or for a CI run that a
+  # PUSH to this repository's main produced. CI also runs on pull requests,
+  # fork PRs included, and a fork branch named "main" passes the `branches`
+  # filter above; without the event/repository checks such a PR's scripts
+  # would run here with the VPS SSH key and a package-write token.
+  # ---------------------------------------------------------------------------
   build-api:
     name: Build & push API image
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: >-
+      github.event_name == 'workflow_dispatch' || (
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.head_repository.full_name == github.repository
+      )
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -59,7 +72,13 @@ jobs:
 
   build-web:
     name: Build & push Web image
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: >-
+      github.event_name == 'workflow_dispatch' || (
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.head_repository.full_name == github.repository
+      )
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -116,7 +135,13 @@ jobs:
   # ---------------------------------------------------------------------------
   deploy:
     name: Deploy to VPS
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: >-
+      github.event_name == 'workflow_dispatch' || (
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.head_repository.full_name == github.repository
+      )
     # Deliberately does NOT depend on build-api/build-web — the VPS builds
     # locally, so ghcr push failures shouldn't block the deploy.
     runs-on: ubuntu-latest
@@ -148,5 +173,8 @@ jobs:
           VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
           APP_PATH: ${{ secrets.VPS_APP_PATH }}
           NO_CACHE: ${{ inputs.no_cache }}
-          REMOTE_ENV: APP_PATH NO_CACHE
+          # The commit CI verified; the VPS deploys exactly this one, not
+          # whatever main points at by the time this job runs.
+          DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          REMOTE_ENV: APP_PATH NO_CACHE DEPLOY_SHA
         run: bash infra/scripts/run-on-vps.sh infra/scripts/lib/vps-common.sh infra/scripts/vps-deploy.sh
