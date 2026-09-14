@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { CalendarDays, KeyRound, Pencil, Plus, QrCode, Trash2 } from 'lucide-react';
+import { CalendarDays, KeyRound, Pencil, Plus, QrCode, ShieldCheck, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { DataTable, type DataTableColumn } from '@/components/data-table/data-table';
@@ -14,6 +14,7 @@ import { DeleteEmployeeDialog } from '@/components/employees/delete-employee-dia
 import { EmployeeFormDialog } from '@/components/employees/employee-form-dialog';
 import { ResetPasswordDialog } from '@/components/employees/reset-password-dialog';
 import { ResetScanPinDialog } from '@/components/employees/reset-scan-pin-dialog';
+import { ChangeRoleDialog } from '@/components/employees/change-role-dialog';
 import { ScanPinsDialog } from '@/components/attendance/scan-pins-dialog';
 import { EmployeeStatusBadge } from '@/components/employees/employee-status-badge';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
@@ -23,8 +24,11 @@ import { teamsApi } from '@/lib/api/endpoints/teams';
 import { hasPermission, useAuthStore } from '@/lib/stores/auth-store';
 import type { Employee, EmployeeStatus } from '@/lib/api/types';
 import { EMPLOYEE_STATUS_OPTIONS } from '@/lib/constants/employee-options';
+import { ROLE_OPTIONS } from '@/lib/constants/request-options';
 
 const PER_PAGE = 20;
+
+const ROLE_LABELS: Record<string, string> = Object.fromEntries(ROLE_OPTIONS.map((option) => [option.value, option.label]));
 
 export default function EmployeesPage() {
   const router = useRouter();
@@ -47,6 +51,7 @@ export default function EmployeesPage() {
   const [resetPasswordEmployee, setResetPasswordEmployee] = React.useState<Employee | null>(null);
   const [resetScanPinEmployee, setResetScanPinEmployee] = React.useState<Employee | null>(null);
   const [scanPinsOpen, setScanPinsOpen] = React.useState(false);
+  const [roleEmployee, setRoleEmployee] = React.useState<Employee | null>(null);
 
   const debouncedSearch = useDebouncedValue(search);
 
@@ -126,6 +131,11 @@ export default function EmployeesPage() {
       key: 'department',
       header: 'القسم',
       cell: (employee) => employee.department?.name ?? '—',
+    },
+    {
+      key: 'role',
+      header: 'الدور',
+      cell: (employee) => (employee.role ? ROLE_LABELS[employee.role] ?? employee.role : '—'),
     },
     {
       key: 'team',
@@ -216,6 +226,12 @@ export default function EmployeesPage() {
             hidden: () => !canManageUsers,
           },
           {
+            label: 'تغيير الدور',
+            icon: ShieldCheck,
+            onClick: setRoleEmployee,
+            hidden: () => !canManageUsers,
+          },
+          {
             label: 'إعادة تعيين رمز الحضور',
             icon: QrCode,
             onClick: setResetScanPinEmployee,
@@ -238,6 +254,11 @@ export default function EmployeesPage() {
         onOpenChange={(open) => !open && setResetScanPinEmployee(null)}
       />
       <ScanPinsDialog open={scanPinsOpen} onOpenChange={setScanPinsOpen} />
+      <ChangeRoleDialog
+        employee={roleEmployee}
+        open={!!roleEmployee}
+        onOpenChange={(open) => !open && setRoleEmployee(null)}
+      />
       <DeleteEmployeeDialog
         employee={deletingEmployee}
         open={!!deletingEmployee}

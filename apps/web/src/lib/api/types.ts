@@ -337,6 +337,8 @@ export type Employee = {
   work_schedule_id: number | null;
   work_schedule: { id: number; name: string } | null;
   direct_manager: EmployeeMini | null;
+  /** Role of the login account; null without one. Present on list responses. */
+  role?: string | null;
   // Only ever set on the create response — the plaintext password the
   // server just minted for the new user. It's also enqueued as a welcome
   // SMS (see EmployeeService::sendWelcomeSms on the API), so this is a

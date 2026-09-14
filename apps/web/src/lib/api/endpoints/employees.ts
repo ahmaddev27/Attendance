@@ -20,6 +20,9 @@ export const employeesApi = {
     apiClient.put<ApiResource<Employee>>(`/employees/${id}`, data),
   delete: (id: number) => apiClient.delete(`/employees/${id}`),
   restore: (id: number) => apiClient.post(`/employees/${id}/restore`),
+  /** Replaces the role of the employee's login account (manage-users). */
+  assignRole: (id: number, role: string) =>
+    apiClient.put<{ data: { employee_id: number; user_id: number; role: string | null } }>(`/employees/${id}/role`, { role }),
   /**
    * Any authenticated user — returns teammates the caller is allowed
    * to assign tasks to (same team_id, or just self if teamless).
