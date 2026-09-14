@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use Database\Seeders\RecruitmentPermissionSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\Models\Role;
@@ -24,7 +25,15 @@ function grantedPermissions(string $role): array
 
 test('the migration gives every role exactly the approved permissions', function () {
     foreach (RolePermissionSeeder::ROLE_PERMISSIONS as $role => $permissions) {
-        expect(grantedPermissions($role))->toBe(collect($permissions)->sort()->values()->all());
+        // Management also reads recruitment (RecruitmentPermissionSeeder).
+        $expected = collect($permissions)
+            ->merge(RecruitmentPermissionSeeder::ROLE_PERMISSIONS[$role] ?? [])
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+
+        expect(grantedPermissions($role))->toBe($expected);
     }
 
     expect(grantedPermissions('employee'))->toBe([]);

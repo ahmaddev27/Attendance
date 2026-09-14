@@ -7,6 +7,7 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 /**
  * Creates the 16 Recruitment-module permissions and grants them to the
@@ -41,6 +42,34 @@ class RecruitmentPermissionSeeder extends Seeder
         'export-recruitment-data',
     ];
 
+    /**
+     * Owner decision (2026-09-14): besides super-admin, recruitment is used by
+     * sales staff, recruitment officers, a publishing officer and management
+     * (read-only). Grants are additive so a re-run never strips anything an
+     * admin added by hand.
+     *
+     * @var array<string, list<string>>
+     */
+    public const ROLE_PERMISSIONS = [
+        'sales' => [
+            'view-leads', 'manage-leads', 'convert-leads',
+            'view-clients', 'manage-clients',
+            'view-recruitment-cases', 'manage-recruitment-cases',
+            'view-jobs', 'export-recruitment-data',
+        ],
+        'recruiter' => [
+            'view-jobs', 'manage-jobs', 'advance-job-stage',
+            'screen-candidates', 'schedule-interviews', 'prepare-contracts',
+            'view-recruitment-cases', 'view-clients', 'export-recruitment-data',
+        ],
+        'job-publisher' => [
+            'view-jobs', 'advance-job-stage', 'publish-jobs',
+        ],
+        'management' => [
+            'view-leads', 'view-clients', 'view-recruitment-cases', 'view-jobs', 'export-recruitment-data',
+        ],
+    ];
+
     public function run(): void
     {
         foreach (self::PERMISSIONS as $name) {
@@ -54,5 +83,11 @@ class RecruitmentPermissionSeeder extends Seeder
         // case anyway — a fresh migration run + this seeder in
         // isolation shouldn't crash.
         $superAdmin?->givePermissionTo(self::PERMISSIONS);
+
+        foreach (self::ROLE_PERMISSIONS as $roleName => $permissions) {
+            Role::findOrCreate($roleName)->givePermissionTo($permissions);
+        }
+
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 }
