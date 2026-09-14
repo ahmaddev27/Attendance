@@ -130,6 +130,7 @@ class LeaveBalanceRepository
     public function chunkEmployeeIdsOnStaff(int $size, Closure $callback): void
     {
         Employee::query()
+            ->staffOnly()
             ->where('status', '!=', EmployeeStatus::Terminated->value)
             ->select('id')
             ->chunkById($size, fn ($employees) => $callback(

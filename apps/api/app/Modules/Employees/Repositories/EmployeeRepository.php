@@ -22,13 +22,6 @@ class EmployeeRepository
     private const WITH = ['position', 'department', 'team', 'directManager', 'workSchedule'];
 
     /**
-     * Numbers from here up belong to system accounts: migration
-     * 2026_09_20_100008 gives each super-admin an employee record at 900000+,
-     * so regular hires must keep counting below it.
-     */
-    private const SYSTEM_NUMBER_RANGE_START = 900000;
-
-    /**
      * Reserve the next employee_number. Must be called inside a transaction
      * (see EmployeeService::create) so concurrent creates serialize on the
      * locked range instead of racing to the same number.
@@ -41,13 +34,13 @@ class EmployeeRepository
     public function nextEmployeeNumberForUpdate(): int
     {
         $next = (int) Employee::withTrashed()
-            ->where('employee_number', '<', self::SYSTEM_NUMBER_RANGE_START)
+            ->where('employee_number', '<', Employee::SYSTEM_NUMBER_RANGE_START)
             ->lockForUpdate()
             ->max('employee_number') + 1;
 
         $takenByUsers = User::query()
             ->where('employee_number', '>=', $next)
-            ->where('employee_number', '<', self::SYSTEM_NUMBER_RANGE_START)
+            ->where('employee_number', '<', Employee::SYSTEM_NUMBER_RANGE_START)
             ->orderBy('employee_number')
             ->pluck('employee_number');
 
@@ -58,7 +51,7 @@ class EmployeeRepository
             $next++;
         }
 
-        if ($next >= self::SYSTEM_NUMBER_RANGE_START) {
+        if ($next >= Employee::SYSTEM_NUMBER_RANGE_START) {
             throw new RuntimeException('Regular employee numbers have reached the reserved system range.');
         }
 
@@ -126,7 +119,7 @@ class EmployeeRepository
      */
     public function paginate(array $filters, int $perPage): LengthAwarePaginator
     {
-        $query = Employee::query()->with(self::WITH);
+        $query = Employee::query()->staffOnly()->with(self::WITH);
 
         $this->applyFilters($query, $filters);
 

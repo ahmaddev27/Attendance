@@ -66,6 +66,7 @@ class AttendanceReportService
         // list separately to make sure inactive-but-relevant staff are
         // still shown with zeros (matches how payroll expects the report).
         $employees = Employee::query()
+            ->staffOnly()
             ->with('department:id,name')
             ->when($departmentId, fn ($q) => $q->where('department_id', $departmentId))
             ->when($employeeId, fn ($q) => $q->where('id', $employeeId))

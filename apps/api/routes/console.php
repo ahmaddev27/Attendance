@@ -52,6 +52,7 @@ Schedule::call(function (): void {
 
     $processed = 0;
     Employee::query()
+        ->staffOnly()
         ->where('status', EmployeeStatus::Active->value)
         ->whereNotNull('user_id')
         ->with('user')

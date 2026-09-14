@@ -63,6 +63,7 @@ class AdminDashboardService
         // the sidebar's own filter treats on_leave/terminated as
         // "temporarily not around" rather than a separate cohort.
         $rows = Employee::query()
+            ->staffOnly()
             ->selectRaw('status, COUNT(*) as c')
             ->groupBy('status')
             ->pluck('c', 'status');

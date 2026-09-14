@@ -8,6 +8,7 @@ use App\Shared\Enums\EmployeeStatus;
 use App\Shared\Enums\EmploymentType;
 use App\Shared\Enums\Gender;
 use Database\Factories\EmployeeFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -23,6 +24,13 @@ class Employee extends Model
 {
     /** @use HasFactory<EmployeeFactory> */
     use HasFactory, LogsActivity, Searchable, SoftDeletes;
+
+    /**
+     * Employee numbers from here up belong to system accounts, not staff:
+     * migration 2026_09_20_100008 links each super-admin to such a record so
+     * approvals and tasks, which reference employees, can reach them.
+     */
+    public const SYSTEM_NUMBER_RANGE_START = 900000;
 
     /**
      * `employee_number` is fillable here because it must be mass-assignable
@@ -203,6 +211,31 @@ class Employee extends Model
         }
 
         return Storage::disk('public')->url($this->avatar_path);
+    }
+
+    public function isSystemAccount(): bool
+    {
+        return (int) $this->employee_number >= self::SYSTEM_NUMBER_RANGE_START;
+    }
+
+    /**
+     * Staff lists, counts and reports use this. Approvals and tasks must not:
+     * they still have to reach the super-admin's system account.
+     *
+     * @param  Builder<Employee>  $query
+     * @return Builder<Employee>
+     */
+    public function scopeStaffOnly(Builder $query): Builder
+    {
+        return $query->where($query->qualifyColumn('employee_number'), '<', self::SYSTEM_NUMBER_RANGE_START);
+    }
+
+    /**
+     * System accounts never appear in global search.
+     */
+    public function shouldBeSearchable(): bool
+    {
+        return ! $this->isSystemAccount();
     }
 
     /**

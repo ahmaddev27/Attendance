@@ -29,7 +29,9 @@ class EmployeeFactory extends Factory
     public function definition(): array
     {
         return [
-            'employee_number' => fake()->unique()->numberBetween(1, 999999),
+            // Numbers from Employee::SYSTEM_NUMBER_RANGE_START up are system
+            // accounts, which staff lists and counts leave out.
+            'employee_number' => fake()->unique()->numberBetween(1, Employee::SYSTEM_NUMBER_RANGE_START - 1),
             'user_id' => null,
             'first_name' => fake()->firstName(),
             'last_name' => fake()->lastName(),

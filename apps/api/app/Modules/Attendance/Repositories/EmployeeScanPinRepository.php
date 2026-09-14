@@ -99,6 +99,6 @@ class EmployeeScanPinRepository
      */
     private function activeEmployees(): Builder
     {
-        return Employee::query()->where('employees.status', EmployeeStatus::Active->value);
+        return Employee::query()->staffOnly()->where('employees.status', EmployeeStatus::Active->value);
     }
 }

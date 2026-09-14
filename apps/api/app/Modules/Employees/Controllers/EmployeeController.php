@@ -90,7 +90,8 @@ class EmployeeController extends Controller
         } else {
             // Admin without a linked employee record (bootstrap super-admin).
             // They already have manage-workflows so cross-team is allowed —
-            // return the full active roster.
+            // return the full active roster, minus system accounts.
+            $query->staffOnly();
         }
 
         if ($search = trim((string) $request->query('search', ''))) {
