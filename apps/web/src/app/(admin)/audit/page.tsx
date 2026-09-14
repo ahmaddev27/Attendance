@@ -4,16 +4,62 @@ import * as React from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { History, X } from 'lucide-react';
 
+import { FilterSelect } from '@/components/data-table/filter-select';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Skeleton } from '@/components/ui/skeleton';
 import { auditLogApi, type AuditActivity } from '@/lib/api/endpoints/audit-log';
 
+type FilterOption = { value: string; label: string };
+
+// Values are matched exactly by the API: subject_type is the stored model
+// class and log_name is the channel each model or listener writes under.
+const SUBJECT_TYPE_OPTIONS: FilterOption[] = [
+  { value: 'App\\Models\\Employee', label: 'موظف' },
+  { value: 'App\\Models\\User', label: 'حساب مستخدم' },
+  { value: 'App\\Models\\LeaveRequest', label: 'طلب إجازة' },
+  { value: 'App\\Models\\LeaveBalance', label: 'رصيد إجازة' },
+  { value: 'App\\Models\\LeaveType', label: 'نوع إجازة' },
+  { value: 'App\\Models\\Request', label: 'طلب' },
+  { value: 'App\\Models\\RequestApproval', label: 'قرار على طلب' },
+  { value: 'App\\Models\\RequestType', label: 'نوع طلب' },
+  { value: 'App\\Models\\Workflow', label: 'مسار عمل' },
+  { value: 'App\\Models\\WorkflowStep', label: 'خطوة مسار عمل' },
+  { value: 'App\\Models\\Department', label: 'قسم' },
+  { value: 'App\\Models\\Team', label: 'فريق' },
+  { value: 'App\\Models\\Position', label: 'مسمى وظيفي' },
+  { value: 'App\\Models\\WorkSchedule', label: 'جدول دوام' },
+  { value: 'App\\Models\\Holiday', label: 'عطلة' },
+  { value: 'App\\Models\\AttendanceDevice', label: 'جهاز QR' },
+  { value: 'App\\Models\\Lead', label: 'عميل محتمل' },
+  { value: 'App\\Models\\Client', label: 'عميل' },
+  { value: 'App\\Models\\RecruitmentCase', label: 'حملة توظيف' },
+  { value: 'App\\Models\\JobRequirement', label: 'وظيفة' },
+];
+
+const LOG_NAME_OPTIONS: FilterOption[] = [
+  { value: 'auth', label: 'تسجيل الدخول والخروج' },
+  { value: 'users', label: 'الحسابات والأدوار' },
+  { value: 'employees', label: 'الموظفون' },
+  { value: 'organization', label: 'الهيكل التنظيمي' },
+  { value: 'attendance', label: 'رموز الحضور' },
+  { value: 'leaves', label: 'الإجازات' },
+  { value: 'leave-balance', label: 'تعديلات أرصدة الإجازات' },
+  { value: 'requests', label: 'الطلبات والموافقات' },
+  { value: 'workflows', label: 'مسارات العمل' },
+  { value: 'settings', label: 'الإعدادات' },
+  { value: 'recruitment.lead', label: 'العملاء المحتملون' },
+  { value: 'recruitment.client', label: 'العملاء' },
+  { value: 'recruitment.case', label: 'الحملات' },
+  { value: 'recruitment.job_requirement', label: 'الوظائف' },
+];
+
 export default function AuditLogPage() {
   const [page, setPage] = React.useState(1);
   const [filters, setFilters] = React.useState<{
     subject_type?: string;
+    log_name?: string;
     from?: string;
     to?: string;
   }>({});
@@ -48,21 +94,26 @@ export default function AuditLogPage() {
       </div>
 
       <Card className="border-hairline bg-surface p-4">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <label className="text-xs">
+            <span className="mb-1 block font-semibold text-ink-2">التصنيف</span>
+            <FilterSelect
+              value={filters.log_name}
+              options={LOG_NAME_OPTIONS}
+              onChange={(v) => setFilter('log_name', v)}
+              placeholder="الكل"
+              className="w-full"
+            />
+          </label>
           <label className="text-xs">
             <span className="mb-1 block font-semibold text-ink-2">النوع</span>
-            <select
-              value={filters.subject_type ?? ''}
-              onChange={(e) => setFilter('subject_type', e.target.value || undefined)}
-              className="w-full rounded-lg border border-hairline bg-surface px-3 py-2 text-sm"
-            >
-              <option value="">الكل</option>
-              <option value="App\\Models\\LeaveRequest">إجازة</option>
-              <option value="App\\Models\\Request">طلب</option>
-              <option value="App\\Models\\Task">مهمة</option>
-              <option value="App\\Models\\Employee">موظف</option>
-              <option value="App\\Models\\Attendance">حضور</option>
-            </select>
+            <FilterSelect
+              value={filters.subject_type}
+              options={SUBJECT_TYPE_OPTIONS}
+              onChange={(v) => setFilter('subject_type', v)}
+              placeholder="الكل"
+              className="w-full"
+            />
           </label>
           <label className="text-xs">
             <span className="mb-1 block font-semibold text-ink-2">من</span>
