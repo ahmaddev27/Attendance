@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
  * A submittable request type (e.g. "business mission", "advance",
@@ -43,7 +45,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class RequestType extends Model
 {
     /** @use HasFactory<RequestTypeFactory> */
-    use HasFactory, SoftDeletes;
+    use HasFactory, LogsActivity, SoftDeletes;
 
     /**
      * The only field `type` values a form schema entry may declare. Single
@@ -124,5 +126,18 @@ class RequestType extends Model
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);
+    }
+
+    /**
+     * Description, icon, colour and sort order are left out: they change how
+     * the type is shown, not what it collects or who approves it.
+     */
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['name', 'code', 'workflow_id', 'form_schema', 'is_active'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('workflows');
     }
 }

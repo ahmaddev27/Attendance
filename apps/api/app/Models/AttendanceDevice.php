@@ -9,11 +9,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class AttendanceDevice extends Model
 {
     /** @use HasFactory<AttendanceDeviceFactory> */
-    use HasFactory;
+    use HasFactory, LogsActivity;
 
     protected $fillable = [
         'name',
@@ -78,5 +80,27 @@ class AttendanceDevice extends Model
     public function isTokenExpired(): bool
     {
         return false;
+    }
+
+    /**
+     * qr_token is the credential printed on the kiosk poster; anyone holding
+     * it can forge scans, so it never enters the trail.
+     */
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly([
+                'name',
+                'allowed_lat',
+                'allowed_lng',
+                'allowed_radius_meters',
+                'ip_whitelist',
+                'enforce_geo',
+                'enforce_ip',
+                'is_active',
+            ])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('organization');
     }
 }

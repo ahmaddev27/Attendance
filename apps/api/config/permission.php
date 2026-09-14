@@ -122,8 +122,11 @@ return [
      * \Spatie\Permission\Events\PermissionDetached
      *
      * To enable, set to true, and then create listeners to watch these events.
+     *
+     * On because role pivots fire no model events; the audit trail depends on
+     * these (see App\Modules\Auth\Listeners\RecordRoleAssignmentActivity).
      */
-    'events_enabled' => false,
+    'events_enabled' => true,
 
     /*
      * Teams Feature.

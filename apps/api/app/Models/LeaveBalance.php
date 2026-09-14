@@ -8,11 +8,13 @@ use Database\Factories\LeaveBalanceFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class LeaveBalance extends Model
 {
     /** @use HasFactory<LeaveBalanceFactory> */
-    use HasFactory;
+    use HasFactory, LogsActivity;
 
     protected $fillable = [
         'employee_id',
@@ -86,5 +88,22 @@ class LeaveBalance extends Model
         }
 
         return $this->remaining;
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly([
+                'employee_id',
+                'leave_type_id',
+                'year',
+                'entitlement',
+                'used',
+                'pending',
+                'carry_over_from_previous',
+            ])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('leaves');
     }
 }

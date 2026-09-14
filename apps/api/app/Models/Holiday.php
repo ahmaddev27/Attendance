@@ -10,11 +10,13 @@ use Database\Factories\HolidayFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class Holiday extends Model
 {
     /** @use HasFactory<HolidayFactory> */
-    use HasFactory;
+    use HasFactory, LogsActivity;
 
     protected $fillable = [
         'date',
@@ -50,5 +52,14 @@ class Holiday extends Model
                         ->whereDay('date', $date->day);
                 });
         });
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['date', 'name', 'type', 'is_recurring'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('organization');
     }
 }

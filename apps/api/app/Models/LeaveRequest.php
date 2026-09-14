@@ -11,11 +11,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Laravel\Scout\Searchable;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class LeaveRequest extends Model
 {
     /** @use HasFactory<LeaveRequestFactory> */
-    use HasFactory, Searchable;
+    use HasFactory, LogsActivity, Searchable;
 
     protected $fillable = [
         'employee_id',
@@ -157,5 +159,28 @@ class LeaveRequest extends Model
             'reason' => (string) $this->reason,
             'employee_name' => $this->employee?->full_name ?? '',
         ];
+    }
+
+    /**
+     * The employee's free-text reason and attachment path stay on the
+     * request row; the trail follows dates, status and who decided.
+     */
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly([
+                'employee_id',
+                'leave_type_id',
+                'start_date',
+                'end_date',
+                'days',
+                'status',
+                'reviewed_by',
+                'reviewed_at',
+                'rejection_reason',
+            ])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('leaves');
     }
 }

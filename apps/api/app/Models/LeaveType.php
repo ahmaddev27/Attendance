@@ -10,11 +10,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class LeaveType extends Model
 {
     /** @use HasFactory<LeaveTypeFactory> */
-    use HasFactory, SoftDeletes;
+    use HasFactory, LogsActivity, SoftDeletes;
 
     protected $fillable = [
         'name',
@@ -83,5 +85,29 @@ class LeaveType extends Model
     public function scopeBalanceBased(Builder $query): Builder
     {
         return $query->where('is_balance_based', true);
+    }
+
+    /**
+     * Colour and sort order are left out because they are presentation-only.
+     */
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly([
+                'name',
+                'code',
+                'is_paid',
+                'is_balance_based',
+                'default_annual_entitlement',
+                'carry_over_max_days',
+                'allow_negative_balance',
+                'requires_attachment',
+                'max_consecutive_days',
+                'min_notice_days',
+                'is_active',
+            ])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('leaves');
     }
 }

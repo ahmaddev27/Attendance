@@ -9,6 +9,8 @@ use Database\Factories\RequestApprovalFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
  * A single immutable decision on a Request's current step. Only
@@ -19,7 +21,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class RequestApproval extends Model
 {
     /** @use HasFactory<RequestApprovalFactory> */
-    use HasFactory;
+    use HasFactory, LogsActivity;
 
     /**
      * @var string|null
@@ -77,5 +79,22 @@ class RequestApproval extends Model
     public function forwardedTo(): BelongsTo
     {
         return $this->belongsTo(Employee::class, 'forwarded_to_id');
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly([
+                'request_id',
+                'workflow_step_id',
+                'approver_id',
+                'action',
+                'comment',
+                'forwarded_to_id',
+                'decided_at',
+            ])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('requests');
     }
 }

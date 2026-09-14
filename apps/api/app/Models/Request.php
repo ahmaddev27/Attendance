@@ -16,6 +16,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 use Laravel\Scout\Searchable;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
  * A single submitted instance of a RequestType, routed through that
@@ -30,7 +32,7 @@ use Laravel\Scout\Searchable;
 class Request extends Model
 {
     /** @use HasFactory<RequestFactory> */
-    use HasFactory, Searchable;
+    use HasFactory, LogsActivity, Searchable;
 
     /**
      * How long after a `forwarded` approval action the forwarded-to
@@ -265,6 +267,27 @@ class Request extends Model
             'request_number' => (string) $this->request_number,
             'form_data' => is_array($formData) ? json_encode($formData, JSON_UNESCAPED_UNICODE) : (string) $formData,
         ];
+    }
+
+    /**
+     * form_data is an unbounded, type-specific payload the request row
+     * already keeps; the trail follows routing and status.
+     */
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly([
+                'request_number',
+                'employee_id',
+                'request_type_id',
+                'status',
+                'current_step_id',
+                'submitted_at',
+                'completed_at',
+            ])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('requests');
     }
 
     /**

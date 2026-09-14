@@ -10,12 +10,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, HasRoles, Notifiable;
+    use HasApiTokens, HasFactory, HasRoles, LogsActivity, Notifiable;
 
     /**
      * The attributes that are mass assignable.
@@ -78,5 +80,20 @@ class User extends Authenticatable
     public function pushTokens(): HasMany
     {
         return $this->hasMany(PushToken::class);
+    }
+
+    /**
+     * Credentials never enter the trail. Saves that touch only them, or the
+     * timestamp stamped on every sign-in, are skipped before Spatie re-reads
+     * the row, so login and password rotation cost no extra queries.
+     */
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['name', 'email', 'employee_number', 'is_active', 'employee_id'])
+            ->logOnlyDirty()
+            ->dontLogIfAttributesChangedOnly(['password', 'remember_token', 'last_login_at', 'updated_at'])
+            ->dontSubmitEmptyLogs()
+            ->useLogName('users');
     }
 }

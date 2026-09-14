@@ -9,11 +9,13 @@ use Database\Factories\WorkflowStepFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class WorkflowStep extends Model
 {
     /** @use HasFactory<WorkflowStepFactory> */
-    use HasFactory;
+    use HasFactory, LogsActivity;
 
     protected $fillable = [
         'workflow_id',
@@ -62,5 +64,24 @@ class WorkflowStep extends Model
     public function workflow(): BelongsTo
     {
         return $this->belongsTo(Workflow::class);
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly([
+                'workflow_id',
+                'step_order',
+                'name',
+                'approver_type',
+                'approver_ref',
+                'can_reject',
+                'can_return',
+                'can_forward',
+                'sla_hours',
+            ])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('workflows');
     }
 }

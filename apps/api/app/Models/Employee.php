@@ -16,11 +16,13 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Scout\Searchable;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class Employee extends Model
 {
     /** @use HasFactory<EmployeeFactory> */
-    use HasFactory, Searchable, SoftDeletes;
+    use HasFactory, LogsActivity, Searchable, SoftDeletes;
 
     /**
      * `employee_number` is fillable here because it must be mass-assignable
@@ -219,5 +221,33 @@ class Employee extends Model
             'email' => (string) $this->email,
             'phone' => (string) $this->phone,
         ];
+    }
+
+    /**
+     * Personal details (birth date, gender, notes, avatar) stay out: anyone
+     * with view-audit-logs reads this trail, and those fields say nothing
+     * about who changed an employee's placement or status.
+     */
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly([
+                'employee_number',
+                'first_name',
+                'last_name',
+                'email',
+                'phone',
+                'position_id',
+                'department_id',
+                'team_id',
+                'direct_manager_id',
+                'employment_type',
+                'joining_date',
+                'status',
+                'work_schedule_id',
+            ])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('employees');
     }
 }

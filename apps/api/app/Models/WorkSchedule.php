@@ -9,11 +9,13 @@ use Database\Factories\WorkScheduleFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class WorkSchedule extends Model
 {
     /** @use HasFactory<WorkScheduleFactory> */
-    use HasFactory;
+    use HasFactory, LogsActivity;
 
     protected $fillable = [
         'name',
@@ -62,5 +64,25 @@ class WorkSchedule extends Model
     public function expectedMinutes(): int
     {
         return (int) round(((float) $this->min_hours_per_day) * 60);
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly([
+                'name',
+                'timezone',
+                'check_in_time',
+                'check_out_time',
+                'min_hours_per_day',
+                'grace_late_minutes',
+                'grace_early_leave_minutes',
+                'workdays',
+                'is_flexible',
+                'is_active',
+            ])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('organization');
     }
 }

@@ -6,6 +6,9 @@ namespace App\Modules\Auth\Services;
 
 use App\Models\User;
 use App\Modules\Auth\Repositories\UserRepository;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Auth\Events\Logout;
+use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -30,6 +33,7 @@ class AuthService
 
     public function __construct(
         private readonly UserRepository $users,
+        private readonly Dispatcher $events,
     ) {}
 
     /**
@@ -89,6 +93,11 @@ class AuthService
 
         $user->forceFill(['last_login_at' => now()])->save();
 
+        // Minting a token bypasses every guard, so the framework never raises
+        // Login on this path; raising it here keeps a single audit listener
+        // for both token and session sign-ins.
+        $this->events->dispatch(new Login('sanctum', $user, false));
+
         return ['user' => $user, 'token' => $token];
     }
 
@@ -147,5 +156,9 @@ class AuthService
         if ($token && method_exists($token, 'delete')) {
             $token->delete();
         }
+
+        // Session sign-outs raise Logout from the web guard; revoking a token
+        // never touches a guard, so it is raised here for the audit trail.
+        $this->events->dispatch(new Logout('sanctum', $user));
     }
 }

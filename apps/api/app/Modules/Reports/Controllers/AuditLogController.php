@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Reports\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Spatie\Activitylog\Models\Activity;
 
 class AuditLogController extends Controller
 {
@@ -17,14 +17,14 @@ class AuditLogController extends Controller
      * GET /api/admin/audit-log
      *   ?subject_type=&causer_id=&log_name=&from=&to=&per_page=
      *
-     * Everything piggy-backs on spatie/activitylog's own Activity model —
-     * any package that calls activity()->log() shows up here for free.
+     * Reads through ActivityLog, the configured activity model, so anything
+     * that calls activity()->log() or uses LogsActivity shows up here for free.
      * No paginated response for very old batches because the table is
      * truncated by Spatie's DB pruner (activitylog.delete_records_older_than_days).
      */
     public function index(Request $request): AnonymousResourceCollection
     {
-        $activities = Activity::query()
+        $activities = ActivityLog::query()
             ->with('causer:id,name,employee_number')
             ->latest('id')
             ->when($request->filled('subject_type'), fn ($q) => $q->where('subject_type', $request->string('subject_type')))
@@ -40,7 +40,7 @@ class AuditLogController extends Controller
         return AnonymousResourceCollection::make($activities, new class(null) extends \Illuminate\Http\Resources\Json\JsonResource {
             public function toArray($request): array
             {
-                /** @var Activity $activity */
+                /** @var ActivityLog $activity */
                 $activity = $this->resource;
 
                 return [
