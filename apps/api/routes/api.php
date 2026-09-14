@@ -24,6 +24,7 @@ use App\Modules\Notifications\Controllers\MyNotificationsController;
 use App\Modules\Push\Controllers\PushTokenController;
 use App\Modules\Recruitment\Controllers\ClientContactController;
 use App\Modules\Recruitment\Controllers\ClientController;
+use App\Modules\Recruitment\Controllers\BrightGazaJobImportController;
 use App\Modules\Recruitment\Controllers\JobRequirementController;
 use App\Modules\Recruitment\Controllers\LeadActivityController;
 use App\Modules\Recruitment\Controllers\LeadController;
@@ -563,6 +564,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // work to the next owner.
     Route::post('/jobs/{job}/advance-stage', [JobRequirementController::class, 'advanceStage'])
         ->middleware('permission:advance-job-stage');
+
+    // "Pull from BrightGaza" on the jobs list: reads BrightGaza's public job
+    // board and upserts the listed jobs (no API credentials involved).
+    Route::post('/recruitment/brightgaza/jobs/import', BrightGazaJobImportController::class)
+        ->middleware(['permission:manage-jobs', 'throttle:3,1,brightgaza-import']);
 
     // Pipelines: anyone who can see jobs reads the stages (job page,
     // advance-stage dialog, job form); changing a pipeline is admin-only.

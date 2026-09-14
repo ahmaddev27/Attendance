@@ -112,4 +112,13 @@ class RecruitmentCaseRepository
             });
         }
     }
+
+    public function findForClientByTitle(int $clientId, string $title): ?RecruitmentCase
+    {
+        return RecruitmentCase::query()
+            ->where('client_id', $clientId)
+            ->where('title', $title)
+            ->orderBy('id')
+            ->first();
+    }
 }

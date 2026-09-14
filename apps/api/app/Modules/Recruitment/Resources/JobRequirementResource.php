@@ -78,8 +78,45 @@ class JobRequirementResource extends JsonResource
             'stage_entered_at' => $this->stage_entered_at?->toIso8601String(),
             'completed_at' => $this->completed_at?->toIso8601String(),
 
+            // Set when the job was pulled from an outside board (BrightGaza).
+            'external' => $this->external_source === null ? null : [
+                'source' => $this->external_source,
+                'id' => $this->external_id,
+                'status' => $this->external_status,
+                'synced_at' => $this->external_synced_at?->toIso8601String(),
+                'details' => $this->externalDetails(),
+            ],
+
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * The board fields TAQAT has no column for, flattened for display. The
+     * complete payload stays in the database.
+     *
+     * @return array<string, mixed>
+     */
+    private function externalDetails(): array
+    {
+        $payload = is_array($this->external_payload) ? $this->external_payload : [];
+
+        return [
+            'category' => $payload['category']['name'] ?? null,
+            'sub_category' => $payload['sub_category']['name'] ?? null,
+            'job_type' => $payload['type']['label'] ?? null,
+            'contract_time_type' => $payload['contract_time_type'] ?? null,
+            'weekly_hours' => $payload['weekly_hours'] ?? null,
+            'experience_level' => $payload['experience_level'] ?? null,
+            'duration' => $payload['duration'] ?? null,
+            'proposal_count' => $payload['proposal_count'] ?? $payload['proposals'] ?? null,
+            'last_proposal_at' => $payload['last_proposal_time'] ?? null,
+            'posted_at' => $payload['created_at'] ?? null,
+            'poster' => $payload['client']['name'] ?? null,
+            'poster_country' => $payload['client']['country']['name'] ?? null,
+            'employer_type' => $payload['employer_type']['name'] ?? null,
+            'is_open' => $payload['is_open'] ?? null,
         ];
     }
 }

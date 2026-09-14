@@ -217,4 +217,30 @@ class JobRequirementRepository
             ->map(fn ($id) => (int) $id)
             ->all();
     }
+
+    /**
+     * Includes soft-deleted rows: a job deleted in TAQAT still owns its
+     * external reference, so a later pull must see it rather than recreate it.
+     */
+    public function findByExternalReference(string $source, string $externalId): ?JobRequirement
+    {
+        return JobRequirement::withTrashed()
+            ->where('external_source', $source)
+            ->where('external_id', $externalId)
+            ->first();
+    }
+
+    /**
+     * Flags every job from $source missing from the latest pull.
+     *
+     * @param  list<string>  $listedIds
+     */
+    public function markExternalNotListed(string $source, array $listedIds, string $status): int
+    {
+        return JobRequirement::query()
+            ->where('external_source', $source)
+            ->whereNotIn('external_id', $listedIds)
+            ->where(fn (Builder $query) => $query->whereNull('external_status')->orWhere('external_status', '!=', $status))
+            ->update(['external_status' => $status, 'updated_at' => now()]);
+    }
 }

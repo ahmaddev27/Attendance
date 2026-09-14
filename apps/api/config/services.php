@@ -28,6 +28,13 @@ return [
         'key' => env('RESEND_KEY'),
     ],
 
+    // Public job board of TAQAT's recruitment brand. api_url serves
+    // GET /api/v1/jobs; site_url builds the public job links.
+    'brightgaza' => [
+        'api_url' => env('BRIGHTGAZA_API_URL', 'https://taqatgaza.com'),
+        'site_url' => env('BRIGHTGAZA_SITE_URL', 'https://brightgaza.com'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

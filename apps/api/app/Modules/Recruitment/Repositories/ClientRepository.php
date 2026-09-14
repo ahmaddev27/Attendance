@@ -141,4 +141,17 @@ class ClientRepository
             });
         }
     }
+
+    public function findByCompany(string $companyName, ?string $country): ?Client
+    {
+        return Client::query()
+            ->where('company_name', $companyName)
+            ->when(
+                $country === null,
+                fn (Builder $query) => $query->whereNull('country'),
+                fn (Builder $query) => $query->where('country', $country),
+            )
+            ->orderBy('id')
+            ->first();
+    }
 }
