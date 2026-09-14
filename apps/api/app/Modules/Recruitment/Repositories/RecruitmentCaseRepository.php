@@ -70,7 +70,9 @@ class RecruitmentCaseRepository
     {
         $prefix = "RC-{$year}-";
 
-        $latest = RecruitmentCase::query()
+        // withTrashed: the *_number unique index still holds soft-deleted rows,
+        // so skipping them would hand out a number that is already taken.
+        $latest = RecruitmentCase::withTrashed()
             ->where('case_number', 'like', $prefix.'%')
             ->orderByDesc('id')
             ->value('case_number');

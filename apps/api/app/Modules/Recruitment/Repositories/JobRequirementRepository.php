@@ -77,7 +77,9 @@ class JobRequirementRepository
     {
         $prefix = "J-{$year}-";
 
-        $latest = JobRequirement::query()
+        // withTrashed: the *_number unique index still holds soft-deleted rows,
+        // so skipping them would hand out a number that is already taken.
+        $latest = JobRequirement::withTrashed()
             ->where('job_number', 'like', $prefix.'%')
             ->orderByDesc('id')
             ->value('job_number');

@@ -107,7 +107,9 @@ class ClientRepository
     {
         $prefix = "C-{$year}-";
 
-        $latest = Client::query()
+        // withTrashed: the *_number unique index still holds soft-deleted rows,
+        // so skipping them would hand out a number that is already taken.
+        $latest = Client::withTrashed()
             ->where('client_number', 'like', $prefix.'%')
             ->orderByDesc('id')
             ->value('client_number');

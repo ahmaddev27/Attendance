@@ -116,7 +116,9 @@ class LeadRepository
     {
         $prefix = "L-{$year}-";
 
-        $latest = Lead::query()
+        // withTrashed: the *_number unique index still holds soft-deleted rows,
+        // so skipping them would hand out a number that is already taken.
+        $latest = Lead::withTrashed()
             ->where('lead_number', 'like', $prefix.'%')
             ->orderByDesc('id')
             ->value('lead_number');
