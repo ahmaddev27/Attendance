@@ -12,6 +12,14 @@ use Illuminate\Validation\Rules\Enum;
 
 class StoreEmployeeRequest extends FormRequest
 {
+    /**
+     * Digits with the separators people type (+, spaces, dashes, brackets).
+     * SmsService turns it into the international form when sending.
+     */
+    public const PHONE_PATTERN = '/^\+?[\d\s\-().]{7,20}$/';
+
+    public const PHONE_MESSAGE = 'رقم الهاتف غير صالح. اكتبه مثل 0599123456 أو +970599123456.';
+
     public function authorize(): bool
     {
         return true;
@@ -31,7 +39,7 @@ class StoreEmployeeRequest extends FormRequest
             'first_name' => ['required', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],
             'email' => ['nullable', 'email', 'max:150', 'unique:employees,email'],
-            'phone' => ['nullable', 'string', 'max:20'],
+            'phone' => ['nullable', 'string', 'max:20', 'regex:'.self::PHONE_PATTERN],
             'position_id' => ['nullable', 'integer', 'exists:positions,id'],
             'department_id' => ['nullable', 'integer', 'exists:departments,id'],
             'team_id' => ['nullable', 'integer', 'exists:teams,id'],
@@ -50,5 +58,13 @@ class StoreEmployeeRequest extends FormRequest
             'status' => ['sometimes', new Enum(EmployeeStatus::class)],
             'notes' => ['nullable', 'string'],
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return ['phone.regex' => self::PHONE_MESSAGE];
     }
 }

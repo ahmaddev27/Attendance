@@ -43,11 +43,11 @@ return [
     ],
 
     /*
-    | MTC SMS gateway (Jordan Telecom).
-    | Credentials live in env — the SmsGateway binding in
-    | AppServiceProvider picks the real gateway when username/password
-    | are set and `fake=false`, otherwise the FakeSmsGateway is used
-    | (also always used in the `testing` env).
+    | MTCSMS gateway (Modern Tech Corp, Palestine).
+    | The admin settings page overrides every value here through
+    | SettingsService; env is only the fresh-install fallback. The
+    | SmsGateway binding in AppServiceProvider uses the FakeSmsGateway when
+    | `fake` is on (and always in the `testing` env).
     */
     'mtc_sms' => [
         'username' => env('MTC_SMS_USERNAME'),
@@ -56,6 +56,10 @@ return [
         'endpoint' => env('MTC_SMS_ENDPOINT'),
         'timeout' => (int) env('MTC_SMS_TIMEOUT', 10),
         'fake' => (bool) env('MTC_SMS_FAKE', false),
+        // Prefix for locally typed numbers (0599... becomes 970599...).
+        'default_country_code' => env('MTC_SMS_DEFAULT_COUNTRY_CODE', '970'),
+        // The account's `type` value for Arabic / non-ASCII messages.
+        'unicode_type' => (int) env('MTC_SMS_UNICODE_TYPE', 1),
     ],
 
     /*

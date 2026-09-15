@@ -61,7 +61,15 @@ const employeeFormSchema = z
       .email('صيغة البريد الإلكتروني غير صحيحة')
       .optional()
       .or(z.literal('')),
-    phone: z.string().trim().max(30, 'رقم الهاتف طويل جداً').optional().or(z.literal('')),
+    // Same rule as the API (StoreEmployeeRequest::PHONE_PATTERN); the SMS
+    // service adds the country code, so local numbers are fine.
+    phone: z
+      .string()
+      .trim()
+      .max(20, 'رقم الهاتف طويل جداً')
+      .regex(/^\+?[\d\s\-().]{7,20}$/, 'رقم الهاتف غير صالح. اكتبه مثل 0599123456 أو +970599123456')
+      .optional()
+      .or(z.literal('')),
     department_id: z.number().nullable(),
     team_id: z.number().nullable(),
     position_id: z.number().nullable(),
@@ -221,7 +229,7 @@ export function EmployeeFormDialog({ open, onOpenChange, employee }: EmployeeFor
         toast.success('تمت إضافة الموظف — كلمة السر أدناه', {
           duration: 20000,
           description: hasPhone
-            ? `تم إرسال بيانات الدخول عبر SMS. كلمة السر: ${password}`
+            ? `أُرسلت بيانات الدخول بـ SMS (تابع وصولها من الإعدادات ← آخر رسائل SMS). كلمة السر: ${password}`
             : `الموظف بدون رقم جوّال، سلّمه كلمة السر يدوياً: ${password}`,
           action: {
             label: 'نسخ',
@@ -305,8 +313,11 @@ export function EmployeeFormDialog({ open, onOpenChange, employee }: EmployeeFor
                   <FormItem>
                     <FormLabel>رقم الهاتف (اختياري)</FormLabel>
                     <FormControl>
-                      <Input dir="ltr" className="num text-right" {...field} />
+                      <Input dir="ltr" inputMode="tel" placeholder="0599123456" className="num text-right" {...field} />
                     </FormControl>
+                    <p className="text-[11px] text-muted">
+                      رقم محلي أو دولي — تُضاف مقدمة الدولة تلقائياً عند إرسال SMS.
+                    </p>
                     <FormMessage />
                   </FormItem>
                 )}

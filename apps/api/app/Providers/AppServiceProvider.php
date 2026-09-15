@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Modules\Push\Contracts\PushGateway;
+use App\Modules\Push\Gateways\ExpoPushGateway;
+use App\Modules\Push\Gateways\FakePushGateway;
 use App\Modules\Settings\Services\SettingsService;
 use App\Modules\Sms\Contracts\SmsGateway;
 use App\Modules\Sms\Gateways\FakeSmsGateway;
 use App\Modules\Sms\Gateways\MtcSmsGateway;
-use App\Modules\Push\Contracts\PushGateway;
-use App\Modules\Push\Gateways\ExpoPushGateway;
-use App\Modules\Push\Gateways\FakePushGateway;
 use App\Modules\Whatsapp\Contracts\WhatsappGateway;
 use App\Modules\Whatsapp\Gateways\FakeWhatsappGateway;
 use App\Modules\Whatsapp\Gateways\MetaCloudGateway;
@@ -68,6 +68,7 @@ class AppServiceProvider extends ServiceProvider
             if (method_exists($user, 'hasRole') && $user->hasRole('super-admin')) {
                 return true;
             }
+
             return null;
         });
     }
@@ -90,8 +91,10 @@ class AppServiceProvider extends ServiceProvider
                 || filter_var($fakeFlag, FILTER_VALIDATE_BOOLEAN);
 
             if ($useFake) {
-                return new FakeSmsGateway();
+                return new FakeSmsGateway;
             }
+
+            $unicodeType = $this->safe(fn () => $settings->get('sms.mtc_unicode_type', 'services.mtc_sms.unicode_type'));
 
             return new MtcSmsGateway(
                 username: (string) $this->safe(fn () => $settings->get('sms.mtc_username', 'services.mtc_sms.username')),
@@ -99,6 +102,8 @@ class AppServiceProvider extends ServiceProvider
                 sender: (string) $this->safe(fn () => $settings->get('sms.mtc_sender', 'services.mtc_sms.sender', 'TAQAT')),
                 endpoint: (string) $this->safe(fn () => $settings->get('sms.mtc_endpoint', 'services.mtc_sms.endpoint')),
                 timeout: (int) config('services.mtc_sms.timeout', 10),
+                // Blank on the settings page means the account default (1).
+                unicodeType: is_numeric($unicodeType) ? (int) $unicodeType : 1,
             );
         });
     }
@@ -121,7 +126,7 @@ class AppServiceProvider extends ServiceProvider
                 || filter_var($fakeFlag, FILTER_VALIDATE_BOOLEAN);
 
             if ($useFake) {
-                return new FakeWhatsappGateway();
+                return new FakeWhatsappGateway;
             }
 
             return new MetaCloudGateway(
@@ -152,7 +157,7 @@ class AppServiceProvider extends ServiceProvider
                 || filter_var($fakeFlag, FILTER_VALIDATE_BOOLEAN);
 
             if ($useFake) {
-                return new FakePushGateway();
+                return new FakePushGateway;
             }
 
             $accessToken = $this->safe(fn () => $settings->get('push.expo_access_token', 'services.push.access_token'));
@@ -200,6 +205,7 @@ class AppServiceProvider extends ServiceProvider
      * assume the settings table is migrated yet.
      *
      * @template T
+     *
      * @param  callable(): T  $callback
      * @return T|null
      */

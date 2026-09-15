@@ -1,5 +1,7 @@
 <?php
 
+use App\Modules\AI\Controllers\MotivationController;
+use App\Modules\Analytics\Controllers\AnalyticsController;
 use App\Modules\Attendance\Controllers\AttendanceController;
 use App\Modules\Attendance\Controllers\AttendanceDeviceController;
 use App\Modules\Attendance\Controllers\HolidayController;
@@ -16,16 +18,14 @@ use App\Modules\Leaves\Controllers\EmployeeLeavesController;
 use App\Modules\Leaves\Controllers\LeaveBalanceController;
 use App\Modules\Leaves\Controllers\LeaveRequestController;
 use App\Modules\Leaves\Controllers\LeaveTypeController;
+use App\Modules\Notifications\Controllers\MyNotificationsController;
 use App\Modules\Organization\Controllers\DepartmentController;
 use App\Modules\Organization\Controllers\PositionController;
 use App\Modules\Organization\Controllers\TeamController;
-use App\Modules\AI\Controllers\MotivationController;
-use App\Modules\Analytics\Controllers\AnalyticsController;
-use App\Modules\Notifications\Controllers\MyNotificationsController;
 use App\Modules\Push\Controllers\PushTokenController;
+use App\Modules\Recruitment\Controllers\BrightGazaJobImportController;
 use App\Modules\Recruitment\Controllers\ClientContactController;
 use App\Modules\Recruitment\Controllers\ClientController;
-use App\Modules\Recruitment\Controllers\BrightGazaJobImportController;
 use App\Modules\Recruitment\Controllers\JobRequirementController;
 use App\Modules\Recruitment\Controllers\LeadActivityController;
 use App\Modules\Recruitment\Controllers\LeadController;
@@ -40,13 +40,14 @@ use App\Modules\Reports\Controllers\AuditLogController;
 use App\Modules\Reports\Controllers\EmployeeDashboardController;
 use App\Modules\Reports\Controllers\LeaveReportController;
 use App\Modules\Reports\Controllers\RequestReportController;
-use App\Modules\Search\Controllers\SearchController;
-use App\Modules\Settings\Controllers\OptionListController;
-use App\Modules\Settings\Controllers\SettingsController;
-use App\Modules\System\Controllers\HealthController;
 use App\Modules\Requests\Controllers\ApprovalInboxController;
 use App\Modules\Requests\Controllers\MyRequestsController;
 use App\Modules\Requests\Controllers\RequestController;
+use App\Modules\Search\Controllers\SearchController;
+use App\Modules\Settings\Controllers\OptionListController;
+use App\Modules\Settings\Controllers\SettingsController;
+use App\Modules\Sms\Controllers\SmsLogController;
+use App\Modules\System\Controllers\HealthController;
 use App\Modules\Tasks\Controllers\MyTasksController;
 use App\Modules\Tasks\Controllers\TaskAttachmentController;
 use App\Modules\Tasks\Controllers\TaskCommentController;
@@ -386,11 +387,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::middleware('permission:view-reports')
             ->prefix('analytics')
             ->group(function () {
-                Route::get('/attendance/kpis',    [AnalyticsController::class, 'attendanceKpis']);
+                Route::get('/attendance/kpis', [AnalyticsController::class, 'attendanceKpis']);
                 Route::get('/attendance/heatmap', [AnalyticsController::class, 'attendanceHeatmap']);
-                Route::get('/leaves/patterns',    [AnalyticsController::class, 'leavePatterns']);
-                Route::get('/tasks/performance',  [AnalyticsController::class, 'taskPerformance']);
-                Route::get('/employees/summary',  [AnalyticsController::class, 'employeeSummary']);
+                Route::get('/leaves/patterns', [AnalyticsController::class, 'leavePatterns']);
+                Route::get('/tasks/performance', [AnalyticsController::class, 'taskPerformance']);
+                Route::get('/employees/summary', [AnalyticsController::class, 'employeeSummary']);
             });
 
         // Audit log viewer
@@ -405,6 +406,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::middleware('permission:manage-settings')->group(function () {
             Route::get('/settings', [SettingsController::class, 'index']);
             Route::put('/settings', [SettingsController::class, 'update']);
+
+            // Latest SMS attempts with the carrier's answer, so a message
+            // that never arrived can be diagnosed without server access.
+            Route::get('/sms-logs', [SmsLogController::class, 'index']);
 
             // Picker lists (currencies, lead sources, industries, ...).
             Route::get('/option-lists', [OptionListController::class, 'adminIndex']);
@@ -431,7 +436,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Team roster the current user can assign tasks to — same team_id
     // members, or the caller alone when they have no team. Any auth user;
     // controller scopes by request->user()->employee->team_id.
-    Route::get('/me/team', [\App\Modules\Employees\Controllers\EmployeeController::class, 'myTeam']);
+    Route::get('/me/team', [EmployeeController::class, 'myTeam']);
 
     // Employee self-service profile — read, phone-only PATCH, password
     // rotation. Every write is scoped to $request->user()->employee at the

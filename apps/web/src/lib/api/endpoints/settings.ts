@@ -32,6 +32,18 @@ export type SettingsTestResult = {
   error?: string | null;
 };
 
+// One SMS attempt as the carrier answered it. The number is masked
+// server-side and the message body is never returned.
+export type SmsLogEntry = {
+  id: number;
+  to: string;
+  status: 'sent' | 'failed' | string;
+  error: string | null;
+  provider_message_id: string | null;
+  provider_response: string | null;
+  created_at: string | null;
+};
+
 export const settingsApi = {
   get: () => apiClient.get<{ data: SettingsPayload }>('/admin/settings'),
   update: (payload: SettingsUpdatePayload) =>
@@ -43,4 +55,7 @@ export const settingsApi = {
     apiClient.post<{ data: SettingsTestResult }>('/admin/settings/test/sms', { to }),
   testWhatsapp: (to: string) =>
     apiClient.post<{ data: SettingsTestResult }>('/admin/settings/test/whatsapp', { to }),
+
+  smsLogs: (limit = 20) =>
+    apiClient.get<{ data: SmsLogEntry[] }>('/admin/sms-logs', { params: { limit } }),
 };

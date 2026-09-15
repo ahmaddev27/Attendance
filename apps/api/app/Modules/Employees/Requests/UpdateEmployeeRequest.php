@@ -31,7 +31,7 @@ class UpdateEmployeeRequest extends FormRequest
                 'nullable', 'email', 'max:150',
                 Rule::unique('employees', 'email')->ignore($this->route('employee')),
             ],
-            'phone' => ['nullable', 'string', 'max:20'],
+            'phone' => ['nullable', 'string', 'max:20', 'regex:'.StoreEmployeeRequest::PHONE_PATTERN],
             'position_id' => ['nullable', 'integer', 'exists:positions,id'],
             'department_id' => ['nullable', 'integer', 'exists:departments,id'],
             'team_id' => ['nullable', 'integer', 'exists:teams,id'],
@@ -49,5 +49,13 @@ class UpdateEmployeeRequest extends FormRequest
             'status' => ['sometimes', new Enum(EmployeeStatus::class)],
             'notes' => ['nullable', 'string'],
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return ['phone.regex' => StoreEmployeeRequest::PHONE_MESSAGE];
     }
 }

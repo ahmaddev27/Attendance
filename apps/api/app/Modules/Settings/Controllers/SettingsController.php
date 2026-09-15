@@ -40,10 +40,12 @@ class SettingsController extends Controller
             ['key' => 'resend_key', 'label' => 'مفتاح Resend', 'encrypted' => true, 'type' => 'password'],
         ],
         'sms' => [
-            ['key' => 'mtc_username', 'label' => 'اسم مستخدم MTC'],
-            ['key' => 'mtc_password', 'label' => 'كلمة مرور MTC', 'encrypted' => true, 'type' => 'password'],
+            ['key' => 'mtc_username', 'label' => 'اسم مستخدم MTCSMS'],
+            ['key' => 'mtc_password', 'label' => 'كلمة مرور MTCSMS', 'encrypted' => true, 'type' => 'password'],
             ['key' => 'mtc_sender', 'label' => 'اسم المرسِل (Sender ID)'],
-            ['key' => 'mtc_endpoint', 'label' => 'MTC endpoint URL', 'type' => 'url'],
+            ['key' => 'mtc_endpoint', 'label' => 'رابط الإرسال (اتركه فارغاً لاستخدام https://int.mtcsms.com/sendsms.aspx)', 'type' => 'url'],
+            ['key' => 'default_country_code', 'label' => 'مقدمة الدولة للأرقام المحلية مثل 0599… (افتراضي 970)'],
+            ['key' => 'mtc_unicode_type', 'label' => 'قيمة type للرسائل العربية (افتراضي 1)'],
             ['key' => 'mtc_fake', 'label' => 'وضع الاختبار (Fake)', 'type' => 'boolean'],
         ],
         'whatsapp' => [
@@ -120,6 +122,8 @@ class SettingsController extends Controller
             // credentials in the request body, so plaintext HTTP would
             // leak them on the wire.
             'sms.mtc_endpoint' => ['nullable', 'string', 'url:https', 'max:500', $this->endpointHostRule()],
+            'sms.default_country_code' => ['nullable', 'string', 'regex:/^\+?\d{1,4}$/'],
+            'sms.mtc_unicode_type' => ['nullable', 'string', 'regex:/^\d$/'],
             'whatsapp' => 'array',
             'whatsapp.*' => 'nullable|string|max:500',
             // The WhatsApp endpoint isn't in the UI schema today but the
@@ -218,9 +222,11 @@ class SettingsController extends Controller
                         ->subject('اختبار إعدادات البريد — TAQAT');
                 },
             );
+
             return response()->json(['data' => ['ok' => true, 'message' => "تم إرسال بريد الاختبار إلى {$data['to']}"]]);
         } catch (Throwable $e) {
             Log::warning('[settings:test-mail] failed', ['error' => $e->getMessage(), 'to' => $data['to']]);
+
             return response()->json([
                 'data' => ['ok' => false, 'error' => $e->getMessage()],
                 'message' => 'تعذر إرسال البريد. تحقق من مفتاح Resend والعنوان.',
@@ -230,7 +236,8 @@ class SettingsController extends Controller
 
     /**
      * `POST /api/admin/settings/test/sms`
-     * Body: { to: "+9627XXXXXXXX" }
+     * Body: { to: "0599123456" } — local or international; SmsService
+     * converts it the same way it does for real sends.
      *
      * Uses SmsService::sendNow so the send runs inline (not queued) —
      * the admin can immediately see success/failure. Reads config through
@@ -267,6 +274,7 @@ class SettingsController extends Controller
                     'to' => $data['to'],
                     'raw_response' => $result->raw_response,
                 ]);
+
                 return response()->json([
                     'data' => [
                         'ok' => false,
@@ -290,6 +298,7 @@ class SettingsController extends Controller
             ]]);
         } catch (Throwable $e) {
             Log::warning('[settings:test-sms] failed', ['error' => $e->getMessage(), 'to' => $data['to']]);
+
             return response()->json([
                 'data' => ['ok' => false, 'error' => $e->getMessage()],
                 'message' => 'تعذر إرسال الرسالة. تحقق من إعدادات MTC.',
@@ -335,6 +344,7 @@ class SettingsController extends Controller
                     'to' => $data['to'],
                     'raw_response' => $result->raw_response,
                 ]);
+
                 return response()->json([
                     'data' => [
                         'ok' => false,
@@ -358,6 +368,7 @@ class SettingsController extends Controller
             ]]);
         } catch (Throwable $e) {
             Log::warning('[settings:test-whatsapp] failed', ['error' => $e->getMessage(), 'to' => $data['to']]);
+
             return response()->json([
                 'data' => ['ok' => false, 'error' => $e->getMessage()],
                 'message' => 'تعذر إرسال الرسالة. تحقق من إعدادات واتساب.',

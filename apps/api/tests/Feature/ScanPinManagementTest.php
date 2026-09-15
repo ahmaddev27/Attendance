@@ -14,6 +14,7 @@ use App\Modules\Sms\Contracts\SmsResult;
 use App\Modules\Sms\Jobs\SendSmsJob;
 use App\Shared\Enums\EmployeeStatus;
 use App\Shared\Enums\ScanPinSource;
+use App\Shared\Support\PhoneNumber;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Queue;
@@ -66,7 +67,8 @@ test('an admin reset returns a strong 4-digit pin once and stores only its hash'
 
     Queue::assertPushed(
         SendSmsJob::class,
-        fn (SendSmsJob $job): bool => $job->to === '0791234567' && str_contains($job->body, $pin),
+        // SmsService dials the international form of the stored local phone.
+        fn (SendSmsJob $job): bool => $job->to === '970791234567' && str_contains($job->body, $pin),
     );
 
     $audit = DB::table('activity_log')->where('description', 'scan_pin_reset')->sole();
@@ -117,7 +119,9 @@ test('the pin never reaches the sms log', function () {
         ->assertOk()
         ->json('data.pin');
 
-    $log = SmsLog::query()->where('to', '0791234567')->sole();
+    // The log records the number actually dialled: local phones are sent
+    // in international form (default country code 970).
+    $log = SmsLog::query()->where('to', '970791234567')->sole();
 
     expect($log->body)->toContain('[REDACTED]')
         ->and($log->body)->not->toContain($pin);
@@ -164,7 +168,9 @@ test('issue-missing only issues pins to active employees without one and reports
 
     Queue::pushed(SendSmsJob::class)->each(function (SendSmsJob $job): void {
         preg_match('/\d{4}/', $job->body, $matches);
-        $employee = Employee::query()->where('phone', $job->to)->sole();
+        // Jobs carry the international number; employees keep what was typed.
+        $employee = Employee::query()->whereNotNull('phone')->get()
+            ->sole(fn (Employee $candidate): bool => PhoneNumber::toInternational((string) $candidate->phone, '970') === $job->to);
 
         expect(Hash::check($matches[0], (string) EmployeeScanPin::query()->where('employee_id', $employee->id)->value('pin_hash')))->toBeTrue();
     });

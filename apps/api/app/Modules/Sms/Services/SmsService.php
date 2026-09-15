@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Modules\Sms\Services;
 
 use App\Models\SmsLog;
+use App\Modules\Settings\Services\SettingsService;
 use App\Modules\Sms\Contracts\SmsGateway;
 use App\Modules\Sms\Contracts\SmsResult;
 use App\Modules\Sms\Jobs\SendSmsJob;
+use App\Shared\Support\PhoneNumber;
 use App\Shared\Support\RedactsSensitiveText;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -27,14 +29,20 @@ use Throwable;
  *
  * Both funnel through the container-resolved SmsGateway so the concrete
  * transport (MTC vs fake) is a single binding switch in
- * AppServiceProvider.
+ * AppServiceProvider, and both convert the recipient to the international
+ * form the carrier dials: admins type local numbers (0599 123 456), and
+ * MTCSMS silently never delivered those.
  */
 final class SmsService
 {
     use RedactsSensitiveText;
 
+    /** MTCSMS is a Palestinian carrier; staff phones are 059/056 numbers. */
+    private const DEFAULT_COUNTRY_CODE = '970';
+
     public function __construct(
         private readonly SmsGateway $gateway,
+        private readonly SettingsService $settings,
     ) {}
 
     /**
@@ -44,7 +52,13 @@ final class SmsService
      */
     public function send(string $to, string $body): SmsResult
     {
-        SendSmsJob::dispatch($to, $body);
+        $recipient = $this->recipient($to);
+
+        if ($recipient === null) {
+            return $this->rejectUnusablePhone($to, $body);
+        }
+
+        SendSmsJob::dispatch($recipient, $body);
 
         return SmsResult::success(null, ['queued' => true]);
     }
@@ -57,11 +71,51 @@ final class SmsService
      */
     public function sendNow(string $to, string $body): SmsResult
     {
-        $result = $this->gateway->send($to, $body);
+        $recipient = $this->recipient($to);
 
+        if ($recipient === null) {
+            return $this->rejectUnusablePhone($to, $body);
+        }
+
+        $result = $this->gateway->send($recipient, $body);
+
+        $this->log($recipient, $body, $result);
+
+        return $result;
+    }
+
+    /**
+     * The country code for locally typed numbers is editable from the
+     * settings page, because the owner never touches the server env.
+     */
+    private function recipient(string $to): ?string
+    {
+        $countryCode = $this->settings->get(
+            'sms.default_country_code',
+            'services.mtc_sms.default_country_code',
+        ) ?: self::DEFAULT_COUNTRY_CODE;
+
+        return PhoneNumber::toInternational($to, $countryCode);
+    }
+
+    /**
+     * A phone that is not a number never reaches the carrier, but it is
+     * logged so the admin sees why the employee got nothing.
+     */
+    private function rejectUnusablePhone(string $to, string $body): SmsResult
+    {
+        $result = SmsResult::failure('invalid_phone');
+
+        $this->log($to, $body, $result);
+
+        return $result;
+    }
+
+    private function log(string $to, string $body, SmsResult $result): void
+    {
         try {
             // Persist the redacted body only — the raw copy still hit the
-            // carrier above. See SendSmsJob::writeLog for the same rule.
+            // carrier. See SendSmsJob::writeLog for the same rule.
             SmsLog::create([
                 'to' => $to,
                 'body' => $this->redactBody($body),
@@ -73,13 +127,11 @@ final class SmsService
         } catch (Throwable $e) {
             // Same rationale as SendSmsJob::writeLog: the SMS already
             // hit the carrier, a log-write failure must not raise.
-            Log::error('[SmsService::sendNow] log write failed', [
+            Log::error('[SmsService] log write failed', [
                 'to' => $to,
                 'sms_success' => $result->success,
                 'error' => $e->getMessage(),
             ]);
         }
-
-        return $result;
     }
 }

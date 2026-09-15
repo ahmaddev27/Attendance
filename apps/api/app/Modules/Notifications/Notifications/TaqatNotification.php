@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Notifications\Notifications;
 
 use App\Modules\Push\Notifications\Channels\PushChannel;
+use App\Modules\Settings\Services\SettingsService;
 use App\Modules\Sms\Notifications\Channels\SmsChannel;
 use App\Modules\Whatsapp\Notifications\Channels\WhatsappChannel;
 use Illuminate\Bus\Queueable;
@@ -65,32 +66,32 @@ class TaqatNotification extends Notification implements ShouldQueue
 
     /**
      * @param  array<string, mixed>  $meta  Optional structured payload
-     *                                       (leave_request_id, task_id, ...)
+     *                                      (leave_request_id, task_id, ...)
      * @param  bool  $suppressBroadcast  Set by NotificationService when the
-     *                                    same event was already broadcast to
-     *                                    the same recipient within the dedup
-     *                                    window — the DB row is still written
-     *                                    (durable inbox) but Reverb is skipped
-     *                                    to avoid toast/counter double-fires.
+     *                                   same event was already broadcast to
+     *                                   the same recipient within the dedup
+     *                                   window — the DB row is still written
+     *                                   (durable inbox) but Reverb is skipped
+     *                                   to avoid toast/counter double-fires.
      * @param  bool  $suppressMail  Opt-out for high-volume events (e.g. every
-     *                               approver on a step) that would otherwise
-     *                               flood inboxes. Database + broadcast still
-     *                               fire as usual.
+     *                              approver on a step) that would otherwise
+     *                              flood inboxes. Database + broadcast still
+     *                              fire as usual.
      * @param  bool  $sendSms  Opt-IN to also send this notification as an SMS
-     *                          via MTC. Defaults false because SMS costs money;
-     *                          only fires when MTC credentials are configured
-     *                          and the recipient's employee has a phone.
+     *                         via MTC. Defaults false because SMS costs money;
+     *                         only fires when MTC credentials are configured
+     *                         and the recipient's employee has a phone.
      * @param  bool  $sendWhatsapp  Opt-IN to also send this notification over
-     *                               WhatsApp via Meta's Cloud API. Defaults
-     *                               false; only fires when WhatsApp
-     *                               credentials are configured (or the fake
-     *                               driver is on) AND the recipient's employee
-     *                               has a phone.
+     *                              WhatsApp via Meta's Cloud API. Defaults
+     *                              false; only fires when WhatsApp
+     *                              credentials are configured (or the fake
+     *                              driver is on) AND the recipient's employee
+     *                              has a phone.
      * @param  bool  $sendPush  Opt-IN to also send this notification as a
-     *                           mobile push via Expo. Defaults false; only
-     *                           fires when the recipient has at least one
-     *                           registered push_tokens row (the mobile app
-     *                           writes one on login and clears it on logout).
+     *                          mobile push via Expo. Defaults false; only
+     *                          fires when the recipient has at least one
+     *                          registered push_tokens row (the mobile app
+     *                          writes one on login and clears it on logout).
      */
     public function __construct(
         public readonly string $title,
@@ -182,8 +183,11 @@ class TaqatNotification extends Notification implements ShouldQueue
      */
     private function smsIsSendable(mixed $notifiable): bool
     {
-        $hasCredentials = ! empty(config('services.mtc_sms.username'))
-            || (bool) config('services.mtc_sms.fake', false);
+        // Read through SettingsService: the owner saves the MTC account on
+        // the settings page, and a config-only check ignored it.
+        $settings = app(SettingsService::class);
+        $hasCredentials = ! empty($settings->get('sms.mtc_username', 'services.mtc_sms.username'))
+            || filter_var($settings->get('sms.mtc_fake', 'services.mtc_sms.fake'), FILTER_VALIDATE_BOOLEAN);
 
         if (! $hasCredentials) {
             return false;
@@ -249,15 +253,15 @@ class TaqatNotification extends Notification implements ShouldQueue
      */
     public function toMail(mixed $notifiable): MailMessage
     {
-        $mail = (new MailMessage())
+        $mail = (new MailMessage)
             ->subject($this->title)
-            ->greeting('مرحبًا ' . ($notifiable->name ?? ''))
+            ->greeting('مرحبًا '.($notifiable->name ?? ''))
             ->line($this->body ?? '');
 
         if ($this->url !== null && $this->url !== '') {
             // Deep-link back into the frontend SPA. APP_URL is expected to
             // point at the FE origin (config/app.php reads it from env).
-            $mail->action('عرض التفاصيل', rtrim((string) config('app.url'), '/') . $this->url);
+            $mail->action('عرض التفاصيل', rtrim((string) config('app.url'), '/').$this->url);
         }
 
         return $mail

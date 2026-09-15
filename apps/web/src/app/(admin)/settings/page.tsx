@@ -11,6 +11,7 @@ import {
   MessageCircle,
   MessageSquareText,
   PlugZap,
+  RefreshCw,
   Save,
   Send,
   Settings,
@@ -28,6 +29,7 @@ import {
   settingsApi,
   type SettingField,
   type SettingsUpdatePayload,
+  type SmsLogEntry,
 } from '@/lib/api/endpoints/settings';
 
 type TestKind = 'mail' | 'sms' | 'whatsapp';
@@ -189,8 +191,8 @@ export default function SettingsPage() {
               )}
               {'sms' in data && (
                 <SettingsGroup
-                  title="الرسائل النصية (MTC SMS)"
-                  description="بيانات الاعتماد لبوابة MTC Jordan."
+                  title="الرسائل النصية (MTCSMS)"
+                  description="بيانات حسابك في MTCSMS. الأرقام المحلية مثل 0599… تُرسَل تلقائياً بالصيغة الدولية."
                   icon={<MessageSquareText className="h-4 w-4 text-brand" />}
                   fields={data.sms}
                   values={formState.sms ?? {}}
@@ -198,8 +200,8 @@ export default function SettingsPage() {
                   test={{
                     kind: 'sms',
                     label: 'أرسل SMS اختبار',
-                    inputLabel: 'رقم الجوّال (مثال: 962791234567)',
-                    inputPlaceholder: '9627XXXXXXXX',
+                    inputLabel: 'رقم الجوّال (محلي 0599123456 أو دولي 970599123456)',
+                    inputPlaceholder: '0599123456',
                     inputType: 'tel',
                   }}
                 />
@@ -243,6 +245,8 @@ export default function SettingsPage() {
               )}
             </div>
           )}
+
+          {data && 'sms' in data && <SmsLogsCard />}
         </TabsContent>
 
         <TabsContent value="lists">
@@ -375,6 +379,101 @@ function TestSender({ test }: { test: TestConfig }) {
         الاختبار يستخدم الإعدادات المحفوظة حالياً — احفظ التغييرات أوّلاً ثم اختبر.
       </p>
     </div>
+  );
+}
+
+/** Plain-language reading of the error codes the API stores per attempt. */
+function smsErrorHint(error: string | null): string | null {
+  if (!error) return null;
+  if (error === 'invalid_phone') return 'رقم الهاتف غير صالح';
+  if (error.startsWith('exception:')) return 'تعذّر الاتصال بمزوّد الرسائل';
+  if (error.startsWith('http_')) return `ردّ المزوّد برمز HTTP ${error.slice('http_'.length)}`;
+  if (error.startsWith('provider_')) return `رفض المزوّد الرسالة (رمز ${error.slice('provider_'.length)})`;
+  return error;
+}
+
+/**
+ * The latest SMS attempts as MTCSMS answered them. Admins have no access
+ * to the server log, so this is where "the employee never got the SMS"
+ * gets explained (bad number, rejected account, unreachable provider).
+ */
+function SmsLogsCard() {
+  const { data, isLoading, isError, isFetching, refetch } = useQuery({
+    queryKey: ['admin', 'sms-logs'],
+    queryFn: async () => (await settingsApi.smsLogs(20)).data.data,
+  });
+
+  return (
+    <Card className="border-hairline bg-surface p-5">
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h2 className="text-base font-semibold text-ink">آخر رسائل SMS</h2>
+          <p className="text-xs text-muted">
+            حالة آخر 20 رسالة كما ردّ عليها المزوّد — راجعها إذا لم تصل رسالة لموظف.
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => refetch()}
+          disabled={isFetching}
+          className="gap-1"
+        >
+          <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} /> تحديث
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <Skeleton className="h-24 w-full" />
+      ) : isError ? (
+        <p className="text-sm text-danger">تعذّر تحميل سجل الرسائل.</p>
+      ) : !data || data.length === 0 ? (
+        <p className="text-sm text-muted">لم تُرسَل أي رسالة بعد.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-hairline text-xs text-muted">
+                <th className="py-2 text-start font-medium">الوقت</th>
+                <th className="py-2 text-start font-medium">الرقم</th>
+                <th className="py-2 text-start font-medium">الحالة</th>
+                <th className="py-2 text-start font-medium">التفاصيل</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((log: SmsLogEntry) => (
+                <tr key={log.id} className="border-b border-hairline align-top last:border-0">
+                  <td className="num whitespace-nowrap py-2 text-xs text-muted" dir="ltr">
+                    {log.created_at
+                      ? new Date(log.created_at).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' })
+                      : '—'}
+                  </td>
+                  <td className="num whitespace-nowrap py-2" dir="ltr">{log.to}</td>
+                  <td className="py-2">
+                    <span
+                      className={
+                        log.status === 'sent'
+                          ? 'rounded bg-success-soft px-1.5 py-0.5 text-xs font-medium text-success'
+                          : 'rounded bg-danger-soft px-1.5 py-0.5 text-xs font-medium text-danger'
+                      }
+                    >
+                      {log.status === 'sent' ? 'قُبلت' : 'فشلت'}
+                    </span>
+                  </td>
+                  <td className="py-2 text-xs text-ink-2">
+                    {smsErrorHint(log.error) && <div>{smsErrorHint(log.error)}</div>}
+                    {log.provider_response && (
+                      <div className="text-muted" dir="ltr">{log.provider_response}</div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
   );
 }
 

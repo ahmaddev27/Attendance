@@ -257,6 +257,22 @@ test('a login user already holding the next number does not block the create', f
         ->assertJsonPath('data.employee_number', 2);
 });
 
+test('an employee phone must look like a phone number', function () {
+    $payload = [
+        'first_name' => 'Omar',
+        'last_name' => 'Saleh',
+        'employment_type' => 'full_time',
+        'joining_date' => '2026-09-01',
+        'work_schedule_id' => WorkSchedule::factory()->create()->id,
+    ];
+
+    $this->postJson('/api/employees', [...$payload, 'phone' => 'call me'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('phone');
+
+    $this->postJson('/api/employees', [...$payload, 'phone' => '+970 599-123-456'])->assertCreated();
+});
+
 test('the reserved system number range does not push new hires past it', function () {
     Employee::factory()->create(['employee_number' => 900000]);
     Employee::factory()->create(['employee_number' => 41]);
