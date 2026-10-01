@@ -410,8 +410,50 @@ export type UpdateMyPasswordPayload = {
 };
 
 // ---------------------------------------------------------------------------
-// Organization structure — departments, teams, positions
+// Organization structure — companies, departments, teams, positions
 // ---------------------------------------------------------------------------
+
+export type Company = {
+  id: number;
+  name: string;
+  logo_url: string | null;
+  timezone: string;
+  settings: Record<string, unknown>;
+  departments_count?: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type CompanyInput = {
+  name: string;
+  timezone?: string | null;
+  settings?: Record<string, unknown> | null;
+};
+
+export type CompanyListParams = {
+  page?: number;
+  per_page?: number;
+  search?: string;
+};
+
+export type CompanyTreeTeam = {
+  id: number;
+  name: string;
+  employee_count: number;
+};
+
+export type CompanyTreeDepartment = {
+  id: number;
+  name: string;
+  teams: CompanyTreeTeam[];
+};
+
+export type CompanyTreeNode = {
+  id: number;
+  name: string;
+  logo_url: string | null;
+  departments: CompanyTreeDepartment[];
+};
 
 export type Department = {
   id: number;

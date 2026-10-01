@@ -76,6 +76,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'الأشخاص',
     items: [
       { href: '/employees', label: 'الموظفون', icon: Users, permissions: ['manage-users'] },
+      { href: '/organization/companies', label: 'الشركات', icon: Building2, permissions: ['manage-settings'] },
       { href: '/organization/departments', label: 'الأقسام', icon: Building, permissions: ['manage-departments'] },
       { href: '/organization/teams', label: 'الفرق', icon: UsersRound, permissions: ['manage-departments'] },
       { href: '/organization/positions', label: 'المسميات الوظيفية', icon: Briefcase, permissions: ['manage-departments'] },

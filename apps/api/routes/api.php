@@ -19,6 +19,7 @@ use App\Modules\Leaves\Controllers\LeaveBalanceController;
 use App\Modules\Leaves\Controllers\LeaveRequestController;
 use App\Modules\Leaves\Controllers\LeaveTypeController;
 use App\Modules\Notifications\Controllers\MyNotificationsController;
+use App\Modules\Organization\Controllers\CompanyController;
 use App\Modules\Organization\Controllers\DepartmentController;
 use App\Modules\Organization\Controllers\PositionController;
 use App\Modules\Organization\Controllers\TeamController;
@@ -115,6 +116,19 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::apiResource('teams', TeamController::class);
             Route::apiResource('positions', PositionController::class);
         });
+    });
+
+    // Companies are platform-level config (one row today, multi-tenant
+    // later) so they are gated behind `manage-settings` rather than any
+    // per-employee permission — a department manager shouldn't be able
+    // to rename or delete the company they work in. The `tree` endpoint
+    // powers the "org structure" viewer; registered BEFORE the
+    // {company} route so Laravel never binds "tree" as a company id.
+    Route::middleware('permission:manage-settings')->group(function () {
+        Route::get('/companies/tree', [CompanyController::class, 'tree']);
+        Route::apiResource('companies', CompanyController::class);
+        Route::post('/companies/{company}/logo', [CompanyController::class, 'uploadLogo']);
+        Route::delete('/companies/{company}/logo', [CompanyController::class, 'removeLogo']);
     });
 
     Route::middleware('permission:manage-users')->group(function () {

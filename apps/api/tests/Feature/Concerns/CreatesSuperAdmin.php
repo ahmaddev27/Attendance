@@ -48,6 +48,7 @@ trait CreatesSuperAdmin
             'manage-workflows',
             'view-reports',
             'view-audit-logs',
+            'manage-settings',
         ] as $permissionName) {
             Permission::findOrCreate($permissionName, 'web');
         }

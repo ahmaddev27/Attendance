@@ -88,6 +88,7 @@ function actingAsAdmin(): User
         'manage-workflows',
         'view-reports',
         'view-audit-logs',
+        'manage-settings',
     ] as $p) {
         \Spatie\Permission\Models\Permission::findOrCreate($p, 'web');
     }
