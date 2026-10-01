@@ -199,17 +199,46 @@ export function ScanPinsDialog({ open, onOpenChange }: ScanPinsDialogProps) {
               )}
 
               {issueResult && (
-                <p className="rounded-md bg-success-soft p-3 text-xs text-success">
-                  تم إصدار <span className="num font-semibold">{issueResult.issued}</span> رمز، وجُدولت{' '}
-                  <span className="num font-semibold">{issueResult.sms_queued}</span> رسالة SMS.
-                  {issueResult.without_phone > 0 && (
-                    <>
-                      {' '}
-                      <span className="num font-semibold">{issueResult.without_phone}</span> موظف بلا رقم جوال —
-                      أعد تعيين رموزهم من قائمة الموظفين لتسليمها يدوياً.
-                    </>
+                <div className="space-y-2 rounded-md bg-success-soft p-3 text-xs text-success">
+                  <p>
+                    تم إصدار <span className="num font-semibold">{issueResult.issued}</span> رمز، وجُدولت{' '}
+                    <span className="num font-semibold">{issueResult.sms_queued}</span> رسالة SMS.
+                    {issueResult.without_phone > 0 && (
+                      <>
+                        {' '}
+                        <span className="num font-semibold">{issueResult.without_phone}</span> موظف بلا رقم جوال —
+                        أعد تعيين رموزهم من قائمة الموظفين لتسليمها يدوياً.
+                      </>
+                    )}
+                  </p>
+                  {/*
+                    Bridge between step 1 (issue) and step 2 (enforce) — otherwise
+                    a first-time admin issues the PINs, sees "success", closes the
+                    dialog, and never flips the switch, so the kiosk still accepts
+                    employee_number only. One click promotes the force-enable
+                    confirmation (which is the right path when without_phone > 0)
+                    or flips the switch directly when every active employee now
+                    has a PIN.
+                  */}
+                  {!summary.required && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      // The summary was refetched after a successful issue
+                      // (invalidateQueries), so summary.without_pin now
+                      // reflects what's STILL missing — anyone the issue
+                      // couldn't reach because they had no phone. If any
+                      // remain, route through the force-enable guard; if
+                      // every active employee is covered, flip directly.
+                      onClick={() => handleEnforcementChange(true)}
+                      disabled={busy}
+                      className="w-full gap-2 bg-success text-white hover:bg-success/90"
+                    >
+                      {enforcementMutation.isPending && <Spinner className="text-white" />}
+                      فعّل طلب رمز الحضور الآن
+                    </Button>
                   )}
-                </p>
+                </div>
               )}
             </section>
 
