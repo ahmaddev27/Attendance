@@ -6,6 +6,7 @@ import { Menu, Search } from 'lucide-react';
 
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { SidebarNav, UserFooter } from '@/components/layout/admin-sidebar';
+import { CompanySwitcher } from '@/components/layout/company-switcher';
 import { NotificationBell } from '@/components/notifications/notification-bell';
 import { GlobalSearch, useGlobalSearchTrigger } from '@/components/search/global-search';
 
@@ -56,6 +57,12 @@ export function AdminHeader() {
           priority
         />
       </div>
+
+      {/* Soft Company Scoping switcher — sits before the search/bell group
+          so the admin's "which company am I viewing" context is adjacent
+          to the brand, not the alerts. Hidden by the component itself
+          when the viewer lacks `view-clients` or no companies exist. */}
+      <CompanySwitcher />
 
       {/* Global search trigger — sits just before the bell at the reading
           end. Cmd/Ctrl+K also opens it via the hook. */}

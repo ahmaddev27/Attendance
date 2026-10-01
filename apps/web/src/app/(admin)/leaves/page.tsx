@@ -40,6 +40,7 @@ import { reportsApi } from '@/lib/api/endpoints/reports';
 import { formatDate } from '@/lib/attendance-format';
 import { LEAVE_STATUS_OPTIONS } from '@/lib/constants/leave-options';
 import { hasPermission, useAuthStore } from '@/lib/stores/auth-store';
+import { useScopedCompanyId } from '@/lib/stores/company-scope-store';
 import type { EmployeeSummary, LeaveRequest, LeaveStatus } from '@/lib/api/types';
 
 const PER_PAGE = 20;
@@ -60,6 +61,10 @@ export default function LeavesPage() {
   const [rejectTarget, setRejectTarget] = React.useState<LeaveRequest | null>(null);
   const [viewTarget, setViewTarget] = React.useState<LeaveRequest | null>(null);
 
+  // Soft Company Scoping — reads the shared switcher state; the query
+  // refetches automatically when the admin picks a different company.
+  const scopedCompanyId = useScopedCompanyId();
+
   const filters = {
     // The backend repository treats an unknown status as "match nothing";
     // 'all' is a UI-only sentinel and must be dropped before the request.
@@ -68,11 +73,12 @@ export default function LeavesPage() {
     employee_id: employee?.id,
     start_date: from || undefined,
     end_date: to || undefined,
+    company_id: scopedCompanyId ?? undefined,
   };
 
   React.useEffect(() => {
     setPage(1);
-  }, [status, leaveTypeId, employee?.id, from, to]);
+  }, [status, leaveTypeId, employee?.id, from, to, scopedCompanyId]);
 
   const { data: leaveTypes } = useQuery({
     queryKey: ['leave-types', 'filter-options'],

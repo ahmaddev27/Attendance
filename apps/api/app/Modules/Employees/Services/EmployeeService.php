@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Employees\Services;
 
 use App\Models\Employee;
+use App\Models\Team;
 use App\Models\User;
 use App\Modules\Employees\Repositories\EmployeeRepository;
 use App\Modules\Leaves\Services\LeaveBalanceService;
@@ -63,6 +64,10 @@ class EmployeeService
         // client-supplied value here, even if one slipped through.
         unset($data['employee_number']);
 
+        // Keep company_id consistent with team_id without surprising
+        // callers who want to pin a specific company explicitly.
+        $data = $this->syncCompanyIdFromTeam($data);
+
         $result = DB::transaction(function () use ($data) {
             $data['employee_number'] = $this->employees->nextEmployeeNumberForUpdate();
 
@@ -116,6 +121,11 @@ class EmployeeService
         if (array_key_exists('direct_manager_id', $data) && $data['direct_manager_id'] !== null) {
             $this->assertManagerIsNotSelf($employee, (int) $data['direct_manager_id']);
         }
+
+        // Re-derive company_id whenever the caller changed team_id but
+        // left company_id to inference. An explicit company_id on the
+        // payload always wins.
+        $data = $this->syncCompanyIdFromTeam($data);
 
         return $this->employees->update($employee, $data);
     }
@@ -183,6 +193,47 @@ class EmployeeService
             'user_created' => $user->wasRecentlyCreated,
             'identifier' => $user->email ?: (string) $user->employee_number,
         ];
+    }
+
+    /**
+     * Normalise company_id so the Soft Company Scoping filters stay
+     * accurate. If the caller supplied `company_id` explicitly, we leave
+     * it alone — an admin may need to pin an unassigned employee to a
+     * company before giving them a team. Otherwise, when `team_id` is
+     * set, pull the owning company id from team.department and write it
+     * through so the Companies-scope filter indexes it directly on
+     * employees.company_id.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function syncCompanyIdFromTeam(array $data): array
+    {
+        if (array_key_exists('company_id', $data)) {
+            return $data;
+        }
+
+        if (! array_key_exists('team_id', $data)) {
+            return $data;
+        }
+
+        $teamId = $data['team_id'];
+        if ($teamId === null || $teamId === '') {
+            $data['company_id'] = null;
+
+            return $data;
+        }
+
+        $companyId = Team::query()
+            ->whereKey($teamId)
+            ->with('department:id,company_id')
+            ->first()?->department?->company_id;
+
+        if ($companyId !== null) {
+            $data['company_id'] = $companyId;
+        }
+
+        return $data;
     }
 
     private function assertManagerIsNotSelf(Employee $employee, int $managerId): void

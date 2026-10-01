@@ -22,6 +22,7 @@ import { departmentsApi } from '@/lib/api/endpoints/departments';
 import { employeesApi } from '@/lib/api/endpoints/employees';
 import { teamsApi } from '@/lib/api/endpoints/teams';
 import { hasPermission, useAuthStore } from '@/lib/stores/auth-store';
+import { useScopedCompanyId } from '@/lib/stores/company-scope-store';
 import type { Employee, EmployeeStatus } from '@/lib/api/types';
 import { EMPLOYEE_STATUS_OPTIONS } from '@/lib/constants/employee-options';
 import { ROLE_OPTIONS } from '@/lib/constants/request-options';
@@ -98,11 +99,15 @@ export default function EmployeesPage() {
   const [roleEmployee, setRoleEmployee] = React.useState<Employee | null>(null);
 
   const debouncedSearch = useDebouncedValue(search);
+  // Soft Company Scoping — the header switcher writes to this store; the
+  // list refetches automatically because scopedCompanyId is part of the
+  // query key below.
+  const scopedCompanyId = useScopedCompanyId();
 
   // Any filter change invalidates the current page number.
   React.useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, departmentId, teamId, status]);
+  }, [debouncedSearch, departmentId, teamId, status, scopedCompanyId]);
 
   const { data: departments } = useQuery({
     queryKey: ['departments', 'filter-options'],
@@ -122,12 +127,13 @@ export default function EmployeesPage() {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ['employees', 'list', { page, search: debouncedSearch, departmentId, teamId, status }],
+    queryKey: ['employees', 'list', { page, search: debouncedSearch, departmentId, teamId, status, scopedCompanyId }],
     queryFn: async () => {
       const { data } = await employeesApi.list({
         page,
         per_page: PER_PAGE,
         search: debouncedSearch || undefined,
+        company_id: scopedCompanyId ?? undefined,
         department_id: departmentId ? Number(departmentId) : undefined,
         team_id: teamId ? Number(teamId) : undefined,
         status: status as EmployeeStatus | undefined,

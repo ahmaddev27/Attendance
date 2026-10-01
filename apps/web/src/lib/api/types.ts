@@ -368,6 +368,9 @@ export type EmployeeInput = {
   phone?: string | null;
   department_id: number | null;
   team_id?: number | null;
+  // Soft Company Scoping: usually derived server-side from team.department;
+  // callers may pin it explicitly when the employee has no team yet.
+  company_id?: number | null;
   position_id?: number | null;
   work_schedule_id?: number | null;
   employment_type: EmploymentType;
@@ -380,6 +383,10 @@ export type EmployeeListParams = {
   page?: number;
   per_page?: number;
   search?: string;
+  // Soft Company Scoping: optional admin filter. Normally supplied by
+  // the Company Switcher via useScopedCompanyId(); any explicit
+  // department/team filter is still ANDed on top.
+  company_id?: number;
   department_id?: number;
   team_id?: number;
   position_id?: number;
@@ -606,6 +613,9 @@ export type LeaveRequestListParams = {
   page?: number;
   per_page?: number;
   employee_id?: number;
+  // Soft Company Scoping: optional admin filter. Normally supplied by
+  // the Company Switcher via useScopedCompanyId().
+  company_id?: number;
   leave_type_id?: number;
   status?: LeaveStatus;
   start_date?: string;
@@ -756,6 +766,9 @@ export type TaskListParams = {
   per_page?: number;
   assigned_to?: number;
   created_by?: number;
+  // Soft Company Scoping: optional admin filter. Matched when EITHER
+  // the task's creator OR its assignee belongs to the given company.
+  company_id?: number;
   status_id?: number;
   priority_id?: number;
   tag_id?: number;
@@ -920,6 +933,9 @@ export type RequestListParams = {
   status?: RequestStatus;
   request_type_id?: number;
   employee_id?: number;
+  // Soft Company Scoping: optional admin filter. Normally supplied by
+  // the Company Switcher via useScopedCompanyId().
+  company_id?: number;
   from?: string;
   to?: string;
 };

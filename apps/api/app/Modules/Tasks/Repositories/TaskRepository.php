@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tasks\Repositories;
 
+use App\Models\Employee;
 use App\Models\Task;
 use App\Models\TaskStatus;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -257,6 +258,23 @@ class TaskRepository
             } else {
                 $query->where('parent_task_id', $value);
             }
+        }
+
+        // Soft Company Scoping: a task is "in" a company when its creator
+        // OR its assignee belongs to that company. Either match keeps the
+        // card visible when the admin filters by company — this is kinder
+        // than requiring both, because cross-company tasks (an HR
+        // super-admin created a task for a specific company's manager)
+        // would otherwise drop out of both companies' lists.
+        if (! empty($filters['company_id'])) {
+            $employeeSubquery = Employee::withTrashed()
+                ->select('id')
+                ->where('company_id', $filters['company_id']);
+
+            $query->where(function (Builder $q) use ($employeeSubquery): void {
+                $q->whereIn('created_by', (clone $employeeSubquery))
+                    ->orWhereIn('assigned_to', (clone $employeeSubquery));
+            });
         }
     }
 

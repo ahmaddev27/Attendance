@@ -38,7 +38,7 @@ class AttendanceReportService
      *   late_minutes: int,
      * }>
      */
-    public function monthly(int $year, int $month, ?int $departmentId = null, ?int $employeeId = null): Collection
+    public function monthly(int $year, int $month, ?int $departmentId = null, ?int $employeeId = null, ?int $companyId = null): Collection
     {
         $start = Carbon::create($year, $month, 1)->startOfDay();
         $end = $start->copy()->endOfMonth();
@@ -57,6 +57,12 @@ class AttendanceReportService
             ->when($departmentId, function ($q) use ($departmentId): void {
                 $q->whereHas('employee', fn ($eq) => $eq->where('department_id', $departmentId));
             })
+            ->when($companyId, function ($q) use ($companyId): void {
+                // whereHas against the (soft-deletable) employee rows so a
+                // termination mid-period doesn't erase the aggregate for
+                // the former employee's company.
+                $q->whereHas('employee', fn ($eq) => $eq->withTrashed()->where('company_id', $companyId));
+            })
             ->when($employeeId, fn ($q) => $q->where('employee_id', $employeeId))
             ->groupBy('employee_id', 'status')
             ->get();
@@ -69,6 +75,7 @@ class AttendanceReportService
             ->staffOnly()
             ->with('department:id,name')
             ->when($departmentId, fn ($q) => $q->where('department_id', $departmentId))
+            ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
             ->when($employeeId, fn ($q) => $q->where('id', $employeeId))
             ->whereIn('id', $rows->pluck('employee_id')->unique())
             ->get()

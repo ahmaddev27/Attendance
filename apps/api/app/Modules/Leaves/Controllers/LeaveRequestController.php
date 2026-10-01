@@ -38,7 +38,11 @@ class LeaveRequestController extends Controller
 
     public function index(Request $request): AnonymousResourceCollection
     {
-        $filters = $request->only(['employee_id', 'leave_type_id', 'status', 'start_date', 'end_date']);
+        $request->validate([
+            'company_id' => ['nullable', 'integer', 'exists:companies,id'],
+        ]);
+
+        $filters = $request->only(['employee_id', 'leave_type_id', 'status', 'start_date', 'end_date', 'company_id']);
         $perPage = (int) $request->integer('per_page', self::DEFAULT_PER_PAGE);
 
         return LeaveRequestResource::collection($this->leaveRequests->listAdmin($filters, $perPage));

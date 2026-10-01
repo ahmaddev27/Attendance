@@ -121,5 +121,16 @@ class RequestRepository
         if (! empty($filters['to'])) {
             $query->where('submitted_at', '<', Carbon::parse($filters['to'])->addDay());
         }
+
+        // Soft Company Scoping: subquery over employees — the admin
+        // "scope to one company" filter leaves rows authored by employees
+        // of other companies out of the list. A subquery keeps the
+        // eager-loaded relations unambiguous (no column collisions).
+        if (! empty($filters['company_id'])) {
+            $query->whereIn(
+                'employee_id',
+                Employee::withTrashed()->select('id')->where('company_id', $filters['company_id']),
+            );
+        }
     }
 }

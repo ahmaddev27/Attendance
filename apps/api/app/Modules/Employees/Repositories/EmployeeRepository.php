@@ -132,7 +132,7 @@ class EmployeeRepository
      */
     private function applyFilters(Builder $query, array $filters): void
     {
-        foreach (['department_id', 'team_id', 'position_id', 'status', 'employment_type', 'direct_manager_id'] as $field) {
+        foreach (['company_id', 'department_id', 'team_id', 'position_id', 'status', 'employment_type', 'direct_manager_id'] as $field) {
             if (array_key_exists($field, $filters) && $filters[$field] !== null && $filters[$field] !== '') {
                 $query->where($field, $filters[$field]);
             }

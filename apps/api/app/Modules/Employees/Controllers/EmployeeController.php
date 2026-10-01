@@ -26,7 +26,7 @@ class EmployeeController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         $filters = $request->only([
-            'search', 'department_id', 'team_id', 'position_id',
+            'search', 'company_id', 'department_id', 'team_id', 'position_id',
             'status', 'employment_type', 'direct_manager_id',
         ]);
 

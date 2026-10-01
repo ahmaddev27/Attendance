@@ -39,23 +39,23 @@ class AdminDashboardService
      *   tasks: array{open: int, in_progress: int, overdue: int},
      * }
      */
-    public function kpis(?CarbonImmutable $today = null): array
+    public function kpis(?CarbonImmutable $today = null, ?int $companyId = null): array
     {
         $today ??= CarbonImmutable::now()->startOfDay();
         $todayDate = $today->toDateString();
 
         return [
-            'employees' => $this->employeeCounts(),
-            'today' => $this->todayAttendance($todayDate),
-            'pending' => $this->pendingApprovals(),
-            'tasks' => $this->taskCounts($today),
+            'employees' => $this->employeeCounts($companyId),
+            'today' => $this->todayAttendance($todayDate, $companyId),
+            'pending' => $this->pendingApprovals($companyId),
+            'tasks' => $this->taskCounts($today, $companyId),
         ];
     }
 
     /**
      * @return array{total: int, active: int, inactive: int}
      */
-    private function employeeCounts(): array
+    private function employeeCounts(?int $companyId): array
     {
         // Single grouped query — one row per EmployeeStatus value (active,
         // inactive, on_leave, terminated). We collapse everything that
@@ -64,6 +64,7 @@ class AdminDashboardService
         // "temporarily not around" rather than a separate cohort.
         $rows = Employee::query()
             ->staffOnly()
+            ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
             ->selectRaw('status, COUNT(*) as c')
             ->groupBy('status')
             ->pluck('c', 'status');
@@ -81,10 +82,16 @@ class AdminDashboardService
     /**
      * @return array{date: string, present: int, late: int, absent: int, on_leave: int}
      */
-    private function todayAttendance(string $todayDate): array
+    private function todayAttendance(string $todayDate, ?int $companyId): array
     {
         $counts = Attendance::query()
             ->where('date', $todayDate)
+            ->when($companyId, function ($q) use ($companyId): void {
+                $q->whereIn(
+                    'employee_id',
+                    Employee::withTrashed()->select('id')->where('company_id', $companyId),
+                );
+            })
             ->selectRaw('status, COUNT(*) as c')
             ->groupBy('status')
             ->pluck('c', 'status');
@@ -104,14 +111,26 @@ class AdminDashboardService
     /**
      * @return array{leaves: int, requests: int, total: int}
      */
-    private function pendingApprovals(): array
+    private function pendingApprovals(?int $companyId): array
     {
+        $employeeFilter = static function ($q) use ($companyId): void {
+            if ($companyId === null) {
+                return;
+            }
+            $q->whereIn(
+                'employee_id',
+                Employee::withTrashed()->select('id')->where('company_id', $companyId),
+            );
+        };
+
         $leaves = LeaveRequest::query()
             ->where('status', LeaveStatus::Pending->value)
+            ->tap($employeeFilter)
             ->count();
 
         $requests = RequestModel::query()
             ->where('status', RequestStatus::Pending->value)
+            ->tap($employeeFilter)
             ->count();
 
         return [
@@ -124,7 +143,7 @@ class AdminDashboardService
     /**
      * @return array{open: int, in_progress: int, overdue: int}
      */
-    private function taskCounts(CarbonImmutable $today): array
+    private function taskCounts(CarbonImmutable $today, ?int $companyId): array
     {
         // A task is "open" when:
         //   • its status is not a done/cancelled state, AND
@@ -139,6 +158,13 @@ class AdminDashboardService
             ->whereNull('completed_at')
             ->whereHas('status', function ($q): void {
                 $q->where('is_done_state', false)->where('is_cancelled_state', false);
+            })
+            ->when($companyId, function ($q) use ($companyId): void {
+                $companyEmployees = Employee::withTrashed()->select('id')->where('company_id', $companyId);
+                $q->where(function ($w) use ($companyEmployees): void {
+                    $w->whereIn('created_by', (clone $companyEmployees))
+                        ->orWhereIn('assigned_to', (clone $companyEmployees));
+                });
             });
 
         $open = (clone $baseOpen)->count();

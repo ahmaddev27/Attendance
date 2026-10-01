@@ -50,11 +50,16 @@ class AttendanceRepository
     }
 
     /**
+     * @param  array{company_id?: int|null}  $filters  Only `company_id` is
+     *   honored today — the attendance rows must be filtered down to
+     *   employees belonging to the given company before the single-
+     *   employee range check runs. Everything else is still scoped to the
+     *   passed Employee.
      * @return Collection<int, Attendance>
      */
-    public function forEmployeeInRange(Employee $employee, Carbon $start, Carbon $end): Collection
+    public function forEmployeeInRange(Employee $employee, Carbon $start, Carbon $end, array $filters = []): Collection
     {
-        return Attendance::query()
+        $query = Attendance::query()
             ->where('employee_id', $employee->id)
             // Bare where() on the DATE column so MySQL keeps the
             // UNIQUE(employee_id, date) index — DATE()-wrapping via
@@ -62,16 +67,19 @@ class AttendanceRepository
             // pure 'Y-m-d' value so bare string comparisons range-scan
             // cleanly on both MySQL and SQLite.
             ->where('date', '>=', $start->toDateString())
-            ->where('date', '<=', $end->toDateString())
-            ->get();
+            ->where('date', '<=', $end->toDateString());
+
+        $this->applyCompanyScope($query, $filters);
+
+        return $query->get();
     }
 
     /**
-     * @param  array{employee_id?: int, status?: string, date_from?: string, date_to?: string}  $filters
+     * @param  array{employee_id?: int, status?: string, date_from?: string, date_to?: string, company_id?: int|null}  $filters
      */
     public function paginate(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        return Attendance::query()
+        $query = Attendance::query()
             // withTrashed() on the `employee` relation so historical
             // attendance rows keep showing the former employee's name
             // instead of collapsing to null when the person leaves and
@@ -88,8 +96,31 @@ class AttendanceRepository
             // Bare where() so the composite (employee_id, status, date)
             // index actually gets used — DATE() wrappers disqualify it.
             ->when($filters['date_from'] ?? null, fn (Builder $query, $date) => $query->where('date', '>=', $date))
-            ->when($filters['date_to'] ?? null, fn (Builder $query, $date) => $query->where('date', '<=', $date))
-            ->orderByDesc('date')
-            ->paginate($perPage);
+            ->when($filters['date_to'] ?? null, fn (Builder $query, $date) => $query->where('date', '<=', $date));
+
+        $this->applyCompanyScope($query, $filters);
+
+        return $query->orderByDesc('date')->paginate($perPage);
+    }
+
+    /**
+     * Soft Company Scoping: scope attendance rows to a given company via
+     * a subquery against employees (any employee_id matching the
+     * company_id passes). A subquery, not a JOIN, so the base query's
+     * eager loads and pagination stay unambiguous.
+     *
+     * @param  Builder<Attendance>  $query
+     * @param  array<string, mixed>  $filters
+     */
+    private function applyCompanyScope(Builder $query, array $filters): void
+    {
+        if (empty($filters['company_id'])) {
+            return;
+        }
+
+        $query->whereIn(
+            'employee_id',
+            Employee::withTrashed()->select('id')->where('company_id', $filters['company_id']),
+        );
     }
 }

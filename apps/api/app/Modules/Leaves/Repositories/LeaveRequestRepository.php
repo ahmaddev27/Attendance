@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Leaves\Repositories;
 
+use App\Models\Employee;
 use App\Models\LeaveRequest;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -90,6 +91,17 @@ class LeaveRequestRepository
 
         if (! empty($filters['end_date'])) {
             $query->where('start_date', '<=', $filters['end_date']);
+        }
+
+        // Soft Company Scoping: filter via a subquery against employees so
+        // leaves authored by employees of other companies are left out.
+        // Subquery keeps the eager-loaded `employee` relation unambiguous
+        // (no column name collisions a JOIN would cause).
+        if (! empty($filters['company_id'])) {
+            $query->whereIn(
+                'employee_id',
+                Employee::withTrashed()->select('id')->where('company_id', $filters['company_id']),
+            );
         }
     }
 }

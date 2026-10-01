@@ -30,6 +30,7 @@ import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { taskPrioritiesApi, taskStatusesApi, taskTagsApi } from '@/lib/api/endpoints/task-config';
 import { tasksApi } from '@/lib/api/endpoints/tasks';
 import { formatDate } from '@/lib/attendance-format';
+import { useScopedCompanyId } from '@/lib/stores/company-scope-store';
 import { DUE_DATE_URGENCY_CLASSNAME, getDueDateUrgency } from '@/lib/task-format';
 import type { EmployeeSummary, Task } from '@/lib/api/types';
 import { cn } from '@/lib/utils';
@@ -56,10 +57,12 @@ export default function TasksPage() {
   const openTaskDetail = (task: Task) => router.push(`/tasks/${task.id}`);
 
   const debouncedSearch = useDebouncedValue(search);
+  // Soft Company Scoping — admin header switcher state.
+  const scopedCompanyId = useScopedCompanyId();
 
   React.useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, statusId, priorityId, tagId, assignee?.id, dueFrom, dueTo]);
+  }, [debouncedSearch, statusId, priorityId, tagId, assignee?.id, dueFrom, dueTo, scopedCompanyId]);
 
   const { data: statuses } = useQuery({
     queryKey: ['task-statuses'],
@@ -78,7 +81,7 @@ export default function TasksPage() {
     queryKey: [
       'tasks',
       'list',
-      { page, search: debouncedSearch, statusId, priorityId, tagId, assigneeId: assignee?.id, dueFrom, dueTo },
+      { page, search: debouncedSearch, statusId, priorityId, tagId, assigneeId: assignee?.id, dueFrom, dueTo, scopedCompanyId },
     ],
     queryFn: async () => {
       const { data } = await tasksApi.list({
@@ -91,6 +94,7 @@ export default function TasksPage() {
         assigned_to: assignee?.id,
         due_date_from: dueFrom || undefined,
         due_date_to: dueTo || undefined,
+        company_id: scopedCompanyId ?? undefined,
       });
       return data;
     },

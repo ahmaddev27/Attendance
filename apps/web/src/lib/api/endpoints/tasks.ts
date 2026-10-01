@@ -19,7 +19,7 @@ export const tasksApi = {
   delete: (id: number) => apiClient.delete(`/tasks/${id}`),
   complete: (id: number) => apiClient.post<ApiResource<TaskDetail>>(`/tasks/${id}/complete`),
   restore: (id: number) => apiClient.post<ApiResource<TaskDetail>>(`/tasks/${id}/restore`),
-  kanban: (params?: Pick<TaskListParams, 'assigned_to' | 'created_by' | 'search'>) =>
+  kanban: (params?: Pick<TaskListParams, 'assigned_to' | 'created_by' | 'search' | 'company_id'>) =>
     apiClient.get<ApiResource<KanbanBoard>>('/tasks/kanban', { params }),
 };
 

@@ -19,9 +19,8 @@ import { TaskCard } from '@/components/tasks/task-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { taskStatusesApi } from '@/lib/api/endpoints/task-config';
 import { tasksApi } from '@/lib/api/endpoints/tasks';
+import { useScopedCompanyId } from '@/lib/stores/company-scope-store';
 import type { KanbanBoard as KanbanBoardData, Task } from '@/lib/api/types';
-
-const KANBAN_QUERY_KEY = ['tasks', 'kanban'];
 
 type KanbanBoardProps = {
   onTaskClick: (task: Task) => void;
@@ -42,6 +41,13 @@ function extractErrorMessage(err: unknown, fallback: string): string {
 export function KanbanBoard({ onTaskClick }: KanbanBoardProps) {
   const queryClient = useQueryClient();
   const [activeTask, setActiveTask] = React.useState<Task | null>(null);
+  // Soft Company Scoping — the switcher writes to this store; the kanban
+  // refetches when the admin picks a different company.
+  const scopedCompanyId = useScopedCompanyId();
+  const kanbanQueryKey = React.useMemo(
+    () => ['tasks', 'kanban', { companyId: scopedCompanyId }],
+    [scopedCompanyId]
+  );
 
   const { data: statuses, isLoading: statusesLoading } = useQuery({
     queryKey: ['task-statuses'],
@@ -49,8 +55,9 @@ export function KanbanBoard({ onTaskClick }: KanbanBoardProps) {
   });
 
   const { data: board, isLoading: boardLoading } = useQuery({
-    queryKey: KANBAN_QUERY_KEY,
-    queryFn: async () => (await tasksApi.kanban()).data.data,
+    queryKey: kanbanQueryKey,
+    queryFn: async () =>
+      (await tasksApi.kanban({ company_id: scopedCompanyId ?? undefined })).data.data,
   });
 
   const sortedStatuses = React.useMemo(
@@ -73,8 +80,8 @@ export function KanbanBoard({ onTaskClick }: KanbanBoardProps) {
     mutationFn: ({ taskId, statusId }: { taskId: number; statusId: number }) =>
       tasksApi.update(taskId, { status_id: statusId }),
     onMutate: async ({ taskId, statusId }) => {
-      await queryClient.cancelQueries({ queryKey: KANBAN_QUERY_KEY });
-      const previousBoard = queryClient.getQueryData<KanbanBoardData>(KANBAN_QUERY_KEY);
+      await queryClient.cancelQueries({ queryKey: kanbanQueryKey });
+      const previousBoard = queryClient.getQueryData<KanbanBoardData>(kanbanQueryKey);
       const targetStatus = sortedStatuses.find((s) => s.id === statusId);
 
       if (previousBoard && targetStatus) {
@@ -108,18 +115,18 @@ export function KanbanBoard({ onTaskClick }: KanbanBoardProps) {
             count_total: (previousTargetEntry?.count_total ?? previousTargetEntry?.tasks?.length ?? 0)
               + (sourceCode === targetStatus.code ? 0 : 1),
           };
-          queryClient.setQueryData(KANBAN_QUERY_KEY, nextBoard);
+          queryClient.setQueryData(kanbanQueryKey, nextBoard);
         }
       }
 
       return { previousBoard };
     },
     onError: (err, _vars, context) => {
-      if (context?.previousBoard) queryClient.setQueryData(KANBAN_QUERY_KEY, context.previousBoard);
+      if (context?.previousBoard) queryClient.setQueryData(kanbanQueryKey, context.previousBoard);
       toast.error(extractErrorMessage(err, 'تعذر نقل المهمة'));
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: KANBAN_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: kanbanQueryKey });
       queryClient.invalidateQueries({ queryKey: ['tasks', 'list'] });
     },
   });

@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Skeleton } from '@/components/ui/skeleton';
 import { departmentsApi } from '@/lib/api/endpoints/departments';
 import { reportsApi, type AttendanceReportRow } from '@/lib/api/endpoints/reports';
+import { useScopedCompanyId } from '@/lib/stores/company-scope-store';
 
 type ExportFormat = 'csv' | 'xlsx' | 'pdf';
 
@@ -38,6 +39,8 @@ export default function AttendanceReportPage() {
   const [departmentId, setDepartmentId] = React.useState<number | undefined>();
   const [downloading, setDownloading] = React.useState<ExportFormat | null>(null);
   const [menuOpen, setMenuOpen] = React.useState(false);
+  // Soft Company Scoping — admin header switcher state.
+  const scopedCompanyId = useScopedCompanyId();
 
   const { data: departments } = useQuery({
     queryKey: ['departments', 'filter-options'],
@@ -45,9 +48,16 @@ export default function AttendanceReportPage() {
   });
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['reports', 'attendance-monthly', { year, month, departmentId }],
+    queryKey: ['reports', 'attendance-monthly', { year, month, departmentId, scopedCompanyId }],
     queryFn: async () =>
-      (await reportsApi.attendanceMonthly({ year, month, department_id: departmentId })).data.data,
+      (
+        await reportsApi.attendanceMonthly({
+          year,
+          month,
+          department_id: departmentId,
+          company_id: scopedCompanyId ?? undefined,
+        })
+      ).data.data,
   });
 
   const rows: AttendanceReportRow[] = data ?? [];
@@ -55,10 +65,16 @@ export default function AttendanceReportPage() {
   const handleDownload = async (format: ExportFormat) => {
     // Guard: axios' Blob transport returns application/json when Laravel
     // sends a 4xx, so the caller re-types the blob per requested format.
+    const commonParams = {
+      year,
+      month,
+      department_id: departmentId,
+      company_id: scopedCompanyId ?? undefined,
+    };
     const fetchers: Record<ExportFormat, () => Promise<{ data: Blob }>> = {
-      csv: () => reportsApi.attendanceMonthlyCsv({ year, month, department_id: departmentId }),
-      xlsx: () => reportsApi.attendanceMonthlyXlsx({ year, month, department_id: departmentId }),
-      pdf: () => reportsApi.attendanceMonthlyPdf({ year, month, department_id: departmentId }),
+      csv: () => reportsApi.attendanceMonthlyCsv(commonParams),
+      xlsx: () => reportsApi.attendanceMonthlyXlsx(commonParams),
+      pdf: () => reportsApi.attendanceMonthlyPdf(commonParams),
     };
 
     try {

@@ -27,10 +27,14 @@ class TaskController extends Controller
 
     public function index(Request $request): AnonymousResourceCollection
     {
+        $request->validate([
+            'company_id' => ['nullable', 'integer', 'exists:companies,id'],
+        ]);
+
         $filters = $request->only([
             'assigned_to', 'created_by', 'status_id', 'priority_id',
             'tag_id', 'search', 'due_date_from', 'due_date_to',
-            'parent_task_id', 'sort',
+            'parent_task_id', 'sort', 'company_id',
         ]);
 
         $perPage = (int) $request->integer('per_page', self::DEFAULT_PER_PAGE);

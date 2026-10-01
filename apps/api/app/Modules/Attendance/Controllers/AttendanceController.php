@@ -23,8 +23,12 @@ class AttendanceController extends Controller
 
     public function index(Request $request): AnonymousResourceCollection
     {
+        $request->validate([
+            'company_id' => ['nullable', 'integer', 'exists:companies,id'],
+        ]);
+
         $attendances = $this->attendances->paginate(
-            $request->only(['employee_id', 'status', 'date_from', 'date_to']),
+            $request->only(['employee_id', 'status', 'date_from', 'date_to', 'company_id']),
             (int) $request->integer('per_page', 15),
         );
 

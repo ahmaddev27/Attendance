@@ -20,6 +20,9 @@ export type AttendanceListParams = {
   page?: number;
   per_page?: number;
   employee_id?: number;
+  // Soft Company Scoping: optional admin filter. Normally supplied by
+  // the Company Switcher via useScopedCompanyId().
+  company_id?: number;
   date_from?: string;
   date_to?: string;
   status?: AttendanceStatus;
@@ -34,6 +37,7 @@ export type AttendanceListParams = {
 export type AttendanceExportParams = {
   year: number;
   month: number;
+  company_id?: number;
   department_id?: number;
   employee_id?: number;
   format?: 'csv' | 'xlsx' | 'pdf';

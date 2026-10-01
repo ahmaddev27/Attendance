@@ -35,6 +35,10 @@ class UpdateEmployeeRequest extends FormRequest
             'position_id' => ['nullable', 'integer', 'exists:positions,id'],
             'department_id' => ['nullable', 'integer', 'exists:departments,id'],
             'team_id' => ['nullable', 'integer', 'exists:teams,id'],
+            // Soft Company Scoping: EmployeeService re-derives this from
+            // team.department.company whenever team_id changes; passing an
+            // explicit value overrides that derivation.
+            'company_id' => ['nullable', 'integer', 'exists:companies,id'],
             // Partial update: if the caller sends work_schedule_id at all,
             // it must resolve to a real schedule. A null/empty value is
             // rejected — see StoreEmployeeRequest for the "why an employee

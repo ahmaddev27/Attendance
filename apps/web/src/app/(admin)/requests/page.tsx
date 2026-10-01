@@ -23,6 +23,7 @@ import { requestsApi } from '@/lib/api/endpoints/requests';
 import { REQUEST_STATUS_OPTIONS } from '@/lib/constants/request-options';
 import { formatDateTime } from '@/lib/request-format';
 import { hasPermission, useAuthStore } from '@/lib/stores/auth-store';
+import { useScopedCompanyId } from '@/lib/stores/company-scope-store';
 import type { EmployeeSummary, RequestStatus, RequestSummary } from '@/lib/api/types';
 
 const PER_PAGE = 20;
@@ -42,6 +43,8 @@ export default function RequestsPage() {
   const [viewingRequestId, setViewingRequestId] = React.useState<number | null>(null);
 
   const debouncedSearch = useDebouncedValue(search);
+  // Soft Company Scoping — admin header switcher state.
+  const scopedCompanyId = useScopedCompanyId();
 
   // Shared by the list and the CSV export, which supports every filter
   // here except the free-text search and the employee picker.
@@ -52,11 +55,12 @@ export default function RequestsPage() {
     request_type_id: requestTypeId ? Number(requestTypeId) : undefined,
     from: from || undefined,
     to: to || undefined,
+    company_id: scopedCompanyId ?? undefined,
   };
 
   React.useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, status, requestTypeId, employee?.id, from, to]);
+  }, [debouncedSearch, status, requestTypeId, employee?.id, from, to, scopedCompanyId]);
 
   const { data: requestTypes } = useQuery({
     queryKey: ['request-types', 'filter-options'],
@@ -64,7 +68,7 @@ export default function RequestsPage() {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ['requests', 'list', { page, search: debouncedSearch, status, requestTypeId, employeeId: employee?.id, from, to }],
+    queryKey: ['requests', 'list', { page, search: debouncedSearch, status, requestTypeId, employeeId: employee?.id, from, to, scopedCompanyId }],
     queryFn: async () => {
       const { data } = await requestsApi.list({
         ...filters,

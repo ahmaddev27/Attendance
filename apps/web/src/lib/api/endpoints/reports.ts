@@ -18,6 +18,9 @@ export type AttendanceReportRow = {
 export type AttendanceMonthlyParams = {
   year: number;
   month: number;
+  // Soft Company Scoping: when set, the service filters by company_id
+  // in addition to any department filter.
+  company_id?: number;
   department_id?: number;
 };
 
@@ -26,6 +29,7 @@ export type LeaveReportExportParams = {
   year?: number;
   leave_type_id?: number;
   status?: LeaveStatus;
+  company_id?: number;
   department_id?: number;
 };
 
@@ -35,6 +39,7 @@ export type RequestReportExportParams = {
   status?: RequestStatus;
   from?: string;
   to?: string;
+  company_id?: number;
   department_id?: number;
 };
 

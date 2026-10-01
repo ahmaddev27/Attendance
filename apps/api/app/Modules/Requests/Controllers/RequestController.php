@@ -34,6 +34,10 @@ class RequestController extends Controller
 
     public function index(HttpRequest $request): AnonymousResourceCollection
     {
+        $request->validate([
+            'company_id' => ['nullable', 'integer', 'exists:companies,id'],
+        ]);
+
         $filters = $request->only([
             'employee_id',
             'request_type_id',
@@ -41,6 +45,7 @@ class RequestController extends Controller
             'search',
             'from',
             'to',
+            'company_id',
         ]);
         $perPage = (int) $request->integer('per_page', self::DEFAULT_PER_PAGE);
 

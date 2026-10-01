@@ -43,6 +43,10 @@ class StoreEmployeeRequest extends FormRequest
             'position_id' => ['nullable', 'integer', 'exists:positions,id'],
             'department_id' => ['nullable', 'integer', 'exists:departments,id'],
             'team_id' => ['nullable', 'integer', 'exists:teams,id'],
+            // When omitted, EmployeeService::create() derives company_id
+            // from the chosen team's department. An explicit value lets
+            // an admin pin an unassigned (team-less) hire to a company.
+            'company_id' => ['nullable', 'integer', 'exists:companies,id'],
             // A schedule is mandatory: the kiosk check-in flow classifies
             // late/early against it, and the monthly summary rolls up
             // expected working days from it. An employee without a

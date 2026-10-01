@@ -61,6 +61,7 @@ class AttendanceReportController extends Controller
         $validated = $request->validate([
             'year' => 'required|integer|min:2000|max:2100',
             'month' => 'required|integer|min:1|max:12',
+            'company_id' => 'nullable|integer|exists:companies,id',
             'department_id' => 'nullable|integer|exists:departments,id',
             'employee_id' => 'nullable|integer|exists:employees,id',
             'format' => 'nullable|in:json,csv,xlsx,pdf',
@@ -68,10 +69,11 @@ class AttendanceReportController extends Controller
 
         $year = (int) $validated['year'];
         $month = (int) $validated['month'];
+        $companyId = isset($validated['company_id']) ? (int) $validated['company_id'] : null;
         $departmentId = isset($validated['department_id']) ? (int) $validated['department_id'] : null;
         $employeeId = isset($validated['employee_id']) ? (int) $validated['employee_id'] : null;
 
-        $rows = $this->service->monthly($year, $month, $departmentId, $employeeId);
+        $rows = $this->service->monthly($year, $month, $departmentId, $employeeId, $companyId);
 
         $filenameBase = sprintf('attendance-%04d-%02d', $year, $month);
 

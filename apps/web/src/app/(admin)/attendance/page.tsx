@@ -33,6 +33,7 @@ import { AttendanceStatusBadge } from '@/components/attendance/attendance-status
 import { PaginationBar } from '@/components/attendance/pagination-bar';
 import { attendanceApi } from '@/lib/api/endpoints/attendance';
 import { formatMinutesAsHours, formatTime } from '@/lib/attendance-format';
+import { useScopedCompanyId } from '@/lib/stores/company-scope-store';
 import type { AttendanceStatus, EmployeeSummary } from '@/lib/api/types';
 
 const PER_PAGE = 20;
@@ -53,11 +54,16 @@ export default function AttendancePage() {
   const [status, setStatus] = useState<AttendanceStatus | 'all'>('all');
   const [exporting, setExporting] = useState(false);
 
+  // Soft Company Scoping — the switcher writes to this store; the query
+  // refetches automatically because the id is part of the key.
+  const scopedCompanyId = useScopedCompanyId();
+
   const filters = {
     date_from: from || undefined,
     date_to: to || undefined,
     employee_id: employee?.id,
     status: status === 'all' ? undefined : status,
+    company_id: scopedCompanyId ?? undefined,
   };
 
   const { data, isLoading, isFetching } = useQuery({
@@ -106,6 +112,7 @@ export default function AttendancePage() {
         year,
         month,
         employee_id: filters.employee_id,
+        company_id: scopedCompanyId ?? undefined,
       });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');

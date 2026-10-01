@@ -52,6 +52,12 @@ class Employee extends Model
         'position_id',
         'department_id',
         'team_id',
+        // Direct FK to companies (nullable). The Soft Company Scoping
+        // phase added this so the admin "scope to company" filter is a
+        // single indexed WHERE across every module instead of a 3-level
+        // join through team -> department -> company. EmployeeService
+        // keeps the value in sync when team_id changes.
+        'company_id',
         'direct_manager_id',
         'employment_type',
         'joining_date',
@@ -114,6 +120,18 @@ class Employee extends Model
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
+    }
+
+    /**
+     * Direct link to the owning company (via the Soft Company Scoping
+     * migration). The value is normally derived from team.department.company,
+     * but EmployeeService lets an admin override it explicitly.
+     *
+     * @return BelongsTo<Company, $this>
+     */
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class);
     }
 
     /**
@@ -273,6 +291,7 @@ class Employee extends Model
                 'position_id',
                 'department_id',
                 'team_id',
+                'company_id',
                 'direct_manager_id',
                 'employment_type',
                 'joining_date',
