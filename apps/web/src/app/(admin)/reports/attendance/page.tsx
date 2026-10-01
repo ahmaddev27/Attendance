@@ -112,16 +112,58 @@ export default function AttendanceReportPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="flex items-center gap-2 text-2xl font-bold text-ink">
-          <BarChart3 className="h-6 w-6 text-brand" /> تقرير الحضور الشهري
-        </h1>
-        <p className="mt-1 text-sm text-muted">ملخّص أيام الحضور والتأخير والغياب لكل موظف — قابل للتصدير CSV / Excel / PDF.</p>
+      {/*
+        RTL ordering: in a flex row with justify-between, the FIRST JSX child
+        lands visually on the RIGHT (reading start) and the LAST on the LEFT.
+        The page title cluster is primary → placed first (right); the Export
+        popover is a utility → placed last (left). Do not reorder.
+      */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-ink">
+            <BarChart3 className="h-6 w-6 text-brand" /> تقرير الحضور الشهري
+          </h1>
+          <p className="mt-1 text-sm text-muted">ملخّص أيام الحضور والتأخير والغياب لكل موظف — قابل للتصدير CSV / Excel / PDF.</p>
+        </div>
+        <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              className="bg-brand hover:bg-brand-hover text-white"
+              disabled={downloading !== null || rows.length === 0}
+            >
+              {downloading !== null ? (
+                <Loader2 className="me-1 h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="me-1 h-4 w-4" />
+              )}
+              تصدير
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-40 p-1">
+            {(['csv', 'xlsx', 'pdf'] as const).map((fmt) => (
+              <button
+                key={fmt}
+                type="button"
+                onClick={() => handleDownload(fmt)}
+                disabled={downloading !== null}
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-ink hover:bg-surface-2 disabled:opacity-60"
+              >
+                {downloading === fmt ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                {EXPORT_LABEL[fmt]}
+              </button>
+            ))}
+          </PopoverContent>
+        </Popover>
       </div>
 
       {/* Filters */}
       <Card className="border-hairline bg-surface p-4">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <label className="text-xs">
             <span className="mb-1 block font-semibold text-ink-2">السنة</span>
             <select
@@ -160,42 +202,6 @@ export default function AttendanceReportPage() {
               ))}
             </select>
           </label>
-          <div className="flex items-end">
-            <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  type="button"
-                  className="w-full bg-brand hover:bg-brand-hover text-white"
-                  disabled={downloading !== null || rows.length === 0}
-                >
-                  {downloading !== null ? (
-                    <Loader2 className="me-1 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Download className="me-1 h-4 w-4" />
-                  )}
-                  تصدير
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-40 p-1">
-                {(['csv', 'xlsx', 'pdf'] as const).map((fmt) => (
-                  <button
-                    key={fmt}
-                    type="button"
-                    onClick={() => handleDownload(fmt)}
-                    disabled={downloading !== null}
-                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-ink hover:bg-surface-2 disabled:opacity-60"
-                  >
-                    {downloading === fmt ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Download className="h-4 w-4" />
-                    )}
-                    {EXPORT_LABEL[fmt]}
-                  </button>
-                ))}
-              </PopoverContent>
-            </Popover>
-          </div>
         </div>
       </Card>
 
@@ -215,8 +221,13 @@ export default function AttendanceReportPage() {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[720px] text-start text-sm">
             <thead className="border-b border-hairline bg-surface-2">
+              {/*
+                RTL table columns: the FIRST <Th> in JSX renders on the RIGHT
+                (reading start). Primary identity columns (name, dept) sit at
+                the start; the auxiliary row number lives at the LEFT edge,
+                matching Arabic data-table convention. Keep "#" last.
+              */}
               <tr>
-                <Th>#</Th>
                 <Th>الاسم</Th>
                 <Th>القسم</Th>
                 <Th className="text-center">حضور</Th>
@@ -225,6 +236,7 @@ export default function AttendanceReportPage() {
                 <Th className="text-center">إجازة</Th>
                 <Th className="text-center">ساعات</Th>
                 <Th className="text-center">وقت إضافي</Th>
+                <Th className="text-center">#</Th>
               </tr>
             </thead>
             <tbody>
@@ -254,7 +266,6 @@ export default function AttendanceReportPage() {
               ) : (
                 rows.map((r) => (
                   <tr key={r.employee_id} className="border-b border-hairline last:border-b-0">
-                    <Td className="num" dir="ltr">{r.employee_number}</Td>
                     <Td className="font-medium text-ink">{r.full_name}</Td>
                     <Td className="text-ink-2">{r.department ?? '—'}</Td>
                     <Td className="num text-center" dir="ltr">{r.present_days}</Td>
@@ -267,6 +278,7 @@ export default function AttendanceReportPage() {
                     <Td className="num text-center text-success" dir="ltr">
                       {r.overtime_minutes ? Math.round(r.overtime_minutes / 60) : '—'}
                     </Td>
+                    <Td className="num text-center text-muted" dir="ltr">{r.employee_number}</Td>
                   </tr>
                 ))
               )}

@@ -4,7 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, Ban, Check, ChevronRight, Circle, Pencil } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Ban, Check, ChevronRight, Circle, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -128,7 +128,9 @@ export default function JobDetailPage() {
                 className="gap-2 bg-brand text-white hover:bg-brand-hover"
                 onClick={() => setAdvanceOpen(true)}
               >
-                <ArrowRight className="h-4 w-4" /> نقل للمرحلة التالية
+                {/* Forward-navigation arrow: in RTL reading flows LEFT, so the
+                    "next stage" arrow must point LEFT (ArrowLeft), not RIGHT. */}
+                <ArrowLeft className="h-4 w-4" /> نقل للمرحلة التالية
               </Button>
             )}
             {canManage && !isTerminal && (
