@@ -45,9 +45,15 @@ class AttendanceService
             // block a new check-in. Anything older is treated as orphaned
             // and left for the admin correction flow; today's open row
             // still blocks so a double-tap can't create two sessions.
+            // Half-open range on `date` rather than a bare equality: SQLite
+            // (used by the test suite) stores the Laravel `date` cast as
+            // "YYYY-MM-DD 00:00:00", so `where('date', '2026-10-01')` yields
+            // zero rows and the guard silently misfires. The composite
+            // UNIQUE(employee_id, date) index still covers this range.
             $openAttendance = Attendance::query()
                 ->where('employee_id', $employee->id)
-                ->where('date', $today->toDateString())
+                ->where('date', '>=', $today->copy()->startOfDay())
+                ->where('date', '<', $today->copy()->startOfDay()->addDay())
                 ->whereNotNull('check_in_at')
                 ->whereNull('check_out_at')
                 ->lockForUpdate()
@@ -57,12 +63,15 @@ class AttendanceService
                 throw new AttendanceException('You already checked in and have not checked out yet.');
             }
 
-            // Bare where() on the DATE column — keeps the
-            // UNIQUE(employee_id, date) index in play (DATE() wrappers
-            // would disqualify it and force a full-table scan).
+            // Half-open range for the same reason as above: SQLite stores
+            // the `date` cast as a full datetime, so a bare equality on
+            // the ISO date string matches nothing in the test harness.
+            // Range comparison on the indexed column still uses the
+            // UNIQUE(employee_id, date) index — DATE() wrappers would not.
             $attendance = Attendance::query()
                 ->where('employee_id', $employee->id)
-                ->where('date', $today->toDateString())
+                ->where('date', '>=', $today->copy()->startOfDay())
+                ->where('date', '<', $today->copy()->startOfDay()->addDay())
                 ->lockForUpdate()
                 ->first();
 
