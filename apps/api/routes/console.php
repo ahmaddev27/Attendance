@@ -194,6 +194,27 @@ Schedule::command('taqat:notify-open-sessions')
 
 /*
 |--------------------------------------------------------------------------
+| Nightly working-hours recompute
+|--------------------------------------------------------------------------
+|
+| 00:30 Amman — half an hour past midnight so every stamp (check-in,
+| check-out, the 00:00 tick of the auto-close sweeper) has already
+| settled on yesterday's rows. Walks the previous day's attendance for
+| every active employee and re-runs WorkingHoursCalculator against the
+| current schedule so late / early / overtime minutes reflect any
+| retroactive change (schedule edit, holiday backfilled late, admin
+| corrects a timestamp). Idempotent: a clean day is a no-op.
+*/
+Schedule::command('attendance:recompute-hours')
+    ->dailyAt('00:30')
+    ->timezone(config('app.timezone'))
+    ->onOneServer()
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->name('attendance:recompute-hours');
+
+/*
+|--------------------------------------------------------------------------
 | Recruitment SLA + stale-lead sweeps
 |--------------------------------------------------------------------------
 |
