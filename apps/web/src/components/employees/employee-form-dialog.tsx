@@ -46,7 +46,8 @@ import { employeesApi } from '@/lib/api/endpoints/employees';
 import { positionsApi } from '@/lib/api/endpoints/positions';
 import { schedulesApi } from '@/lib/api/endpoints/schedules';
 import { teamsApi } from '@/lib/api/endpoints/teams';
-import type { Employee, EmployeeInput, EmployeeMini } from '@/lib/api/types';
+import { useScopedCompanyId } from '@/lib/stores/company-scope-store';
+import type { Department, Employee, EmployeeInput, EmployeeMini, Team } from '@/lib/api/types';
 import { EMPLOYMENT_TYPE_LABELS, GENDER_LABELS } from '@/lib/constants/employee-options';
 import { cn } from '@/lib/utils';
 
@@ -133,6 +134,13 @@ type EmployeeFormDialogProps = {
 export function EmployeeFormDialog({ open, onOpenChange, employee }: EmployeeFormDialogProps) {
   const isEdit = !!employee;
   const queryClient = useQueryClient();
+  // Soft Company Scoping — the admin header switcher writes to this store.
+  // In CREATE mode we default the new employee's company_id to the active
+  // scope and narrow the department / team dropdowns to that company so a
+  // طاقات-scoped admin can't accidentally seed an employee under test.
+  // In EDIT mode we leave the picker lists wide open so the employee's
+  // existing (potentially different-company) department stays selectable.
+  const scopedCompanyId = useScopedCompanyId();
   // Held as EmployeeMini because the initial seed from the Employee resource
   // only ships {id, full_name}; the picker itself also only reads those two
   // fields off the current value. A fresh selection from the picker is a
@@ -158,11 +166,34 @@ export function EmployeeFormDialog({ open, onOpenChange, employee }: EmployeeFor
   }, [open, employee?.id]);
 
   const departmentId = form.watch('department_id');
+  const teamId = form.watch('team_id');
+
+  // Picker lists are narrowed to the active company only in create mode.
+  // Edit mode keeps the full list so the existing selection never silently
+  // falls out of the dropdown when it belongs to a different company.
+  const pickerCompanyFilter = isEdit ? undefined : scopedCompanyId ?? undefined;
 
   const { data: departments } = useQuery({
-    queryKey: ['departments', 'picker'],
-    queryFn: async () => (await departmentsApi.list({ per_page: 100, is_active: true })).data.data,
+    queryKey: ['departments', 'picker', { company_id: pickerCompanyFilter ?? null }],
+    queryFn: async () =>
+      (
+        await departmentsApi.list({
+          per_page: 100,
+          is_active: true,
+          company_id: pickerCompanyFilter,
+        })
+      ).data.data,
     enabled: open,
+  });
+
+  // Fetch ALL departments once (unfiltered) to resolve a team -> company
+  // for the cross-company warning below. Small payload (≤200), already a
+  // common fetch elsewhere, and the cross-company check wouldn't work with
+  // only the scoped list (the chosen team's dept wouldn't be there).
+  const { data: allDepartments } = useQuery({
+    queryKey: ['departments', 'picker', 'all'],
+    queryFn: async () => (await departmentsApi.list({ per_page: 200 })).data.data,
+    enabled: open && scopedCompanyId !== null,
   });
 
   const { data: teams } = useQuery({
@@ -172,6 +203,37 @@ export function EmployeeFormDialog({ open, onOpenChange, employee }: EmployeeFor
         .data,
     enabled: open && departmentId != null,
   });
+
+  // Cross-company warning (not a block — the owner may deliberately override
+  // the scope, e.g. a super-admin moving an employee between companies).
+  // Fires when the user picks a team/department whose company differs from
+  // the active scope.
+  const crossCompanyWarning = React.useMemo((): string | null => {
+    if (scopedCompanyId === null || !allDepartments) return null;
+
+    const resolveDeptCompany = (deptId: number | null): number | null => {
+      if (deptId === null) return null;
+      const dept = allDepartments.find((d: Department) => d.id === deptId);
+      return dept?.company_id ?? null;
+    };
+
+    // Team wins when both are set — team.department.company is what the
+    // server derives company_id from (see EmployeeService::syncCompanyIdFromTeam).
+    if (teamId != null) {
+      const team = (teams ?? []).find((t: Team) => t.id === teamId);
+      const teamCompanyId = team ? resolveDeptCompany(team.department_id) : null;
+      if (teamCompanyId !== null && teamCompanyId !== scopedCompanyId) {
+        return 'الفريق المختار يتبع شركة مختلفة عن الشركة المفعّلة في المحوّل. سيُنسب الموظف للشركة التابعة للفريق.';
+      }
+    } else if (departmentId != null) {
+      const deptCompanyId = resolveDeptCompany(departmentId);
+      if (deptCompanyId !== null && deptCompanyId !== scopedCompanyId) {
+        return 'القسم المختار يتبع شركة مختلفة عن الشركة المفعّلة في المحوّل. سيُنسب الموظف للشركة التابعة للقسم.';
+      }
+    }
+
+    return null;
+  }, [scopedCompanyId, allDepartments, teams, teamId, departmentId]);
 
   const { data: positions } = useQuery({
     queryKey: ['positions', 'by-department', departmentId],
@@ -204,6 +266,16 @@ export function EmployeeFormDialog({ open, onOpenChange, employee }: EmployeeFor
         gender: values.gender,
         direct_manager_id: directManager?.id ?? null,
       };
+      // Soft Company Scoping: on create, pin the new employee to the active
+      // scope. Service-side the server will still re-derive from team when
+      // present, but passing it here guarantees a correct bucket in the rare
+      // case the admin picks neither a team nor a dept (and matches the
+      // owner's "I switched companies" mental model). Deliberately NOT sent
+      // on edit — the server keeps the stored value and may re-derive from a
+      // changed team on its own.
+      if (!isEdit && scopedCompanyId !== null) {
+        payload.company_id = scopedCompanyId;
+      }
       return isEdit ? employeesApi.update(employee.id, payload) : employeesApi.create(payload);
     },
     onSuccess: (res) => {
@@ -266,6 +338,14 @@ export function EmployeeFormDialog({ open, onOpenChange, employee }: EmployeeFor
 
         <Form {...form}>
           <form onSubmit={onSubmit} className="space-y-5">
+            {crossCompanyWarning && (
+              <div
+                role="alert"
+                className="rounded-lg border border-warn-soft bg-warn-soft/40 p-3 text-xs text-warn-ink"
+              >
+                {crossCompanyWarning}
+              </div>
+            )}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FormField
                 control={form.control}

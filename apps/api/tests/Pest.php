@@ -45,6 +45,21 @@ function makeEmployeeWithSchedule(?WorkSchedule $schedule = null): Employee
     return Employee::factory()->create(['work_schedule_id' => $schedule->id]);
 }
 
+/**
+ * Build a Company → Department → Team chain for Soft Company Scoping tests.
+ * Shared across every tests/Feature/CompanyScoping test file.
+ *
+ * @return array{company: \App\Models\Company, department: \App\Models\Department, team: \App\Models\Team}
+ */
+function makeOrgChain(string $companyName = 'ACME'): array
+{
+    $company = \App\Models\Company::factory()->create(['name' => $companyName]);
+    $department = \App\Models\Department::factory()->create(['company_id' => $company->id]);
+    $team = \App\Models\Team::factory()->create(['department_id' => $department->id]);
+
+    return ['company' => $company, 'department' => $department, 'team' => $team];
+}
+
 function enableScanPinEnforcement(): void
 {
     app(\App\Modules\Settings\Services\SettingsService::class)

@@ -16,6 +16,7 @@ import { TeamFormDialog } from '@/components/organization/team-form-dialog';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { departmentsApi } from '@/lib/api/endpoints/departments';
 import { teamsApi } from '@/lib/api/endpoints/teams';
+import { useScopedCompanyId } from '@/lib/stores/company-scope-store';
 import type { Team } from '@/lib/api/types';
 
 const PER_PAGE = 20;
@@ -33,23 +34,36 @@ export default function TeamsPage() {
   const [deletingTeam, setDeletingTeam] = React.useState<Team | null>(null);
   const [assignLeaderTarget, setAssignLeaderTarget] = React.useState<Team | null>(null);
 
+  // Soft Company Scoping — the header switcher writes to this store; the
+  // list refetches whenever the id changes because it is part of both the
+  // teams and the departments filter-options query keys below.
+  const scopedCompanyId = useScopedCompanyId();
+
   React.useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, departmentId]);
+  }, [debouncedSearch, departmentId, scopedCompanyId]);
 
   const { data: departments } = useQuery({
-    queryKey: ['departments', 'filter-options'],
-    queryFn: async () => (await departmentsApi.list({ per_page: 100, is_active: true })).data.data,
+    queryKey: ['departments', 'filter-options', { scopedCompanyId }],
+    queryFn: async () =>
+      (
+        await departmentsApi.list({
+          per_page: 100,
+          is_active: true,
+          company_id: scopedCompanyId ?? undefined,
+        })
+      ).data.data,
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ['teams', 'list', { page, search: debouncedSearch, departmentId }],
+    queryKey: ['teams', 'list', { page, search: debouncedSearch, departmentId, scopedCompanyId }],
     queryFn: async () => {
       const { data } = await teamsApi.list({
         page,
         per_page: PER_PAGE,
         search: debouncedSearch || undefined,
         department_id: departmentId ? Number(departmentId) : undefined,
+        company_id: scopedCompanyId ?? undefined,
       });
       return data;
     },
@@ -154,6 +168,7 @@ export default function TeamsPage() {
         onOpenChange={setFormOpen}
         team={editingTeam}
         defaultDepartmentId={departmentId ? Number(departmentId) : undefined}
+        scopedCompanyId={scopedCompanyId ?? undefined}
       />
 
       <AssignEmployeeDialog

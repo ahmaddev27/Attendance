@@ -69,9 +69,22 @@ type TeamFormDialogProps = {
   team?: Team | null;
   /** Pre-selects a department when creating a team from a department-filtered view. */
   defaultDepartmentId?: number;
+  /**
+   * Soft Company Scoping — when the admin header is scoped to one company,
+   * narrow the department dropdown to that company's departments only, and
+   * (in create mode) make a cross-company team impossible to pick. Edit
+   * mode leaves the existing selection intact.
+   */
+  scopedCompanyId?: number;
 };
 
-export function TeamFormDialog({ open, onOpenChange, team, defaultDepartmentId }: TeamFormDialogProps) {
+export function TeamFormDialog({
+  open,
+  onOpenChange,
+  team,
+  defaultDepartmentId,
+  scopedCompanyId,
+}: TeamFormDialogProps) {
   const isEdit = !!team;
   const queryClient = useQueryClient();
 
@@ -85,9 +98,21 @@ export function TeamFormDialog({ open, onOpenChange, team, defaultDepartmentId }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, team?.id]);
 
+  // In edit mode we show the full list so the current department is always
+  // selectable, even if the admin's active scope is a different company —
+  // otherwise the dropdown would silently drop the row's own department.
+  const departmentCompanyFilter = isEdit ? undefined : scopedCompanyId;
+
   const { data: departments } = useQuery({
-    queryKey: ['departments', 'picker'],
-    queryFn: async () => (await departmentsApi.list({ per_page: 200, is_active: true })).data.data,
+    queryKey: ['departments', 'picker', { company_id: departmentCompanyFilter ?? null }],
+    queryFn: async () =>
+      (
+        await departmentsApi.list({
+          per_page: 200,
+          is_active: true,
+          company_id: departmentCompanyFilter,
+        })
+      ).data.data,
     enabled: open,
   });
 

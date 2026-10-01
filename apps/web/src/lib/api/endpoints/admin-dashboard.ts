@@ -26,7 +26,16 @@ export type AdminDashboardKpis = {
   };
 };
 
+export type AdminDashboardKpisParams = {
+  // Soft Company Scoping — mirrors the admin header switcher's current
+  // selection. Omitted (or undefined) means "all companies", matching the
+  // server-side behavior added in c856558.
+  company_id?: number;
+};
+
 export const adminDashboardApi = {
-  kpis: () =>
-    apiClient.get<ApiResource<AdminDashboardKpis>>('/admin/dashboard/kpis'),
+  kpis: (params?: AdminDashboardKpisParams) =>
+    apiClient.get<ApiResource<AdminDashboardKpis>>('/admin/dashboard/kpis', {
+      params,
+    }),
 };

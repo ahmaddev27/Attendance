@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Organization\Repositories;
 
+use App\Models\Department;
 use App\Models\Team;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 
 class TeamRepository
@@ -58,7 +60,31 @@ class TeamRepository
             });
         }
 
+        $this->applyCompanyScope($query, $filters);
+
         return $query->orderBy('name');
+    }
+
+    /**
+     * Soft Company Scoping: teams don't have a direct `company_id` column —
+     * they belong to a department, which belongs to a company. Filter via
+     * a subquery against departments so we don't force a JOIN (keeps the
+     * base query's eager loads unambiguous, mirrors the AttendanceRepository
+     * pattern added in c856558).
+     *
+     * @param  Builder<Team>  $query
+     * @param  array<string, mixed>  $filters
+     */
+    private function applyCompanyScope(Builder $query, array $filters): void
+    {
+        if (empty($filters['company_id'])) {
+            return;
+        }
+
+        $query->whereIn(
+            'department_id',
+            Department::query()->select('id')->where('company_id', $filters['company_id']),
+        );
     }
 
     public function findOrFail(int $id): Team

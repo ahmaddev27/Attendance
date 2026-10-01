@@ -464,6 +464,10 @@ export type CompanyTreeNode = {
 
 export type Department = {
   id: number;
+  // Soft Company Scoping — the backend resource always ships company_id;
+  // typed as nullable because historical rows (pre-backfill) and the
+  // single-company bootstrap case can legitimately be null.
+  company_id: number | null;
   name: string;
   code: string | null;
   parent_id: number | null;
@@ -481,6 +485,10 @@ export type DepartmentInput = {
   parent_id?: number | null;
   description?: string | null;
   is_active?: boolean;
+  // Soft Company Scoping: let the create form default this to the currently
+  // scoped company. The DepartmentService falls back to the first configured
+  // company when nothing is passed.
+  company_id?: number | null;
 };
 
 export type DepartmentListParams = {
@@ -488,6 +496,8 @@ export type DepartmentListParams = {
   per_page?: number;
   search?: string;
   is_active?: boolean;
+  // Soft Company Scoping — matches the admin-side header switcher's scope.
+  company_id?: number;
 };
 
 export type Team = {
@@ -514,6 +524,8 @@ export type TeamListParams = {
   search?: string;
   department_id?: number;
   is_active?: boolean;
+  // Soft Company Scoping — the API joins through departments.company_id.
+  company_id?: number;
 };
 
 export type Position = {

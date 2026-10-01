@@ -27,21 +27,8 @@ beforeEach(function (): void {
     Role::findOrCreate('employee', 'web');
 });
 
-/**
- * Convenience: a Company that already owns a Department + Team so a
- * freshly-created Employee can be attached and inherit the company_id
- * via EmployeeService's team-sync logic.
- *
- * @return array{company: Company, department: Department, team: Team}
- */
-function makeOrgChain(string $companyName = 'ACME'): array
-{
-    $company = Company::factory()->create(['name' => $companyName]);
-    $department = Department::factory()->create(['company_id' => $company->id]);
-    $team = Team::factory()->create(['department_id' => $department->id]);
-
-    return ['company' => $company, 'department' => $department, 'team' => $team];
-}
+// makeOrgChain() lives in tests/Pest.php so every CompanyScoping test can
+// reuse it without redeclaring the function (PHP would fatal on reload).
 
 // -----------------------------------------------------------------------
 // Backfill — migration populates company_id from the team->department

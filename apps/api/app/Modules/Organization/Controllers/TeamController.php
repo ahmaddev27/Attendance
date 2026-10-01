@@ -24,7 +24,14 @@ class TeamController extends Controller
 
     public function index(Request $request): AnonymousResourceCollection
     {
-        $filters = $request->only(['active', 'is_active', 'department_id', 'search']);
+        // Same shape as AttendanceController + DepartmentController after
+        // the Soft Company Scoping follow-up — invalid company_id returns
+        // 422 rather than silently empty page.
+        $request->validate([
+            'company_id' => ['nullable', 'integer', 'exists:companies,id'],
+        ]);
+
+        $filters = $request->only(['active', 'is_active', 'department_id', 'search', 'company_id']);
         $perPage = (int) $request->integer('per_page', self::DEFAULT_PER_PAGE);
 
         return TeamResource::collection($this->teams->paginate($filters, $perPage));

@@ -14,6 +14,7 @@ import { DeleteEntityDialog } from '@/components/organization/delete-entity-dial
 import { DepartmentFormDialog } from '@/components/organization/department-form-dialog';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { departmentsApi } from '@/lib/api/endpoints/departments';
+import { useScopedCompanyId } from '@/lib/stores/company-scope-store';
 import type { Department } from '@/lib/api/types';
 
 const PER_PAGE = 20;
@@ -30,14 +31,25 @@ export default function DepartmentsPage() {
   const [deletingDepartment, setDeletingDepartment] = React.useState<Department | null>(null);
   const [assignManagerTarget, setAssignManagerTarget] = React.useState<Department | null>(null);
 
+  // Soft Company Scoping — mirrors the employees page (c856558): the header
+  // switcher writes the scope; this list refetches because scopedCompanyId
+  // is part of the query key, and the create dialog defaults new rows to
+  // the active scope.
+  const scopedCompanyId = useScopedCompanyId();
+
   React.useEffect(() => {
     setPage(1);
-  }, [debouncedSearch]);
+  }, [debouncedSearch, scopedCompanyId]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['departments', 'list', { page, search: debouncedSearch }],
+    queryKey: ['departments', 'list', { page, search: debouncedSearch, scopedCompanyId }],
     queryFn: async () => {
-      const { data } = await departmentsApi.list({ page, per_page: PER_PAGE, search: debouncedSearch || undefined });
+      const { data } = await departmentsApi.list({
+        page,
+        per_page: PER_PAGE,
+        search: debouncedSearch || undefined,
+        company_id: scopedCompanyId ?? undefined,
+      });
       return data;
     },
     placeholderData: keepPreviousData,
@@ -132,7 +144,12 @@ export default function DepartmentsPage() {
         pagination={data ? { meta: data.meta, onPageChange: setPage } : undefined}
       />
 
-      <DepartmentFormDialog open={formOpen} onOpenChange={setFormOpen} department={editingDepartment} />
+      <DepartmentFormDialog
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        department={editingDepartment}
+        defaultCompanyId={scopedCompanyId ?? undefined}
+      />
 
       <AssignEmployeeDialog
         open={!!assignManagerTarget}

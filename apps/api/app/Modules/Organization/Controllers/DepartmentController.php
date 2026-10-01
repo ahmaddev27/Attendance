@@ -24,7 +24,15 @@ class DepartmentController extends Controller
 
     public function index(Request $request): AnonymousResourceCollection
     {
-        $filters = $request->only(['active', 'is_active', 'search']);
+        // Validate inline so unknown company_id gets a 422 instead of
+        // silently returning an empty list — matches the pattern used
+        // on AttendanceController + AdminDashboardController after
+        // c856558.
+        $request->validate([
+            'company_id' => ['nullable', 'integer', 'exists:companies,id'],
+        ]);
+
+        $filters = $request->only(['active', 'is_active', 'search', 'company_id']);
         $perPage = (int) $request->integer('per_page', self::DEFAULT_PER_PAGE);
 
         return DepartmentResource::collection($this->departments->paginate($filters, $perPage));

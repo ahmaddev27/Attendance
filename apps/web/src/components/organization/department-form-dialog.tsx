@@ -96,9 +96,21 @@ type DepartmentFormDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   department?: Department | null;
+  /**
+   * Soft Company Scoping — when creating a department from the admin
+   * header-switched view, default the new row's `company_id` to the
+   * active scope so it lands under the right company. Ignored in edit
+   * mode (the existing row's company_id is preserved server-side).
+   */
+  defaultCompanyId?: number;
 };
 
-export function DepartmentFormDialog({ open, onOpenChange, department }: DepartmentFormDialogProps) {
+export function DepartmentFormDialog({
+  open,
+  onOpenChange,
+  department,
+  defaultCompanyId,
+}: DepartmentFormDialogProps) {
   const isEdit = !!department;
   const queryClient = useQueryClient();
 
@@ -134,6 +146,13 @@ export function DepartmentFormDialog({ open, onOpenChange, department }: Departm
         description: values.description || null,
         is_active: values.is_active,
       };
+      // Pin the new department to the active company scope. In edit mode
+      // we deliberately omit it — the server keeps the existing value
+      // untouched when the key is absent, which prevents an accidental
+      // scope-change on a save that didn't intend to move the row.
+      if (!isEdit && defaultCompanyId != null) {
+        payload.company_id = defaultCompanyId;
+      }
       return isEdit ? departmentsApi.update(department.id, payload) : departmentsApi.create(payload);
     },
     onSuccess: () => {

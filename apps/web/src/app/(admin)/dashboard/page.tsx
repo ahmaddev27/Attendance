@@ -23,6 +23,7 @@ import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { adminDashboardApi, type AdminDashboardKpis } from '@/lib/api/endpoints/admin-dashboard';
 import { hasPermission, homePathFor, isAdminUser, useAuthStore } from '@/lib/stores/auth-store';
+import { useScopedCompanyId } from '@/lib/stores/company-scope-store';
 import { cn } from '@/lib/utils';
 
 // Arabic day/month labels — no Intl dep, no browser locale drift.
@@ -56,13 +57,21 @@ export default function AdminDashboardPage() {
     }
   }, [user, router]);
 
+  // Soft Company Scoping — the header switcher writes to this store; the
+  // dashboard refetches automatically because scopedCompanyId is in the
+  // query key below. Backend `AdminDashboardService::kpis()` keys its
+  // 15s cache per company (admin.kpis.company.{id}), so switching
+  // companies never serves another's numbers.
+  const scopedCompanyId = useScopedCompanyId();
+
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['admin', 'dashboard', 'kpis'],
+    queryKey: ['admin', 'dashboard', 'kpis', { scopedCompanyId }],
     // Only fire the fetch for admin users — a regular employee's request
     // would 403 before the redirect above kicked in on the next tick,
     // adding a spurious error to the console.
     enabled: user ? isAdminUser(user) && hasPermission(user, 'view-reports') : false,
-    queryFn: async () => (await adminDashboardApi.kpis()).data.data,
+    queryFn: async () =>
+      (await adminDashboardApi.kpis({ company_id: scopedCompanyId ?? undefined })).data.data,
     // Refresh every minute so counters like "present today" stay live
     // without hammering the endpoint.
     refetchInterval: 60_000,

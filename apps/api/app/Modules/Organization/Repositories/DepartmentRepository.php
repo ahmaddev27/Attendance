@@ -58,6 +58,13 @@ class DepartmentRepository
             });
         }
 
+        // Soft Company Scoping: departments already own `company_id`, so the
+        // filter is a direct where() — no subquery needed, unlike the
+        // attendance/leave/request pattern that has to hop through employees.
+        if (! empty($filters['company_id'])) {
+            $query->where('company_id', $filters['company_id']);
+        }
+
         return $query->orderBy('name');
     }
 
