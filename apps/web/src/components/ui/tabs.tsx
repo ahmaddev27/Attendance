@@ -5,7 +5,14 @@ import * as TabsPrimitive from "@radix-ui/react-tabs"
 
 import { cn } from "@/lib/utils"
 
-const Tabs = TabsPrimitive.Root
+// Radix defaults to LTR when no `dir` is given, which flipped the trigger
+// order and ArrowRight/ArrowLeft keyboard navigation in this Arabic app.
+// Default to RTL (matching Select / Popover) so TabsList lays out from the
+// start (right) and arrow keys walk the triggers in reading order.
+const Tabs = ({ dir = "rtl", ...props }: React.ComponentProps<typeof TabsPrimitive.Root>) => (
+  <TabsPrimitive.Root dir={dir} {...props} />
+)
+Tabs.displayName = "Tabs"
 
 const TabsList = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.List>,

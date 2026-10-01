@@ -224,23 +224,23 @@ export function OptionListEditor({ list }: { list: AdminOptionList }) {
       <p className="mt-3 text-[11px] text-muted">{list.value_hint}</p>
       {formError && <p className="mt-1 text-xs text-danger">{formError}</p>}
 
+      {/* Actions row — JSX order places the FIRST child on the inline-start
+          edge, which under `dir="rtl"` is visually on the RIGHT. Keep the
+          primary save/undo cluster first so "حفظ" lands on the right where
+          the eye finishes reading an Arabic form; secondary utility buttons
+          (add/reset) fall on the left. */}
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-hairline pt-4">
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={addRow} disabled={busy}>
-            <Plus className="h-3.5 w-3.5" /> إضافة عنصر
-          </Button>
           <Button
             type="button"
-            variant="ghost"
             size="sm"
-            className="gap-1.5 text-muted"
-            onClick={() => setConfirmReset(true)}
-            disabled={busy}
+            className="gap-1.5 bg-brand text-white hover:bg-brand-hover"
+            onClick={() => saveMutation.mutate()}
+            disabled={!dirty || busy}
           >
-            <RotateCcw className="h-3.5 w-3.5" /> القيم الافتراضية
+            {saveMutation.isPending ? <Spinner className="text-white" /> : <Save className="h-3.5 w-3.5" />}
+            حفظ
           </Button>
-        </div>
-        <div className="flex flex-wrap gap-2">
           {dirty && (
             <Button
               type="button"
@@ -257,15 +257,20 @@ export function OptionListEditor({ list }: { list: AdminOptionList }) {
               <Undo2 className="h-3.5 w-3.5" /> تجاهل
             </Button>
           )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={addRow} disabled={busy}>
+            <Plus className="h-3.5 w-3.5" /> إضافة عنصر
+          </Button>
           <Button
             type="button"
+            variant="ghost"
             size="sm"
-            className="gap-1.5 bg-brand text-white hover:bg-brand-hover"
-            onClick={() => saveMutation.mutate()}
-            disabled={!dirty || busy}
+            className="gap-1.5 text-muted"
+            onClick={() => setConfirmReset(true)}
+            disabled={busy}
           >
-            {saveMutation.isPending ? <Spinner className="text-white" /> : <Save className="h-3.5 w-3.5" />}
-            حفظ
+            <RotateCcw className="h-3.5 w-3.5" /> القيم الافتراضية
           </Button>
         </div>
       </div>
