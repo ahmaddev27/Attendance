@@ -779,21 +779,18 @@ Schedule::command('recruitment:application-sla-scan')->hourly();         // uses
 
 ---
 
-## 14. Open Questions — تحتاج قرار صاحب المنتج قبل البدء
+## 14. Open Questions — ✅ محسومة (2026-10-01)
 
-هذه قرارات تصميمية لا يُمكن حسمها من الـ Phase 1 docs وحدها:
+كل الأسئلة الـ 7 قرّرها صاحب المنتج بـ "كل توصياتك":
 
-| # | السؤال | البدائل | توصيتنا |
-|---|-------|---------|---------|
-| Q1 | Interview كجدول مستقل أم إعادة استخدام Workflow Engine؟ | أ) جدول مستقل (§4.4). ب) WorkflowStep. | (أ) — Workflow مصمَّم لقرار موظف-على-طلب، ليس لتجميع N تقييمات. |
-| Q2 | Screening schema per Pipeline Stage أم per JobRequirement؟ | أ) Per Stage (الحالي). ب) override على Job. ج) `screening_templates` مُسمّى. | (أ) في Phase 2؛ (ب) migration صغيرة في Phase 3 عند الحاجة. |
-| Q3 | جدول `candidate_import_jobs` دائم أم Redis TTL؟ | أ) جدول. ب) Redis. | جدول خفيف `(uploader_id, job_id, filename, totals, errors_json, status)` — ساعة تطوير، قيمة audit واضحة. |
-| Q4 | Candidate dedup: strict أم warn؟ | أ) silent reuse على email/phone. ب) تحذير في dry-run. ج) fuzzy على name. | (أ) + إظهار `reused_candidate_ids` للمراجعة؛ (ج) إلى Phase 4 مع AI. |
-| Q5 | Interview Feedback: averaging policy؟ | أ) عرض الكل بدون قرار. ب) majority rule. ج) weighted بـ seniority. | (أ) في Phase 2 — حساب `average_score` فقط، قرار الـ Owner يدوي. |
-| Q6 | إعادة تقديم نفس المرشّح على نفس الوظيفة بعد الرفض؟ | أ) UNIQUE صارم. ب) partial unique على `deleted_at IS NULL`. | (أ) في Phase 2؛ تحويل إلى (ب) عند طلب لاحق. |
-| Q7 | SMS للمرشّح عند جدولة المقابلة؟ | أ) الآن. ب) تأجيل. | (ب) — Phase 2 يبقى داخل TAQAT؛ SMS للمرشّح يحتاج consent policy في Phase 3. |
+| # | القرار النهائي | أثره على الكود |
+|---|--------------|---------------|
+| Q1 | **(أ)** جدول `interviews` مستقل | المخطط في §4.4 معتمد كما هو |
+| Q2 | **(أ)** Screening schema per Pipeline Stage (في Phase 2) | ALTER في §4.6 معتمد — لا override per Job |
+| Q3 | **(أ)** جدول `candidate_import_jobs` دائم | migration إضافية صغيرة — سطر واحد في §9.6 |
+| Q4 | **(أ)** silent reuse على email/phone + إرجاع `reused_candidate_ids` | logic في §9.3 معتمدة؛ لا fuzzy name match |
+| Q5 | **(أ)** عرض الكل، قرار يدوي + حساب `average_score` فقط | API `/api/applications/{id}/decision` يبقى يدوي؛ لا auto majority/weighting |
+| Q6 | **(أ)** UNIQUE صارم على (job_requirement_id, candidate_id) | index في §4.2 يُطبَّق — ممنوع إعادة التقديم |
+| Q7 | **(ب)** لا SMS للمرشّح في Phase 2 | NotificationService يرسل داخلياً فقط لفريق TAQAT؛ consent policy في Phase 3 |
 
----
-
-**نهاية خطة تنفيذ Phase 2.**
-المراجعة التالية: بعد قرار الـ owner على Q1–Q7 أعلاه ↑
+**نهاية خطة تنفيذ Phase 2 — جاهزة للتنفيذ.**
