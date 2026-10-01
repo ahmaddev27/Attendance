@@ -60,6 +60,18 @@ class EmployeeResource extends JsonResource
                 'id' => $this->directManager->id,
                 'full_name' => $this->directManager->full_name,
             ]),
+            // Only the PRESENCE of a scan PIN is exposed — never the hash,
+            // and the plaintext is never persisted at all. `set_at` /
+            // `set_via` let admins see when and how it was issued without
+            // leaking the secret itself (plaintext is only visible to the
+            // employee's SMS and the one-shot ResetScanPinDialog response).
+            'scan_pin' => $this->whenLoaded('scanPin', fn () => $this->scanPin === null
+                ? ['has_pin' => false, 'set_at' => null, 'set_via' => null]
+                : [
+                    'has_pin' => true,
+                    'set_at' => $this->scanPin->updated_at?->toIso8601String(),
+                    'set_via' => $this->scanPin->set_via?->value,
+                ]),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
             'deleted_at' => $this->deleted_at,

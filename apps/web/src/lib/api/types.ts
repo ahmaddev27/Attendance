@@ -341,6 +341,19 @@ export type Employee = {
   direct_manager: EmployeeMini | null;
   /** Role of the login account; null without one. Present on list responses. */
   role?: string | null;
+  /**
+   * Attendance scan-PIN presence and provenance only — the plaintext PIN
+   * is NEVER on this payload (nor stored on the server; only the bcrypt
+   * hash is kept). `set_at` is ISO8601 of the most recent change, and
+   * `set_via` says how it was issued (admin_reset / bulk_issue /
+   * self_change). `has_pin` is false when the employee has no row in
+   * employee_scan_pins yet.
+   */
+  scan_pin?: {
+    has_pin: boolean;
+    set_at: string | null;
+    set_via: 'admin_reset' | 'bulk_issue' | 'self_change' | null;
+  };
   // Only ever set on the create response — the plaintext password the
   // server just minted for the new user. It's also enqueued as a welcome
   // SMS (see EmployeeService::sendWelcomeSms on the API), so this is a

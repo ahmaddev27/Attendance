@@ -19,7 +19,7 @@ class EmployeeRepository
      *
      * @var list<string>
      */
-    private const WITH = ['position', 'department', 'team', 'directManager', 'workSchedule', 'user.roles'];
+    private const WITH = ['position', 'department', 'team', 'directManager', 'workSchedule', 'user.roles', 'scanPin'];
 
     /**
      * Reserve the next employee_number. Must be called inside a transaction

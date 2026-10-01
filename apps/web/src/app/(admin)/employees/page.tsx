@@ -25,10 +25,54 @@ import { hasPermission, useAuthStore } from '@/lib/stores/auth-store';
 import type { Employee, EmployeeStatus } from '@/lib/api/types';
 import { EMPLOYEE_STATUS_OPTIONS } from '@/lib/constants/employee-options';
 import { ROLE_OPTIONS } from '@/lib/constants/request-options';
+import { cn } from '@/lib/utils';
 
 const PER_PAGE = 20;
 
 const ROLE_LABELS: Record<string, string> = Object.fromEntries(ROLE_OPTIONS.map((option) => [option.value, option.label]));
+
+const SCAN_PIN_SOURCE_LABELS: Record<string, string> = {
+  admin_reset: 'إعادة تعيين',
+  bulk_issue: 'إصدار جماعي',
+  self_change: 'الموظف غيّره',
+};
+
+/**
+ * Column cell for the scan PIN column. Shows PRESENCE only — the plaintext
+ * PIN is never on the Employee payload (bcrypt-hashed server-side; the
+ * plaintext exists only in the one-shot ResetScanPinDialog response and
+ * the employee's SMS). Three colour-coded states:
+ *   - 🟢 "مسجّل" with the issue date + how it was issued
+ *   - 🟡 "بدون رمز" when the employee could still receive one (has phone)
+ *   - 🔴 "بدون رمز ولا جوال" when neither bulk issue nor SMS can reach them
+ */
+function ScanPinCell({ employee }: { employee: Employee }) {
+  const info = employee.scan_pin;
+  if (!info) {
+    return <span className="text-xs text-muted">—</span>;
+  }
+  if (info.has_pin) {
+    const date = info.set_at ? new Date(info.set_at).toLocaleDateString('ar') : null;
+    const source = info.set_via ? SCAN_PIN_SOURCE_LABELS[info.set_via] ?? info.set_via : null;
+    return (
+      <div className="flex flex-col gap-0.5 text-xs">
+        <span className="font-semibold text-success">● مسجّل</span>
+        {date && (
+          <span className="text-muted">
+            {date}
+            {source ? ` · ${source}` : ''}
+          </span>
+        )}
+      </div>
+    );
+  }
+  const hasPhone = employee.phone !== null && employee.phone.trim() !== '';
+  return (
+    <span className={cn('text-xs font-semibold', hasPhone ? 'text-amber-600' : 'text-danger')}>
+      {hasPhone ? '○ بدون رمز' : '○ بدون رمز ولا جوال'}
+    </span>
+  );
+}
 
 export default function EmployeesPage() {
   const router = useRouter();
@@ -146,6 +190,12 @@ export default function EmployeesPage() {
       key: 'position',
       header: 'المسمى الوظيفي',
       cell: (employee) => employee.position?.title ?? '—',
+    },
+    {
+      key: 'scan_pin',
+      header: 'رمز الحضور',
+      className: 'w-32',
+      cell: (employee) => <ScanPinCell employee={employee} />,
     },
     {
       key: 'status',
