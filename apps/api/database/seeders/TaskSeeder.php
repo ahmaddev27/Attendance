@@ -105,6 +105,30 @@ class TaskSeeder extends Seeder
         $statuses = TaskStatus::query()->ordered()->get();
         $tags = TaskTag::query()->get();
 
+        // Act as the seeded super-admin so TaskService's team-scope guard
+        // on `assigned_to` (TaskService.php ~line 165) does not reject the
+        // demo backlog's cross-team assignments. Admins keep the full-org
+        // reach via Gate::before, and TaskService::create still honours the
+        // real employee passed in `created_by`, so audit trails read
+        // "admin seeded this, created_by = Ahmed" — matching how a manager
+        // actually populates a backlog in production.
+        //
+        // AdminUserSeeder + RolePermissionSeeder are bootstrap-only seeders
+        // that always run before this one (see DatabaseSeeder::run), so
+        // the admin user and super-admin role are both present by the time
+        // we reach here. The null-guard still bails cleanly if someone
+        // invokes TaskSeeder in isolation without the bootstrap chain.
+        $adminUser = User::query()->where('email', 'admin@taqat.local')->first();
+
+        if ($adminUser === null) {
+            $this->command?->warn(
+                'TaskSeeder: skipping sample tasks — admin@taqat.local is missing. '
+                .'Run AdminUserSeeder + RolePermissionSeeder first (or seed via DatabaseSeeder).'
+            );
+
+            return;
+        }
+
         $titles = [
             'تجهيز بيئة التطوير الجديدة',
             'إصلاح خلل تسجيل الدخول',
@@ -144,7 +168,7 @@ class TaskSeeder extends Seeder
                 'due_date' => $dueDate,
                 'progress_percent' => $status->is_done_state ? 100 : ($index * 7) % 90,
                 'tags' => [$tags[$index % $tags->count()]->id],
-            ], $this->userFor($creator));
+            ], $adminUser);
 
             $createdTasks[] = $task;
 
@@ -160,6 +184,9 @@ class TaskSeeder extends Seeder
         }
 
         // One demo subtask, to exercise parent_task_id in a fresh seed.
+        // Admin acts here too so the subtask IDOR guard
+        // (TaskService::create → canActOnTask) passes against the parent
+        // task regardless of who created or was assigned to it.
         if (isset($createdTasks[0])) {
             $tasks->create([
                 'parent_task_id' => $createdTasks[0]->id,
@@ -167,7 +194,7 @@ class TaskSeeder extends Seeder
                 'status_id' => $statuses->first()->id,
                 'priority_id' => $priorities->first()->id,
                 'created_by' => $createdTasks[0]->created_by,
-            ], $this->userFor($employees->firstWhere('id', $createdTasks[0]->created_by)));
+            ], $adminUser);
         }
     }
 
