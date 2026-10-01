@@ -40,7 +40,7 @@ class WorkingHoursCalculator
             return;
         }
 
-        $lateMinutes = $this->lateMinutes($attendance->check_in_at, $schedule);
+        $lateMinutes = $this->calculateLateMinutes($attendance->check_in_at, $schedule);
 
         $attendance->forceFill([
             'late_minutes' => $lateMinutes,
@@ -61,8 +61,8 @@ class WorkingHoursCalculator
         }
 
         $totalMinutes = (int) $attendance->check_in_at->diffInMinutes($attendance->check_out_at);
-        $lateMinutes = $this->lateMinutes($attendance->check_in_at, $schedule);
-        $earlyLeaveMinutes = $this->earlyLeaveMinutes($attendance->check_out_at, $schedule);
+        $lateMinutes = $this->calculateLateMinutes($attendance->check_in_at, $schedule);
+        $earlyLeaveMinutes = $this->calculateEarlyLeaveMinutes($attendance->check_out_at, $schedule);
         $overtimeMinutes = max(0, $totalMinutes - $schedule->expectedMinutes());
 
         $status = match (true) {
@@ -199,8 +199,11 @@ class WorkingHoursCalculator
     /**
      * Minutes late, net of grace, or 0 for a flexible schedule (no fixed
      * check-in time) or an on-time/early arrival.
+     *
+     * Pure compute, no side effects — safe to call from a nightly
+     * recompute sweep or any other read-only consumer.
      */
-    private function lateMinutes(Carbon $checkInAt, WorkSchedule $schedule): int
+    public function calculateLateMinutes(Carbon $checkInAt, WorkSchedule $schedule): int
     {
         if ($schedule->is_flexible || ! $schedule->check_in_time) {
             return 0;
@@ -218,8 +221,11 @@ class WorkingHoursCalculator
     /**
      * Minutes left early, net of grace, or 0 for a flexible schedule (no
      * fixed check-out time) or a departure at/after the scheduled time.
+     *
+     * Pure compute, no side effects — safe to call from a nightly
+     * recompute sweep or any other read-only consumer.
      */
-    private function earlyLeaveMinutes(Carbon $checkOutAt, WorkSchedule $schedule): int
+    public function calculateEarlyLeaveMinutes(Carbon $checkOutAt, WorkSchedule $schedule): int
     {
         if ($schedule->is_flexible || ! $schedule->check_out_time) {
             return 0;

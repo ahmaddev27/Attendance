@@ -314,7 +314,7 @@ class RecomputeAttendanceWorkingHours extends Command
             ];
         }
 
-        $lateMinutes = $this->lateMinutes($checkIn, $schedule);
+        $lateMinutes = $this->calculator->calculateLateMinutes($checkIn, $schedule);
 
         if ($checkOut === null) {
             // Open session: match the stampCheckInStatus contract — late
@@ -329,7 +329,7 @@ class RecomputeAttendanceWorkingHours extends Command
         }
 
         $totalMinutes = (int) $checkIn->diffInMinutes($checkOut);
-        $earlyLeaveMinutes = $this->earlyLeaveMinutes($checkOut, $schedule);
+        $earlyLeaveMinutes = $this->calculator->calculateEarlyLeaveMinutes($checkOut, $schedule);
         $overtimeMinutes = max(0, $totalMinutes - $schedule->expectedMinutes());
 
         $status = match (true) {
@@ -345,49 +345,6 @@ class RecomputeAttendanceWorkingHours extends Command
             'overtime_minutes' => $overtimeMinutes,
             'status' => $status,
         ];
-    }
-
-    /**
-     * Mirror of WorkingHoursCalculator::lateMinutes — kept here because
-     * the shared helper is private on the service and we need the pure
-     * number without the service's forceSave side effect.
-     */
-    private function lateMinutes(Carbon $checkInAt, WorkSchedule $schedule): int
-    {
-        if ($schedule->is_flexible || ! $schedule->check_in_time) {
-            return 0;
-        }
-
-        $scheduledCheckIn = $checkInAt->copy()->setTimeFromTimeString(
-            $schedule->check_in_time->format('H:i:s'),
-        );
-
-        if ($checkInAt->lessThanOrEqualTo($scheduledCheckIn)) {
-            return 0;
-        }
-
-        return max(0, (int) $scheduledCheckIn->diffInMinutes($checkInAt) - $schedule->grace_late_minutes);
-    }
-
-    /**
-     * Mirror of WorkingHoursCalculator::earlyLeaveMinutes — same reason
-     * as lateMinutes above.
-     */
-    private function earlyLeaveMinutes(Carbon $checkOutAt, WorkSchedule $schedule): int
-    {
-        if ($schedule->is_flexible || ! $schedule->check_out_time) {
-            return 0;
-        }
-
-        $scheduledCheckOut = $checkOutAt->copy()->setTimeFromTimeString(
-            $schedule->check_out_time->format('H:i:s'),
-        );
-
-        if ($checkOutAt->greaterThanOrEqualTo($scheduledCheckOut)) {
-            return 0;
-        }
-
-        return max(0, (int) $checkOutAt->diffInMinutes($scheduledCheckOut) - $schedule->grace_early_leave_minutes);
     }
 
     /**
