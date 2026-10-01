@@ -37,7 +37,11 @@ class ScanPinService
 
     private const ISSUE_CHUNK_SIZE = 100;
 
-    private const PIN_SMS_TEMPLATE = 'رمز الحضور الخاص بك في طاقات هو: %s. استخدمه مع رقمك الوظيفي عند مسح رمز QR، ولا تشاركه مع أحد.';
+    // Both the employee_number and the PIN are quoted explicitly — the
+    // employee shouldn't have to look up their own number elsewhere just
+    // to understand "استخدمه مع رقمك الوظيفي". %1$s is employee_number,
+    // %2$s is the PIN.
+    private const PIN_SMS_TEMPLATE = "رمز الحضور الخاص بك في طاقات:\nالرقم الوظيفي: %1\$s\nرمز الحضور: %2\$s\nاستخدم الاثنين معاً عند مسح رمز QR، ولا تشاركهما مع أحد.";
 
     public function __construct(
         private readonly EmployeeScanPinRepository $scanPins,
@@ -259,7 +263,10 @@ class ScanPinService
     private function sendPinSms(Employee $employee, string $pin): bool
     {
         try {
-            $this->sms->send(to: (string) $employee->phone, body: sprintf(self::PIN_SMS_TEMPLATE, $pin));
+            $this->sms->send(
+                to: (string) $employee->phone,
+                body: sprintf(self::PIN_SMS_TEMPLATE, $employee->employee_number, $pin),
+            );
 
             return true;
         } catch (Throwable $e) {

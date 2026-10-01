@@ -280,13 +280,24 @@ class EmployeeService
             return;
         }
 
-        $identifier = $employee->email ?: (string) $employee->employee_number;
-        $body = sprintf(
-            "مرحباً %s،\nتم إنشاء حسابك على منصة TAQAT.\nاسم المستخدم: %s\nكلمة السر: %s\nيرجى تغييرها بعد أول تسجيل دخول.",
-            $employee->full_name,
-            $identifier,
-            $plaintextPassword,
-        );
+        // Always surface the employee_number — it's the identifier the
+        // kiosk scan page accepts, and the one the employee needs for
+        // attendance. The email line is added separately only when it
+        // exists, so an email-less employee doesn't get an empty row.
+        $lines = [
+            sprintf('مرحباً %s،', $employee->full_name),
+            'تم إنشاء حسابك على منصة طاقات.',
+            sprintf('الرقم الوظيفي: %s', $employee->employee_number),
+        ];
+
+        if ($employee->email !== null && $employee->email !== '') {
+            $lines[] = sprintf('البريد الإلكتروني: %s', $employee->email);
+        }
+
+        $lines[] = sprintf('كلمة السر: %s', $plaintextPassword);
+        $lines[] = 'يمكنك تسجيل الدخول بالرقم الوظيفي أو البريد. يرجى تغيير كلمة السر بعد أول دخول.';
+
+        $body = implode("\n", $lines);
 
         try {
             $this->sms->send(to: $employee->phone, body: $body);

@@ -167,12 +167,15 @@ test('issue-missing only issues pins to active employees without one and reports
     Queue::assertPushed(SendSmsJob::class, 2);
 
     Queue::pushed(SendSmsJob::class)->each(function (SendSmsJob $job): void {
-        preg_match('/\d{4}/', $job->body, $matches);
+        // SMS carries BOTH the employee_number and the 4-digit PIN; anchor
+        // the match on the "رمز الحضور:" label so a longer employee_number
+        // can't be mistaken for the PIN here.
+        preg_match('/رمز الحضور:\s*(\d{4})/u', $job->body, $matches);
         // Jobs carry the international number; employees keep what was typed.
         $employee = Employee::query()->whereNotNull('phone')->get()
             ->sole(fn (Employee $candidate): bool => PhoneNumber::toInternational((string) $candidate->phone, '970') === $job->to);
 
-        expect(Hash::check($matches[0], (string) EmployeeScanPin::query()->where('employee_id', $employee->id)->value('pin_hash')))->toBeTrue();
+        expect(Hash::check($matches[1], (string) EmployeeScanPin::query()->where('employee_id', $employee->id)->value('pin_hash')))->toBeTrue();
     });
 
     $audit = DB::table('activity_log')->where('description', 'scan_pin_bulk_issued')->sole();

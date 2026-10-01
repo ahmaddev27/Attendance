@@ -285,16 +285,28 @@ export default function KioskScanPage() {
           <div className="flex w-full max-w-sm flex-col items-center gap-6">
             <LiveClock />
             {/*
-              The /scan/status endpoint no longer returns full_name (that
-              would let anyone with a valid kiosk QR walk employee_number
-              and enumerate the directory). Greet by the employee number
-              here; the actual name is revealed on the success screen
-              after check-in / check-out.
+              /scan/status returns full_name only when PIN mode is on —
+              the PIN proves identity, so the name can safely be shown
+              without turning the kiosk QR into a directory enumeration
+              tool. When PIN mode is off the backend omits full_name and
+              we fall back to the number-only greeting.
             */}
-            <p className="text-2xl font-bold text-ink">
-              مرحباً — الرقم الوظيفي{' '}
-              <span className="num" dir="ltr">{ready.status.employee.employee_number}</span>
-            </p>
+            {ready.status.employee.full_name ? (
+              <div className="flex flex-col items-center gap-1 text-center">
+                <p className="text-3xl font-bold text-ink">
+                  مرحباً {ready.status.employee.full_name}
+                </p>
+                <p className="text-sm text-muted">
+                  الرقم الوظيفي{' '}
+                  <span className="num" dir="ltr">{ready.status.employee.employee_number}</span>
+                </p>
+              </div>
+            ) : (
+              <p className="text-2xl font-bold text-ink">
+                مرحباً — الرقم الوظيفي{' '}
+                <span className="num" dir="ltr">{ready.status.employee.employee_number}</span>
+              </p>
+            )}
             {ready.action === 'check-out' && ready.status.check_in_at && (
               <p className="text-sm text-muted">
                 سُجّل حضورك عند{' '}

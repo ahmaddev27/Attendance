@@ -89,18 +89,23 @@ class ScanController extends Controller
                 default => 'checked_out',
             };
 
-            // NB: deliberately do NOT return the employee's full_name here.
-            // /scan/status is a public, unauthenticated endpoint; returning
-            // the name would let anyone holding a valid kiosk QR walk the
-            // employee_number space and enumerate the entire staff
-            // directory. The FE reveals the name only AFTER a successful
-            // check-in POST, which additionally passes the FraudGuard checks.
+            // full_name is only returned when PIN mode is active: by the
+            // time we reach this response, ScanIdentityService has already
+            // verified the PIN (resolveFromEmployeeNumber), so the PIN
+            // acts as proof-of-identity and leaking the name here can't
+            // be used to walk employee_number for the directory. When PIN
+            // mode is OFF, the endpoint stays silent on the name — a
+            // kiosk QR holder could otherwise enumerate the staff by
+            // iterating numbers.
+            $pinRequired = $this->scanPins->isRequired();
+
             return response()->json([
                 'data' => [
                     'state' => $state,
                     'employee' => [
                         'id' => $employee->id,
                         'employee_number' => $employee->employee_number,
+                        ...($pinRequired ? ['full_name' => $employee->full_name] : []),
                     ],
                     'check_in_at' => $attendance?->check_in_at?->toIso8601String(),
                     'check_out_at' => $attendance?->check_out_at?->toIso8601String(),

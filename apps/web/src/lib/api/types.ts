@@ -257,11 +257,13 @@ export type ScanStatus = {
    * is done, kiosk shows a "see you tomorrow" state.
    */
   state: 'not_checked_in' | 'checked_in' | 'checked_out';
-  // Deliberately no `full_name` — /scan/status is unauthenticated and
-  // returning the name would let a QR-holder enumerate the directory by
-  // walking employee_number. The greeting name comes back only after a
-  // successful check-in POST (see ScanResponse.attendance.employee).
-  employee: { id: number; employee_number: number };
+  // full_name is only present when PIN mode is enabled: the PIN
+  // verified by the status call acts as proof-of-identity, so leaking
+  // the name here can't be used to walk employee_number for the
+  // directory. When PIN mode is OFF the backend omits the field — a
+  // QR-holder would otherwise be able to enumerate staff by iterating
+  // numbers.
+  employee: { id: number; employee_number: number; full_name?: string };
   check_in_at: string | null;
   check_out_at: string | null;
   device_name: string;
