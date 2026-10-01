@@ -1,9 +1,10 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { KeyRound, Loader2, QrCode, ShieldCheck, User as UserIcon } from 'lucide-react';
+import { Bell, ChevronLeft, KeyRound, Loader2, QrCode, ShieldCheck, User as UserIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -93,7 +94,39 @@ export default function EmployeeProfilePage() {
       <PasswordSection />
 
       {data?.employee && <ScanPinSection />}
+
+      <NotificationPreferencesLink />
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Section 4 — link out to the notification preferences matrix. Kept as a
+// separate page because a 6-column opt-OUT matrix dwarfs the identity /
+// password / PIN cards above and warrants its own route.
+// ---------------------------------------------------------------------------
+
+function NotificationPreferencesLink() {
+  return (
+    <Card className="border-hairline bg-surface p-5">
+      <Link
+        href="/profile/preferences"
+        className="flex items-start justify-between gap-4 rounded-md transition hover:bg-surface-2"
+      >
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-md bg-brand-soft text-brand">
+            <Bell className="h-4 w-4" />
+          </span>
+          <div>
+            <h2 className="text-base font-semibold text-ink">تفضيلات الإشعارات</h2>
+            <p className="mt-1 text-xs text-muted">
+              اختر القنوات التي تصلك فيها كل فئة من الإشعارات (البريد، SMS، واتساب، الجوّال...).
+            </p>
+          </div>
+        </div>
+        <ChevronLeft className="mt-1 h-4 w-4 text-muted rtl:rotate-180" />
+      </Link>
+    </Card>
   );
 }
 

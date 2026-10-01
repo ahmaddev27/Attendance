@@ -93,6 +93,26 @@ class TaqatNotification extends Notification implements ShouldQueue
      *                          registered push_tokens row (the mobile app
      *                          writes one on login and clears it on logout).
      */
+    /**
+     * Explicit event key — set via {@see withEventKey()} by
+     * NotificationService::dispatch(). Kept out of the constructor
+     * signature on purpose: callers already pass channel flags positionally
+     * and widening the signature would silently shift later arguments.
+     *
+     * @internal
+     */
+    private ?string $eventKey = null;
+
+    /**
+     * Suppress-database flag — set by NotificationPreferenceService ONLY
+     * when a user has muted every active channel AND we still want to
+     * keep database as the durable inbox. Default false preserves the
+     * existing "database is always on" behaviour.
+     *
+     * @internal
+     */
+    private bool $suppressDatabase = false;
+
     public function __construct(
         public readonly string $title,
         public readonly ?string $body = null,
@@ -109,6 +129,49 @@ class TaqatNotification extends Notification implements ShouldQueue
         // commits — otherwise the queue worker can pick up the job before
         // the notifiable row (or its parent request/task) is visible.
         $this->afterCommit();
+    }
+
+    /**
+     * Attach the preference-matrix event key. NotificationService derives
+     * it from the dedup key (e.g. "leave-decided:42" → "leave_decided") so
+     * the catalog in NotificationPreferenceService stays authoritative
+     * without the caller having to pass the key twice.
+     */
+    public function withEventKey(string $eventKey): self
+    {
+        $this->eventKey = $eventKey;
+
+        return $this;
+    }
+
+    /**
+     * The event-key this notification maps to in the preference matrix,
+     * or null when the caller created the notification directly (tests,
+     * one-off scripts). Null is treated as "no preference check" so
+     * tests that bypass NotificationService keep behaving exactly as
+     * before — the opt-out gate is applied in the service, not here.
+     */
+    public function getEventKey(): ?string
+    {
+        return $this->eventKey;
+    }
+
+    /**
+     * Mark the DB channel for suppression on this instance. Called by the
+     * preference-gate layer when the user has silenced every ACTIVE channel
+     * but we still want to keep the durable inbox row: it would be used by
+     * callers who explicitly want "no record either" — in practice the
+     * dispatcher never flips this on today, because keeping the DB row is
+     * the whole point of the opt-OUT model.
+     *
+     * Guarded with a flag rather than a constructor arg so adding this
+     * capability doesn't shift later positional args on existing callers.
+     */
+    public function suppressDatabase(): self
+    {
+        $this->suppressDatabase = true;
+
+        return $this;
     }
 
     /**
@@ -130,7 +193,11 @@ class TaqatNotification extends Notification implements ShouldQueue
             ]);
         }
 
-        $channels = ['database'];
+        // Database is always on unless the caller flipped suppressDatabase().
+        // The preference-gate layer deliberately does NOT flip it even when
+        // the user silenced every other channel — see suppressDatabase()'s
+        // docblock for why.
+        $channels = $this->suppressDatabase ? [] : ['database'];
 
         // Broadcast is added when Reverb is configured AND the caller
         // didn't ask us to suppress it (see $suppressBroadcast).

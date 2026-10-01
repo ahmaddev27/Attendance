@@ -349,6 +349,13 @@ class NotificationService
      * still lands (so the bell counter and history page catch up on the
      * next poll/open), but Reverb doesn't fan out a second toast/counter
      * update.
+     *
+     * ALSO applies the per-user preference matrix (opt-OUT per channel):
+     * channels the user has silenced for this event_key are suppressed via
+     * the appropriate flag before Laravel resolves via(). The database row
+     * is deliberately NEVER suppressed — even when every active channel is
+     * muted — so the in-app bell remains a durable history even for events
+     * the user doesn't want pushed anywhere else.
      */
     private function dispatch(User $recipient, string $eventKey, TaqatNotification $notification): void
     {
@@ -356,24 +363,68 @@ class NotificationService
 
         $isDuplicate = ! Cache::add($cacheKey, 1, self::DEDUP_WINDOW);
 
-        if ($isDuplicate) {
-            // Preserve every channel flag the caller set (sendSms /
-            // sendWhatsapp / sendPush / suppressMail) — the earlier
-            // partial clone was dropping them silently, which meant a
-            // deduped "leave decided" second event downgraded to
-            // database-only and skipped the SMS the caller expected.
+        // Preferences gate: resolve the catalog key once and ask the matrix
+        // per channel. Unknown keys fall back to the raw TaqatNotification
+        // the caller built — that's the safe default for brand-new events
+        // not yet listed in NotificationPreferenceService::knownEventKeys().
+        $preferences = app(NotificationPreferenceService::class);
+        $catalogKey = $preferences->resolveEventKey($eventKey);
+
+        $suppressBroadcast = $isDuplicate;
+        $suppressMail = $notification->suppressMail;
+        $sendSms = $notification->sendSms;
+        $sendWhatsapp = $notification->sendWhatsapp;
+        $sendPush = $notification->sendPush;
+
+        if ($catalogKey !== null) {
+            if (! $preferences->isEnabled($recipient, $catalogKey, 'broadcast')) {
+                $suppressBroadcast = true;
+            }
+            if (! $preferences->isEnabled($recipient, $catalogKey, 'mail')) {
+                $suppressMail = true;
+            }
+            if ($sendSms && ! $preferences->isEnabled($recipient, $catalogKey, 'sms')) {
+                $sendSms = false;
+            }
+            if ($sendWhatsapp && ! $preferences->isEnabled($recipient, $catalogKey, 'whatsapp')) {
+                $sendWhatsapp = false;
+            }
+            if ($sendPush && ! $preferences->isEnabled($recipient, $catalogKey, 'push')) {
+                $sendPush = false;
+            }
+        }
+
+        // Clone the notification only when any flag diverged — otherwise
+        // the caller's instance is used verbatim. Preserve every channel
+        // flag so a deduped or preference-gated event doesn't accidentally
+        // strip an unrelated flag.
+        $needsClone = $isDuplicate
+            || $suppressMail !== $notification->suppressMail
+            || $sendSms !== $notification->sendSms
+            || $sendWhatsapp !== $notification->sendWhatsapp
+            || $sendPush !== $notification->sendPush
+            || $suppressBroadcast !== $notification->suppressBroadcast;
+
+        if ($needsClone) {
             $notification = new TaqatNotification(
                 title: $notification->title,
                 body: $notification->body,
                 url: $notification->url,
                 icon: $notification->icon,
                 meta: $notification->meta,
-                suppressBroadcast: true,
-                suppressMail: $notification->suppressMail,
-                sendSms: $notification->sendSms,
-                sendWhatsapp: $notification->sendWhatsapp,
-                sendPush: $notification->sendPush,
+                suppressBroadcast: $suppressBroadcast,
+                suppressMail: $suppressMail,
+                sendSms: $sendSms,
+                sendWhatsapp: $sendWhatsapp,
+                sendPush: $sendPush,
             );
+        }
+
+        // Stamp the catalog key on the notification so downstream consumers
+        // (future audit, test assertions) can trace a sent notification
+        // back to the preference matrix entry it was gated by.
+        if ($catalogKey !== null) {
+            $notification->withEventKey($catalogKey);
         }
 
         Notification::send($recipient, $notification);

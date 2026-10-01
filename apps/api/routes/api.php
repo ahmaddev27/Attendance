@@ -18,6 +18,7 @@ use App\Modules\Leaves\Controllers\EmployeeLeavesController;
 use App\Modules\Leaves\Controllers\LeaveBalanceController;
 use App\Modules\Leaves\Controllers\LeaveRequestController;
 use App\Modules\Leaves\Controllers\LeaveTypeController;
+use App\Modules\Notifications\Controllers\MyNotificationPreferencesController;
 use App\Modules\Notifications\Controllers\MyNotificationsController;
 use App\Modules\Organization\Controllers\CompanyController;
 use App\Modules\Organization\Controllers\DepartmentController;
@@ -474,6 +475,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/unread-count', [MyNotificationsController::class, 'unreadCount']);
         Route::post('/read-all', [MyNotificationsController::class, 'markAllRead']);
         Route::post('/{id}/read', [MyNotificationsController::class, 'markRead']);
+    });
+
+    // Per-user notification preference matrix. Opt-OUT model — missing
+    // rows mean "enabled" — so GET fills in true for every untouched cell
+    // and PUT bulk-upserts the whole matrix in one transaction.
+    Route::prefix('me/notification-preferences')->group(function () {
+        Route::get('/', [MyNotificationPreferencesController::class, 'index']);
+        Route::put('/', [MyNotificationPreferencesController::class, 'update']);
     });
 
     // Mobile push tokens. The RN app registers on login/launch and

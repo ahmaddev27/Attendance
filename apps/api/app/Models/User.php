@@ -83,6 +83,18 @@ class User extends Authenticatable
     }
 
     /**
+     * Per-user opt-OUT rows for the notification matrix. Missing rows
+     * mean "enabled" — the service never writes a row for a default
+     * state, so the table stays small even at full scale.
+     *
+     * @return HasMany<NotificationPreference, $this>
+     */
+    public function notificationPreferences(): HasMany
+    {
+        return $this->hasMany(NotificationPreference::class);
+    }
+
+    /**
      * Credentials never enter the trail. Saves that touch only them, or the
      * timestamp stamped on every sign-in, are skipped before Spatie re-reads
      * the row, so login and password rotation cost no extra queries.
