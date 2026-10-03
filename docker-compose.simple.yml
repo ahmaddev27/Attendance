@@ -165,6 +165,11 @@ services:
       # public/ directory that php-fpm serves. api owns writes here; nginx
       # reads only.
       - ./apps/api:/var/www/html:ro
+      # Overlay the same api_storage volume the api container writes
+      # uploads to. Without this, nginx's `/storage/` location would
+      # alias into the empty host folder (no uploads live in the repo
+      # bind mount) and every logo / avatar / attachment 404s.
+      - api_storage:/var/www/html/storage:ro
       - ./infra/docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     networks: [taqat]
 
