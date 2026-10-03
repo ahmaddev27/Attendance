@@ -8,6 +8,11 @@ use Illuminate\Support\Facades\Schema;
  * on the same database. Runs through the real migrator (not by calling
  * down() directly) so the migrations table stays truthful, which is also
  * what lets a failed assertion be repaired by the `finally` block.
+ *
+ * Phase 2 (`2026_11_01_1000*.php`) must roll back BEFORE Phase 1 because
+ * `candidate_applications` FKs point at `job_requirements`; dropping the
+ * tables in forward order would fail the FK constraint. The migrator
+ * handles that naturally when the whole window is rolled back together.
  */
 const RECRUITMENT_TABLES = [
     'recruitment_pipelines',
@@ -18,6 +23,12 @@ const RECRUITMENT_TABLES = [
     'client_contacts',
     'recruitment_cases',
     'job_requirements',
+    // Phase 2 — Candidate bank + Interview workflow.
+    'candidates',
+    'candidate_applications',
+    'candidate_screenings',
+    'interviews',
+    'interview_feedbacks',
 ];
 
 /**
@@ -25,7 +36,9 @@ const RECRUITMENT_TABLES = [
  */
 function recruitmentMigrationPaths(): array
 {
-    $paths = glob(database_path('migrations/2026_10_01_1000*.php')) ?: [];
+    $phase1 = glob(database_path('migrations/2026_10_01_1000*.php')) ?: [];
+    $phase2 = glob(database_path('migrations/2026_11_01_1000*.php')) ?: [];
+    $paths = array_merge($phase1, $phase2);
     sort($paths);
 
     return $paths;
@@ -35,7 +48,8 @@ test('recruitment migrations roll back completely and re-apply cleanly', functio
     $paths = recruitmentMigrationPaths();
     $names = array_map(fn (string $path) => basename($path, '.php'), $paths);
 
-    expect($paths)->toHaveCount(11);
+    // 11 Phase 1 + 7 Phase 2.
+    expect($paths)->toHaveCount(18);
 
     try {
         $this->artisan('migrate:rollback', ['--path' => $paths, '--realpath' => true])
@@ -58,7 +72,7 @@ test('recruitment migrations roll back completely and re-apply cleanly', functio
 
         expect(Schema::hasColumns('tasks', ['entity_type', 'entity_id']))->toBeTrue()
             ->and(Schema::hasColumns('leads', ['converted_client_id', 'lead_number']))->toBeTrue()
-            ->and(DB::table('migrations')->whereIn('migration', $names)->count())->toBe(11);
+            ->and(DB::table('migrations')->whereIn('migration', $names)->count())->toBe(18);
 
         // The reference-data migration re-seeds on the way back up.
         $pipelineId = DB::table('recruitment_pipelines')->where('code', 'standard')->value('id');
