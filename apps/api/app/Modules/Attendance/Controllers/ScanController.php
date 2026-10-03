@@ -59,6 +59,64 @@ class ScanController extends Controller
     }
 
     /**
+     * `POST /api/scan/record` — one-tap kiosk endpoint for PIN-only mode:
+     * resolves the employee from the typed PIN, reads today's state, and
+     * executes the one appropriate action without a confirmation screen.
+     *
+     * This is what makes the "PIN فقط بدون تأكيد ولا اسم" UX possible
+     * (see memory: project-pin-only-scan-decision) — the FE sends PIN,
+     * the server picks check-in vs check-out, both parties learn the
+     * result in a single round trip. If the day is already complete, we
+     * return 409 so the kiosk can show a friendly "done for today".
+     */
+    public function record(ScanRequest $request): JsonResponse
+    {
+        try {
+            $device = $this->qrTokens->resolveDevice($request->qrToken());
+            $employee = $this->resolveEmployee($request);
+
+            // Half-open range on `date` (not a bare equality) because the
+            // Laravel `date` cast stores "YYYY-MM-DD 00:00:00" on SQLite
+            // — a string comparison against the ISO date misses every
+            // row and we'd mis-route the second scan as a brand-new
+            // check-in. AttendanceService::checkIn uses the same pattern.
+            $today = now()->startOfDay();
+            $attendance = Attendance::query()
+                ->where('employee_id', $employee->id)
+                ->where('date', '>=', $today)
+                ->where('date', '<', $today->copy()->addDay())
+                ->first();
+
+            $action = match (true) {
+                $attendance === null || $attendance->check_in_at === null => 'check-in',
+                $attendance->check_out_at === null => 'check-out',
+                default => 'done',
+            };
+
+            if ($action === 'done') {
+                return response()->json([
+                    'action' => 'done',
+                    'message' => 'سجّلت حضورك وانصرافك لليوم.',
+                    'check_in_at' => $attendance->check_in_at?->toIso8601String(),
+                    'check_out_at' => $attendance->check_out_at?->toIso8601String(),
+                ], 409);
+            }
+
+            $result = $action === 'check-in'
+                ? $this->attendanceService->checkIn($employee, $device, $request->latitude(), $request->longitude(), $request->ip() ?? '0.0.0.0')
+                : $this->attendanceService->checkOut($employee, $device, $request->latitude(), $request->longitude(), $request->ip() ?? '0.0.0.0');
+
+            return response()->json([
+                'action' => $action,
+                'attendance' => (new AttendanceResource($result))->resolve(),
+                'message' => $action === 'check-in' ? 'تم تسجيل حضورك' : 'تم تسجيل انصرافك',
+            ]);
+        } catch (AttendanceModuleException $exception) {
+            return response()->json(['message' => $exception->getMessage()], $exception->statusCode());
+        }
+    }
+
+    /**
      * `POST /api/scan/status` — the kiosk asks: "what's the next action
      * for this employee at this device?" Returns exactly one of:
      *   - not_checked_in   → today's row has no check_in_at → show
@@ -77,10 +135,15 @@ class ScanController extends Controller
             $device = $this->qrTokens->resolveDevice($request->qrToken());
             $employee = $this->resolveEmployee($request);
 
-            $today = now()->toDateString();
+            // Half-open range on `date` (not a bare equality) — same reason
+            // as record() and AttendanceService::checkIn: SQLite stores the
+            // `date` cast as "YYYY-MM-DD 00:00:00", so a bare string match
+            // would miss every row and the kiosk would mis-render state.
+            $today = now()->startOfDay();
             $attendance = Attendance::query()
                 ->where('employee_id', $employee->id)
-                ->where('date', $today)
+                ->where('date', '>=', $today)
+                ->where('date', '<', $today->copy()->addDay())
                 ->first();
 
             $state = match (true) {
@@ -89,23 +152,19 @@ class ScanController extends Controller
                 default => 'checked_out',
             };
 
-            // full_name is only returned when PIN mode is active: by the
-            // time we reach this response, ScanIdentityService has already
-            // verified the PIN (resolveFromEmployeeNumber), so the PIN
-            // acts as proof-of-identity and leaking the name here can't
-            // be used to walk employee_number for the directory. When PIN
-            // mode is OFF, the endpoint stays silent on the name — a
-            // kiosk QR holder could otherwise enumerate the staff by
-            // iterating numbers.
-            $pinRequired = $this->scanPins->isRequired();
-
+            // full_name is deliberately NOT returned on PIN-only mode: the
+            // owner's call is "no name, no confirmation screen" (see memory
+            // project-pin-only-scan-decision). Still returned when PIN mode
+            // is off because the legacy employee_number-only flow needs it
+            // for its confirmation screen; the number-only flow IS the
+            // directory-enumeration risk that PIN-only closes down.
             return response()->json([
                 'data' => [
                     'state' => $state,
                     'employee' => [
                         'id' => $employee->id,
                         'employee_number' => $employee->employee_number,
-                        ...($pinRequired ? ['full_name' => $employee->full_name] : []),
+                        ...($this->scanPins->isRequired() ? [] : ['full_name' => $employee->full_name]),
                     ],
                     'check_in_at' => $attendance?->check_in_at?->toIso8601String(),
                     'check_out_at' => $attendance?->check_out_at?->toIso8601String(),
@@ -182,6 +241,11 @@ class ScanController extends Controller
      */
     private function resolveEmployee(ScanIdentityRequest $request): Employee
     {
-        return $this->scanIdentity->resolve($request->bearerToken(), $request->employeeNumber(), $request->pin());
+        return $this->scanIdentity->resolve(
+            $request->bearerToken(),
+            $request->employeeNumber(),
+            $request->pin(),
+            $request->ip() ?? '0.0.0.0',
+        );
     }
 }

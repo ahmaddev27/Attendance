@@ -295,7 +295,7 @@ test('changing my pin replaces the old one for scanning', function () {
 
     $this->postJson('/api/scan/status', [...$payload, 'pin' => '4829'])
         ->assertUnprocessable()
-        ->assertJsonPath('message', 'الرقم الوظيفي أو رمز الحضور غير صحيح.');
+        ->assertJsonPath('message', 'رمز الحضور غير صحيح.');
 
     $this->postJson('/api/scan/status', [...$payload, 'pin' => '7315'])
         ->assertOk();

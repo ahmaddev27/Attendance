@@ -68,11 +68,18 @@ function enableScanPinEnforcement(): void
 
 function issueScanPinFor(Employee $employee, string $pin): void
 {
-    \App\Models\EmployeeScanPin::query()->create([
-        'employee_id' => $employee->id,
-        'pin_hash' => \Illuminate\Support\Facades\Hash::make($pin),
-        'set_via' => \App\Shared\Enums\ScanPinSource::AdminReset,
-    ]);
+    // Mirror ScanPinService::reset: both the bcrypt at-rest hash and the
+    // HMAC lookup hash are set so PIN-only identity can find the row.
+    $lookup = app(\App\Modules\Attendance\Services\ScanPinHasher::class)->hash($pin);
+
+    \App\Models\EmployeeScanPin::query()->updateOrCreate(
+        ['employee_id' => $employee->id],
+        [
+            'pin_hash' => \Illuminate\Support\Facades\Hash::make($pin),
+            'pin_lookup_hash' => $lookup,
+            'set_via' => \App\Shared\Enums\ScanPinSource::AdminReset,
+        ],
+    );
 }
 
 /**

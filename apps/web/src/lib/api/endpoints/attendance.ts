@@ -86,7 +86,8 @@ export const attendanceApi = {
 };
 
 export type ScanCheckPayload = {
-  employee_number: number;
+  /** Omitted on PIN-only mode — the server resolves the employee from `pin`. */
+  employee_number?: number;
   qr_token: string;
   /** Only sent while the device reports `pin_required`. */
   pin?: string;
@@ -96,8 +97,23 @@ export type ScanCheckPayload = {
 
 export type ScanStatusPayload = {
   qr_token: string;
-  employee_number: number;
+  /** Omitted on PIN-only mode — the server resolves from `pin`. */
+  employee_number?: number;
   pin?: string;
+};
+
+/**
+ * `POST /scan/record` response — the one-tap PIN-only endpoint picks the
+ * action for the kiosk, so the FE just renders what the server did.
+ * `action: 'done'` arrives with HTTP 409 (the day already closed) and no
+ * `attendance` payload.
+ */
+export type ScanRecordResponse = {
+  action: 'check-in' | 'check-out' | 'done';
+  message: string;
+  attendance?: Attendance;
+  check_in_at?: string | null;
+  check_out_at?: string | null;
 };
 
 /**
@@ -115,6 +131,14 @@ export const scanApi = {
 
   checkOut: (payload: ScanCheckPayload) =>
     publicApiClient.post<ScanResponse>('/scan/check-out', payload).then((r) => r.data),
+
+  /**
+   * PIN-only one-tap: send just the PIN (+ coords) and the server decides
+   * whether to check-in or check-out, returning the taken action and the
+   * resulting attendance row in a single roundtrip.
+   */
+  record: (payload: ScanCheckPayload) =>
+    publicApiClient.post<ScanRecordResponse>('/scan/record', payload).then((r) => r.data),
 
   /**
    * Read-only probe: given (qr_token, employee_number), returns the

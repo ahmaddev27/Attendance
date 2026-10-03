@@ -26,11 +26,17 @@ abstract class ScanIdentityRequest extends FormRequest
     public function rules(ScanPinService $scanPins): array
     {
         $viaBearerToken = $this->bearerToken() !== null;
+        $pinOnly = ! $viaBearerToken && $scanPins->isRequired();
 
         return [
-            'employee_number' => [$viaBearerToken ? 'nullable' : 'required', 'integer', 'min:1'],
+            // employee_number is required ONLY on the legacy pre-PIN kiosk
+            // flow. PIN-only identity resolves to the employee from the
+            // typed PIN itself (see ScanPinService::resolveByPin).
+            'employee_number' => $viaBearerToken || $pinOnly
+                ? ['nullable', 'integer', 'min:1']
+                : ['required', 'integer', 'min:1'],
             'qr_token' => ['required', 'string', 'size:64'],
-            'pin' => ! $viaBearerToken && $scanPins->isRequired()
+            'pin' => $pinOnly
                 ? ['required', 'digits:4']
                 : ['exclude'],
         ];

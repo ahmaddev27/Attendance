@@ -191,6 +191,11 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::prefix('scan')->withoutMiddleware('throttle:api')->group(function () {
     Route::post('/check-in', [ScanController::class, 'checkIn'])->middleware('throttle:30,1,scan-check-in');
     Route::post('/check-out', [ScanController::class, 'checkOut'])->middleware('throttle:30,1,scan-check-out');
+    // PIN-only one-tap endpoint: resolves the employee from PIN, decides
+    // check-in vs check-out from today's state, and records it in a single
+    // round trip. Same per-minute budget as either explicit action since
+    // in practice an employee hits one or the other, never both at once.
+    Route::post('/record', [ScanController::class, 'record'])->middleware('throttle:30,1,scan-record');
     // Read-only "what's my state?" probe — the kiosk hits this first,
     // then shows a single check-in OR check-out button based on the
     // returned `state`. Higher throttle (60/min) since it's read-only

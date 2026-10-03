@@ -58,18 +58,21 @@ test('with enforcement on a wrong pin is rejected with the generic message', fun
 
     $this->postJson('/api/scan/check-in', scanPinPayload($employee, $device, ['pin' => '9164']))
         ->assertUnprocessable()
-        ->assertJsonPath('message', 'الرقم الوظيفي أو رمز الحضور غير صحيح.');
+        ->assertJsonPath('message', 'رمز الحضور غير صحيح.');
 
     expect(Attendance::query()->where('employee_id', $employee->id)->exists())->toBeFalse();
 });
 
 test('with enforcement on an unknown employee number gets the same generic message', function () {
+    // Under PIN-only identity (owner's 2026-10-03 call), employee_number is
+    // ignored on the kiosk path — the PIN alone identifies the row. An
+    // unknown number plus a wrong PIN therefore collapses to "wrong PIN".
     enableScanPinEnforcement();
     $device = AttendanceDevice::factory()->create();
 
     $this->postJson('/api/scan/check-in', ['employee_number' => 999999, 'qr_token' => $device->qr_token, 'pin' => '4829'])
         ->assertUnprocessable()
-        ->assertJsonPath('message', 'الرقم الوظيفي أو رمز الحضور غير صحيح.');
+        ->assertJsonPath('message', 'رمز الحضور غير صحيح.');
 });
 
 test('with enforcement on the correct pin checks the employee in', function () {
@@ -85,13 +88,16 @@ test('with enforcement on the correct pin checks the employee in', function () {
     expect(Attendance::query()->where('employee_id', $employee->id)->exists())->toBeTrue();
 });
 
-test('five wrong pins lock the employee out even when the next pin is correct', function () {
+test('ten wrong pins from the same IP lock the kiosk out even when the next pin is correct', function () {
+    // PIN-only identity rate-limits per-IP (we can't key off an employee
+    // we haven't resolved yet). Threshold is 10 — wider than the old
+    // per-employee bucket because a busy shared kiosk sees legit typos.
     enableScanPinEnforcement();
     $employee = makeEmployeeWithSchedule();
     issueScanPinFor($employee, '4829');
     $device = AttendanceDevice::factory()->create();
 
-    foreach (range(1, 5) as $attempt) {
+    foreach (range(1, 10) as $attempt) {
         $this->postJson('/api/scan/status', scanPinPayload($employee, $device, ['pin' => '9164']))
             ->assertUnprocessable();
     }
@@ -103,14 +109,14 @@ test('five wrong pins lock the employee out even when the next pin is correct', 
     expect(Attendance::query()->where('employee_id', $employee->id)->exists())->toBeFalse();
 });
 
-test('a correct pin clears the failed-attempt counter', function () {
+test('a correct pin clears the IP failed-attempt counter', function () {
     enableScanPinEnforcement();
     $employee = makeEmployeeWithSchedule();
     issueScanPinFor($employee, '4829');
     $device = AttendanceDevice::factory()->create();
 
     foreach (range(1, 2) as $round) {
-        foreach (range(1, 4) as $attempt) {
+        foreach (range(1, 9) as $attempt) {
             $this->postJson('/api/scan/status', scanPinPayload($employee, $device, ['pin' => '9164']))
                 ->assertUnprocessable();
         }
@@ -120,14 +126,19 @@ test('a correct pin clears the failed-attempt counter', function () {
     }
 });
 
-test('an employee who was never issued a pin is told to contact the administration', function () {
+test('an unknown PIN just gets the generic invalid-credentials response', function () {
+    // Under PIN-only identity, "no PIN issued for this employee" is
+    // indistinguishable from "wrong PIN" — the server never had a row to
+    // match the typed PIN against, so it returns the generic message.
+    // This is a feature: it prevents walking the directory to learn who
+    // does/doesn't have a PIN yet.
     enableScanPinEnforcement();
     $employee = makeEmployeeWithSchedule();
     $device = AttendanceDevice::factory()->create();
 
     $this->postJson('/api/scan/check-in', scanPinPayload($employee, $device, ['pin' => '4829']))
         ->assertUnprocessable()
-        ->assertJsonPath('message', 'لم يُصدر لك رمز حضور بعد. تواصل مع الإدارة.');
+        ->assertJsonPath('message', 'رمز الحضور غير صحيح.');
 });
 
 test('the status endpoint requires the pin too', function () {
@@ -142,7 +153,7 @@ test('the status endpoint requires the pin too', function () {
 
     $this->postJson('/api/scan/status', scanPinPayload($employee, $device, ['pin' => '9164']))
         ->assertUnprocessable()
-        ->assertJsonPath('message', 'الرقم الوظيفي أو رمز الحضور غير صحيح.');
+        ->assertJsonPath('message', 'رمز الحضور غير صحيح.');
 
     $this->postJson('/api/scan/status', scanPinPayload($employee, $device, ['pin' => '4829']))
         ->assertOk()
@@ -157,7 +168,7 @@ test('check-out requires the pin too', function () {
 
     $this->postJson('/api/scan/check-out', scanPinPayload($employee, $device, ['pin' => '9164']))
         ->assertUnprocessable()
-        ->assertJsonPath('message', 'الرقم الوظيفي أو رمز الحضور غير صحيح.');
+        ->assertJsonPath('message', 'رمز الحضور غير صحيح.');
 });
 
 test('scans with an invalid qr token never count against the pin lockout', function () {

@@ -10,7 +10,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { LiveClock } from '@/components/attendance/live-clock';
-import { scanApi, type ScanCheckPayload } from '@/lib/api/endpoints/attendance';
+import {
+  scanApi,
+  type ScanCheckPayload,
+  type ScanRecordResponse,
+} from '@/lib/api/endpoints/attendance';
 import { formatTime } from '@/lib/attendance-format';
 import type { ScanDeviceInfo, ScanResponse, ScanStatus } from '@/lib/api/types';
 
@@ -22,6 +26,7 @@ import type { ScanDeviceInfo, ScanResponse, ScanStatus } from '@/lib/api/types';
 type ViewState =
   | 'loading-device'
   | 'device-error'
+  | 'entering-pin'
   | 'entering-number'
   | 'checking-status'
   | 'ready'
@@ -35,7 +40,16 @@ type ReadyPayload = {
   action: 'check-in' | 'check-out';
 };
 
+type SuccessPayload = {
+  action: 'check-in' | 'check-out';
+  // The timestamp to show (either check_in_at or check_out_at from the
+  // just-written attendance row).
+  at: string | null;
+  message: string;
+};
+
 const PIN_PATTERN = /^\d{4}$/;
+const SUCCESS_RESET_MS = 3500;
 
 function getCurrentPosition(): Promise<GeolocationPosition | null> {
   // Geolocation is best-effort: if the device doesn't have it or the user
@@ -70,10 +84,7 @@ export default function KioskScanPage() {
   const [employeeNumberInput, setEmployeeNumberInput] = useState('');
   const [pinInput, setPinInput] = useState('');
   const [ready, setReady] = useState<ReadyPayload | null>(null);
-  const [successResult, setSuccessResult] = useState<{
-    action: 'check-in' | 'check-out';
-    response: ScanResponse;
-  } | null>(null);
+  const [success, setSuccess] = useState<SuccessPayload | null>(null);
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pinRequired = device?.pin_required === true;
 
@@ -82,9 +93,10 @@ export default function KioskScanPage() {
     try {
       const info = await scanApi.deviceInfo(qrToken);
       setDevice(info);
-      // Always start at the number-entry screen — shared kiosks must not
-      // pre-fill a previous employee (see comment at top of file).
-      setView('entering-number');
+      // Pick the entry screen that matches the device's enforcement mode.
+      // PIN-required = PIN-only identity (owner's call 2026-10-03 — see
+      // memory project-pin-only-scan-decision). No employee number input.
+      setView(info.pin_required ? 'entering-pin' : 'entering-number');
     } catch {
       setView('device-error');
     }
@@ -98,29 +110,101 @@ export default function KioskScanPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadDevice]);
 
+  const resetToEntry = useCallback(() => {
+    setReady(null);
+    setSuccess(null);
+    setPinInput('');
+    setEmployeeNumberInput('');
+    setView(pinRequired ? 'entering-pin' : 'entering-number');
+  }, [pinRequired]);
+
   const returnToNumberEntry = () => {
     setReady(null);
     setPinInput('');
-    setView('entering-number');
+    setView(pinRequired ? 'entering-pin' : 'entering-number');
   };
 
-  /**
-   * Query the backend for what THIS employee should do next — the whole
-   * point of the new flow. `not_checked_in` → offer check-in;
-   * `checked_in` → offer check-out; `checked_out` → show a done screen.
-   */
+  const scheduleAutoReset = useCallback(() => {
+    if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+    resetTimerRef.current = setTimeout(resetToEntry, SUCCESS_RESET_MS);
+  }, [resetToEntry]);
+
+  // ---------- PIN-only flow: one tap, no name, no confirmation ----------
+
+  const submitPinOnly = async () => {
+    if (!PIN_PATTERN.test(pinInput)) {
+      toast.error('أدخل رمز الحضور المكوّن من 4 أرقام');
+      return;
+    }
+    setView('locating');
+
+    const needsGeo = device?.enforce_geo === true;
+    const position = needsGeo ? await getCurrentPosition() : null;
+    const payload: ScanCheckPayload = {
+      qr_token: qrToken,
+      pin: pinInput,
+      latitude: position?.coords.latitude ?? undefined,
+      longitude: position?.coords.longitude ?? undefined,
+    };
+
+    try {
+      const response: ScanRecordResponse = await scanApi.record(payload);
+      // Clear PIN immediately so it never lingers on a shared kiosk,
+      // even for the fraction of a second before the success view mounts.
+      setPinInput('');
+
+      if (response.action === 'done') {
+        setSuccess({
+          action: 'check-out',
+          at: response.check_out_at ?? null,
+          message: response.message,
+        });
+        setView('day-complete');
+        scheduleAutoReset();
+        return;
+      }
+
+      setSuccess({
+        action: response.action,
+        at:
+          response.action === 'check-in'
+            ? response.attendance?.check_in_at ?? null
+            : response.attendance?.check_out_at ?? null,
+        message: response.message,
+      });
+      setView('success');
+      scheduleAutoReset();
+    } catch (err: unknown) {
+      const { status, message } = readApiError(err);
+      // 409 == day complete; the server still ships a message + the two
+      // timestamps so we can show the done screen with real times.
+      if (status === 409) {
+        const payload409 = (err as { response?: { data?: ScanRecordResponse } })?.response?.data;
+        setSuccess({
+          action: 'check-out',
+          at: payload409?.check_out_at ?? null,
+          message: payload409?.message ?? 'سجّلت حضورك وانصرافك لليوم.',
+        });
+        setView('day-complete');
+        scheduleAutoReset();
+        return;
+      }
+      toast.error(message ?? 'رمز غير صحيح، حاول مرة أخرى');
+      setPinInput('');
+      setView('entering-pin');
+    }
+  };
+
+  // ---------- Legacy flow (PIN-off): employee_number → status → confirm ----------
+
   const probeStatus = async (employeeNumber: number) => {
     setView('checking-status');
     try {
       const status = await scanApi.status({
         qr_token: qrToken,
         employee_number: employeeNumber,
-        pin: pinRequired ? pinInput : undefined,
       });
       if (status.state === 'checked_out') {
-        // Nothing is left to submit today, so the PIN must not linger on a
-        // shared kiosk.
-        setPinInput('');
         setReady({ status, action: 'check-out' });
         setView('day-complete');
         return;
@@ -134,70 +218,57 @@ export default function KioskScanPage() {
     }
   };
 
-  const submitScan = async () => {
+  const submitScanLegacy = async () => {
     if (!ready) return;
     setView('locating');
 
-    // Only ask the browser for a location fix when the device actually
-    // enforces geofencing. Prompting every time and then discarding the
-    // answer produced the annoying "enable location" nag the user hit on
-    // devices where geo is off. Also skips the 10-second timeout wait on
-    // OS-level denials.
     const needsGeo = device?.enforce_geo === true;
     const position = needsGeo ? await getCurrentPosition() : null;
     const payload: ScanCheckPayload = {
       employee_number: ready.status.employee.employee_number,
       qr_token: qrToken,
-      pin: pinRequired ? pinInput : undefined,
       latitude: position?.coords.latitude ?? undefined,
       longitude: position?.coords.longitude ?? undefined,
     };
     try {
-      const response =
+      const response: ScanResponse =
         ready.action === 'check-in'
           ? await scanApi.checkIn(payload)
           : await scanApi.checkOut(payload);
-      setPinInput('');
-      setSuccessResult({ action: ready.action, response });
+      setSuccess({
+        action: ready.action,
+        at:
+          ready.action === 'check-in'
+            ? response.attendance.check_in_at
+            : response.attendance.check_out_at,
+        message: response.message,
+      });
       setView('success');
-      // After a beat, reset back to the number-entry screen so the next
-      // person in line at the kiosk can walk up.
-      resetTimerRef.current = setTimeout(() => {
-        setSuccessResult(null);
-        setReady(null);
-        setEmployeeNumberInput('');
-        setView('entering-number');
-      }, 4500);
+      scheduleAutoReset();
     } catch (err: unknown) {
-      const { status, message } = readApiError(err);
+      const { message } = readApiError(err);
       toast.error(message ?? 'حدث خطأ، حاول مرة أخرى');
-      // A rejected or locked-out PIN can never succeed from the ready
-      // screen, so the employee goes back to re-enter it.
-      if (pinRequired && (status === 422 || status === 429)) {
-        returnToNumberEntry();
-        return;
-      }
       setView('ready');
     }
   };
 
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (pinRequired) {
+      submitPinOnly();
+      return;
+    }
     const number = Number(employeeNumberInput);
     if (!employeeNumberInput.trim() || !Number.isFinite(number) || number <= 0) {
       toast.error('أدخل رقماً وظيفياً صحيحاً');
-      return;
-    }
-    if (pinRequired && !PIN_PATTERN.test(pinInput)) {
-      toast.error('أدخل رمز الحضور المكوّن من 4 أرقام');
       return;
     }
     probeStatus(number);
   };
 
   const changeEmployee = () => {
-    setEmployeeNumberInput('');
-    returnToNumberEntry();
+    if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+    resetToEntry();
   };
 
   return (
@@ -227,13 +298,46 @@ export default function KioskScanPage() {
           </div>
         )}
 
+        {/*
+          PIN-only entry screen: a single 4-digit input. The server decides
+          whether this scan is a check-in or a check-out, so the kiosk has
+          exactly one button and no middle "confirm" screen.
+        */}
+        {view === 'entering-pin' && (
+          <form onSubmit={handleManualSubmit} className="flex w-full max-w-sm flex-col items-center gap-6">
+            <LiveClock />
+            <div className="flex flex-col items-center gap-2 text-center">
+              <p className="text-lg font-semibold text-ink">أدخل رمز الحضور</p>
+              <p className="text-xs text-muted">4 أرقام — يحدد النظام تلقائياً حضور أو انصراف</p>
+            </div>
+            <Input
+              id="scan-pin"
+              type="password"
+              inputMode="numeric"
+              autoFocus
+              autoComplete="off"
+              maxLength={4}
+              aria-label="رمز الحضور"
+              value={pinInput}
+              onChange={(e) => setPinInput(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
+              className="num h-20 w-full rounded-2xl text-center text-5xl font-bold tracking-[0.5em]"
+              dir="ltr"
+            />
+            <Button
+              type="submit"
+              className="min-h-[64px] w-full bg-brand text-xl font-bold text-white hover:bg-brand-hover"
+            >
+              تسجيل
+            </Button>
+          </form>
+        )}
+
+        {/* Legacy flow (PIN enforcement off): number entry + status + confirm. */}
         {view === 'entering-number' && (
           <form onSubmit={handleManualSubmit} className="flex w-full max-w-sm flex-col items-center gap-6">
             <LiveClock />
             <div className="flex flex-col items-center gap-2 text-center">
-              <p className="text-lg font-semibold text-ink">
-                {pinRequired ? 'أدخل رقمك الوظيفي ورمز الحضور' : 'أدخل رقمك الوظيفي'}
-              </p>
+              <p className="text-lg font-semibold text-ink">أدخل رقمك الوظيفي</p>
               <p className="text-xs text-muted">سنعرض الزر المناسب لك — حضور أو انصراف</p>
             </div>
             <Input
@@ -246,25 +350,6 @@ export default function KioskScanPage() {
               className="num h-20 w-full rounded-2xl text-center text-4xl font-bold tracking-widest"
               dir="ltr"
             />
-            {pinRequired && (
-              <div className="flex w-full flex-col items-center gap-2">
-                <label htmlFor="scan-pin" className="text-sm font-medium text-ink-2">
-                  رمز الحضور (4 أرقام)
-                </label>
-                <Input
-                  id="scan-pin"
-                  type="password"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  maxLength={4}
-                  value={pinInput}
-                  onChange={(e) => setPinInput(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
-                  className="num h-16 w-full rounded-2xl text-center text-3xl font-bold tracking-[0.5em]"
-                  dir="ltr"
-                />
-                <p className="text-xs text-muted">الرمز الذي وصلك برسالة SMS — لا تشاركه مع أحد</p>
-              </div>
-            )}
             <Button
               type="submit"
               className="min-h-[56px] w-full bg-brand text-lg font-bold text-white hover:bg-brand-hover"
@@ -284,13 +369,6 @@ export default function KioskScanPage() {
         {view === 'ready' && ready && (
           <div className="flex w-full max-w-sm flex-col items-center gap-6">
             <LiveClock />
-            {/*
-              /scan/status returns full_name only when PIN mode is on —
-              the PIN proves identity, so the name can safely be shown
-              without turning the kiosk QR into a directory enumeration
-              tool. When PIN mode is off the backend omits full_name and
-              we fall back to the number-only greeting.
-            */}
             {ready.status.employee.full_name ? (
               <div className="flex flex-col items-center gap-1 text-center">
                 <p className="text-3xl font-bold text-ink">
@@ -317,14 +395,8 @@ export default function KioskScanPage() {
             )}
             <Button
               type="button"
-              onClick={submitScan}
+              onClick={submitScanLegacy}
               className={
-                // Both buttons are solid, high-contrast, same shape —
-                // only the color differs so the kiosk operator sees at a
-                // glance which action they're about to take. Warning
-                // (yellow) faded into the surface on the previous look
-                // and read as disabled; a deep amber holds contrast on
-                // the light kiosk ground.
                 ready.action === 'check-in'
                   ? 'min-h-[64px] w-full bg-brand text-xl font-bold text-white shadow-sm hover:bg-brand-hover'
                   : 'min-h-[64px] w-full bg-amber-600 text-xl font-bold text-white shadow-sm hover:bg-amber-700'
@@ -344,14 +416,13 @@ export default function KioskScanPage() {
           </div>
         )}
 
-        {view === 'day-complete' && ready && (
+        {view === 'day-complete' && (
           <div className="flex w-full max-w-sm flex-col items-center gap-4 text-center">
             <CheckCircle2 className="h-16 w-16 text-success" />
             <p className="text-xl font-semibold text-ink">
-              أنهيت دوامك — الرقم الوظيفي{' '}
-              <span className="num" dir="ltr">{ready.status.employee.employee_number}</span>
+              {success?.message ?? 'سجّلت حضورك وانصرافك لليوم.'}
             </p>
-            {ready.status.check_in_at && ready.status.check_out_at && (
+            {ready?.status.check_in_at && ready?.status.check_out_at && (
               <p className="text-sm text-muted">
                 <span className="num">{formatTime(ready.status.check_in_at)}</span> →{' '}
                 <span className="num">{formatTime(ready.status.check_out_at)}</span>
@@ -363,7 +434,7 @@ export default function KioskScanPage() {
               className="mt-2 flex items-center gap-2 text-sm text-muted underline-offset-4 hover:text-ink hover:underline"
             >
               <RefreshCw className="h-3.5 w-3.5" />
-              موظف آخر
+              {pinRequired ? 'إغلاق' : 'موظف آخر'}
             </button>
           </div>
         )}
@@ -371,21 +442,21 @@ export default function KioskScanPage() {
         {view === 'locating' && (
           <div className="flex flex-col items-center gap-3 text-muted">
             <Spinner className="h-8 w-8" />
-            <p>جارٍ تحديد الموقع وتسجيل البيانات...</p>
+            <p>جارٍ تسجيل البيانات...</p>
           </div>
         )}
 
-        {view === 'success' && successResult && (
+        {view === 'success' && success && (
           <div className="flex animate-in flex-col items-center gap-4 zoom-in-50 duration-300">
-            <CheckCircle2 className="h-20 w-20 text-success" />
-            <p className="text-center text-lg font-semibold text-ink">{successResult.response.message}</p>
-            <p className="num text-4xl font-bold text-ink">
-              {formatTime(
-                successResult.action === 'check-in'
-                  ? successResult.response.attendance.check_in_at
-                  : successResult.response.attendance.check_out_at,
-              )}
-            </p>
+            {success.action === 'check-in' ? (
+              <LogIn className="h-20 w-20 text-success" />
+            ) : (
+              <LogOut className="h-20 w-20 text-amber-600" />
+            )}
+            <p className="text-center text-lg font-semibold text-ink">{success.message}</p>
+            {success.at && (
+              <p className="num text-4xl font-bold text-ink">{formatTime(success.at)}</p>
+            )}
           </div>
         )}
       </main>

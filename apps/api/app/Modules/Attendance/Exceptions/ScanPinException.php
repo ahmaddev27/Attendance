@@ -27,12 +27,13 @@ class ScanPinException extends AttendanceModuleException
     }
 
     /**
-     * Shared by "unknown employee number" and "wrong PIN" so the response
-     * never confirms which half of the pair was wrong.
+     * Deliberately generic so a wrong PIN cannot be distinguished from an
+     * employee the attacker guessed at — enumeration of either side gets
+     * the same response.
      */
     public static function invalidCredentials(): self
     {
-        return new self('الرقم الوظيفي أو رمز الحضور غير صحيح.', 422);
+        return new self('رمز الحضور غير صحيح.', 422);
     }
 
     public function statusCode(): int

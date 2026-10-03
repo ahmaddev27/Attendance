@@ -33,19 +33,26 @@ class ScanPinService
 
     private const MAX_FAILED_ATTEMPTS = 5;
 
+    /**
+     * PIN-only identity resolves by IP (we don't know the employee until
+     * the lookup succeeds). A busy shared kiosk sees several legit typos
+     * in a shift, so the IP budget is wider than the per-employee one.
+     */
+    private const MAX_IP_FAILED_ATTEMPTS = 10;
+
     private const LOCKOUT_SECONDS = 900;
 
     private const ISSUE_CHUNK_SIZE = 100;
 
-    // Both the employee_number and the PIN are quoted explicitly — the
-    // employee shouldn't have to look up their own number elsewhere just
-    // to understand "استخدمه مع رقمك الوظيفي". %1$s is employee_number,
-    // %2$s is the PIN.
-    private const PIN_SMS_TEMPLATE = "رمز الحضور الخاص بك في طاقات:\nالرقم الوظيفي: %1\$s\nرمز الحضور: %2\$s\nاستخدم الاثنين معاً عند مسح رمز QR، ولا تشاركهما مع أحد.";
+    // Kiosk identity is PIN-only (see memory: project-pin-only-scan-decision),
+    // so the SMS leads with the PIN and keeps the employee_number for the
+    // employee's own records. %1$s is employee_number, %2$s is the PIN.
+    private const PIN_SMS_TEMPLATE = "رمز الحضور الخاص بك في طاقات:\nرمز الحضور: %2\$s\nالرقم الوظيفي: %1\$s\nاستخدم رمز الحضور وحده عند مسح رمز QR، ولا تشاركه مع أحد.";
 
     public function __construct(
         private readonly EmployeeScanPinRepository $scanPins,
         private readonly ScanPinGenerator $generator,
+        private readonly ScanPinHasher $hasher,
         private readonly SettingsService $settings,
         private readonly SmsService $sms,
     ) {}
@@ -96,11 +103,20 @@ class ScanPinService
      */
     public function reset(Employee $employee, User $actor): array
     {
-        $pin = $this->generator->generate();
+        // Uniqueness check runs under the HMAC lookup column, excluding
+        // this employee so a reset that happens to land on their current
+        // PIN space does not false-conflict with themselves.
+        $pin = $this->generator->generateUnique(
+            fn (string $candidate): bool => $this->scanPins->isLookupHashTaken(
+                $this->hasher->hash($candidate),
+                $employee->id,
+            ),
+        );
         $pinHash = Hash::make($pin);
+        $lookupHash = $this->hasher->hash($pin);
 
-        DB::transaction(function () use ($employee, $actor, $pinHash): void {
-            $this->scanPins->upsertForEmployee($employee->id, $pinHash, ScanPinSource::AdminReset, $actor->id);
+        DB::transaction(function () use ($employee, $actor, $pinHash, $lookupHash): void {
+            $this->scanPins->upsertForEmployee($employee->id, $pinHash, $lookupHash, ScanPinSource::AdminReset, $actor->id);
 
             activity('attendance')
                 ->causedBy($actor)
@@ -172,10 +188,22 @@ class ScanPinService
             ]);
         }
 
+        $lookupHash = $this->hasher->hash($pin);
+
+        if ($this->scanPins->isLookupHashTaken($lookupHash, $employee->id)) {
+            // PIN-only identity cannot allow two employees to share a PIN,
+            // even on self-service change — otherwise a kiosk scan under
+            // that PIN would be ambiguous. Surface a tactical message so
+            // the employee simply tries another PIN.
+            throw ValidationException::withMessages([
+                'pin' => 'هذا الرمز مُستخدم بالفعل. اختر رمزاً مختلفاً.',
+            ]);
+        }
+
         $pinHash = Hash::make($pin);
 
-        DB::transaction(function () use ($employee, $actor, $pinHash): void {
-            $this->scanPins->upsertForEmployee($employee->id, $pinHash, ScanPinSource::SelfService, $actor->id);
+        DB::transaction(function () use ($employee, $actor, $pinHash, $lookupHash): void {
+            $this->scanPins->upsertForEmployee($employee->id, $pinHash, $lookupHash, ScanPinSource::SelfService, $actor->id);
 
             activity('attendance')
                 ->causedBy($actor)
@@ -215,6 +243,65 @@ class ScanPinService
         RateLimiter::clear($attemptsKey);
     }
 
+    /**
+     * PIN-only identity: given the typed PIN and the caller's IP, resolve
+     * it to the unique employee that owns it (if any). HMAC(pin) → row is
+     * the whole identity proof — the `pin_lookup_hash` UNIQUE index makes
+     * two employees sharing a PIN impossible, and bcrypt still protects
+     * `pin_hash` at rest against a DB dump.
+     *
+     * Rate limit is per-IP (10 failures / 15 min). We cannot key off an
+     * employee here because we do not know who typed the PIN yet, and
+     * keying off the typed PIN itself would let an attacker lock a known
+     * PIN out of their employee. IP-level feels right: a shared kiosk
+     * absorbs a few typos but shuts down a burst-guess attempt.
+     *
+     * @throws ScanPinException
+     */
+    public function resolveByPin(?string $pin, string $ipAddress): Employee
+    {
+        $ipKey = $this->ipAttemptsKey($ipAddress);
+
+        if (RateLimiter::tooManyAttempts($ipKey, self::MAX_IP_FAILED_ATTEMPTS)) {
+            throw ScanPinException::lockedOut();
+        }
+
+        if ($pin === null || ! $this->generator->hasValidFormat($pin)) {
+            RateLimiter::hit($ipKey, self::LOCKOUT_SECONDS);
+
+            throw ScanPinException::invalidCredentials();
+        }
+
+        $scanPin = $this->scanPins->findByLookupHash($this->hasher->hash($pin));
+        // Defense-in-depth: cross-check against the bcrypt column so a
+        // misconfigured HMAC backfill (same lookup, wrong plaintext) still
+        // fails identity. In practice an HMAC hit implies a bcrypt hit for
+        // the correct PIN; this just makes that implicit assumption fail
+        // loud rather than silent.
+        $bcryptOk = $scanPin !== null && Hash::check($pin, $scanPin->pin_hash);
+
+        if (! $bcryptOk) {
+            RateLimiter::hit($ipKey, self::LOCKOUT_SECONDS);
+
+            throw ScanPinException::invalidCredentials();
+        }
+
+        $employee = $scanPin->employee;
+
+        if ($employee === null
+            || $employee->status !== \App\Shared\Enums\EmployeeStatus::Active
+            || ($employee->user !== null && ! $employee->user->is_active)
+        ) {
+            RateLimiter::hit($ipKey, self::LOCKOUT_SECONDS);
+
+            throw ScanPinException::invalidCredentials();
+        }
+
+        RateLimiter::clear($ipKey);
+
+        return $employee;
+    }
+
     private function assertEveryActiveEmployeeHasPin(): void
     {
         $withoutPin = $this->scanPins->countActiveEmployeesWithoutPin();
@@ -228,7 +315,9 @@ class ScanPinService
 
     /**
      * Hashing runs before the transaction opens so bcrypt's cost is never
-     * paid while holding locks.
+     * paid while holding locks. Lookup hashes are checked for uniqueness
+     * both against the DB AND within this chunk — otherwise two freshly
+     * drawn PINs could happen to match before either is committed.
      *
      * @param  Collection<int, Employee>  $employees
      * @return list<array{0: Employee, 1: string}>
@@ -237,17 +326,40 @@ class ScanPinService
     {
         $pins = [];
         $hashes = [];
+        $lookupHashes = [];
+        $takenInChunk = [];
 
         foreach ($employees as $employee) {
-            $pins[$employee->id] = $this->generator->generate();
-            $hashes[$employee->id] = Hash::make($pins[$employee->id]);
+            $pin = $this->generator->generateUnique(
+                function (string $candidate) use ($takenInChunk, $employee): bool {
+                    $lookup = $this->hasher->hash($candidate);
+
+                    return isset($takenInChunk[$lookup])
+                        || $this->scanPins->isLookupHashTaken($lookup, $employee->id);
+                },
+            );
+
+            $lookup = $this->hasher->hash($pin);
+            $takenInChunk[$lookup] = true;
+
+            $pins[$employee->id] = $pin;
+            $hashes[$employee->id] = Hash::make($pin);
+            $lookupHashes[$employee->id] = $lookup;
         }
 
-        return DB::transaction(function () use ($employees, $pins, $hashes, $actor): array {
+        return DB::transaction(function () use ($employees, $pins, $hashes, $lookupHashes, $actor): array {
             $issued = [];
 
             foreach ($employees as $employee) {
-                if ($this->scanPins->createIfMissing($employee->id, $hashes[$employee->id], ScanPinSource::BulkIssue, $actor->id)) {
+                $created = $this->scanPins->createIfMissing(
+                    $employee->id,
+                    $hashes[$employee->id],
+                    $lookupHashes[$employee->id],
+                    ScanPinSource::BulkIssue,
+                    $actor->id,
+                );
+
+                if ($created) {
                     $issued[] = [$employee, $pins[$employee->id]];
                 }
             }
@@ -287,5 +399,13 @@ class ScanPinService
     private function attemptsKey(Employee $employee): string
     {
         return 'scan-pin:'.$employee->id;
+    }
+
+    private function ipAttemptsKey(string $ipAddress): string
+    {
+        // Keep the string short enough to fit any cache driver's key limit
+        // while still being a stable per-IP bucket. '0.0.0.0' is the
+        // controller's fallback when the request has no detectable IP.
+        return 'scan-pin:ip:'.$ipAddress;
     }
 }

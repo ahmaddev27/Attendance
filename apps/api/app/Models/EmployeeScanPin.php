@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $id
  * @property int $employee_id
  * @property string $pin_hash
+ * @property ?string $pin_lookup_hash
  * @property ScanPinSource $set_via
  * @property ?int $set_by_user_id
  */
@@ -26,6 +27,7 @@ class EmployeeScanPin extends Model
     protected $fillable = [
         'employee_id',
         'pin_hash',
+        'pin_lookup_hash',
         'set_via',
         'set_by_user_id',
     ];
@@ -35,6 +37,7 @@ class EmployeeScanPin extends Model
      */
     protected $hidden = [
         'pin_hash',
+        'pin_lookup_hash',
     ];
 
     /**

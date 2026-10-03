@@ -32,11 +32,23 @@ class ScanIdentityService
     /**
      * @throws AttendanceModuleException
      */
-    public function resolve(?string $bearerToken, ?int $employeeNumber, ?string $pin): Employee
+    public function resolve(?string $bearerToken, ?int $employeeNumber, ?string $pin, string $ipAddress): Employee
     {
-        return $bearerToken !== null
-            ? $this->resolveFromBearerToken($bearerToken, $employeeNumber)
-            : $this->resolveFromEmployeeNumber((int) $employeeNumber, $pin);
+        // Mobile app: bearer token already proves identity. employee_number
+        // is only used as a sanity check on the mobile side.
+        if ($bearerToken !== null) {
+            return $this->resolveFromBearerToken($bearerToken, $employeeNumber);
+        }
+
+        // Kiosk: PIN-only identity when PIN enforcement is on (see memory:
+        // project-pin-only-scan-decision). Pre-PIN deployments without
+        // enforcement keep the old employee_number-only path so an admin
+        // isn't locked out before issuing PINs.
+        if ($this->scanPins->isRequired()) {
+            return $this->scanPins->resolveByPin($pin, $ipAddress);
+        }
+
+        return $this->resolveFromEmployeeNumber((int) $employeeNumber, $pin);
     }
 
     private function resolveFromBearerToken(string $bearerToken, ?int $employeeNumber): Employee

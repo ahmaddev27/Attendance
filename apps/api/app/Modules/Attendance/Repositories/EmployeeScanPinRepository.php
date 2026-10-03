@@ -18,17 +18,41 @@ class EmployeeScanPinRepository
         return EmployeeScanPin::query()->where('employee_id', $employeeId)->first();
     }
 
-    public function upsertForEmployee(int $employeeId, string $pinHash, ScanPinSource $setVia, ?int $setByUserId): void
+    /**
+     * Resolve the row whose lookup hash matches — this is the PIN-only
+     * identity path. Returns null when nothing matches, so the caller can
+     * translate that to "invalid credentials" without leaking existence.
+     */
+    public function findByLookupHash(string $lookupHash): ?EmployeeScanPin
+    {
+        return EmployeeScanPin::query()->where('pin_lookup_hash', $lookupHash)->first();
+    }
+
+    /**
+     * Used by the generator's uniqueness loop. Excludes a specific
+     * employee so a reset for someone who already owns that PIN does not
+     * count as a conflict with themselves.
+     */
+    public function isLookupHashTaken(string $lookupHash, ?int $excludeEmployeeId = null): bool
+    {
+        return EmployeeScanPin::query()
+            ->where('pin_lookup_hash', $lookupHash)
+            ->when($excludeEmployeeId !== null, fn ($q) => $q->where('employee_id', '!=', $excludeEmployeeId))
+            ->exists();
+    }
+
+    public function upsertForEmployee(int $employeeId, string $pinHash, string $lookupHash, ScanPinSource $setVia, ?int $setByUserId): void
     {
         EmployeeScanPin::query()->upsert(
             [[
                 'employee_id' => $employeeId,
                 'pin_hash' => $pinHash,
+                'pin_lookup_hash' => $lookupHash,
                 'set_via' => $setVia->value,
                 'set_by_user_id' => $setByUserId,
             ]],
             ['employee_id'],
-            ['pin_hash', 'set_via', 'set_by_user_id'],
+            ['pin_hash', 'pin_lookup_hash', 'set_via', 'set_by_user_id'],
         );
     }
 
@@ -39,13 +63,14 @@ class EmployeeScanPinRepository
      *
      * @return bool true when this call created the row
      */
-    public function createIfMissing(int $employeeId, string $pinHash, ScanPinSource $setVia, ?int $setByUserId): bool
+    public function createIfMissing(int $employeeId, string $pinHash, string $lookupHash, ScanPinSource $setVia, ?int $setByUserId): bool
     {
         $now = now();
 
         return EmployeeScanPin::query()->insertOrIgnore([
             'employee_id' => $employeeId,
             'pin_hash' => $pinHash,
+            'pin_lookup_hash' => $lookupHash,
             'set_via' => $setVia->value,
             'set_by_user_id' => $setByUserId,
             'created_at' => $now,
