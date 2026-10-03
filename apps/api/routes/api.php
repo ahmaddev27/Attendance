@@ -705,10 +705,32 @@ Route::middleware('auth:sanctum')->group(function () {
     // writes — matches the Phase 2 RBAC matrix in the plan.
     Route::middleware('permission:view-candidates')->group(function () {
         Route::get('/applications/{application}', [\App\Modules\Recruitment\Controllers\CandidateApplicationController::class, 'show']);
+        Route::get('/applications/{application}/screening', [\App\Modules\Recruitment\Controllers\CandidateScreeningController::class, 'show']);
     });
     Route::middleware('permission:manage-candidates')->group(function () {
         Route::patch('/applications/{application}', [\App\Modules\Recruitment\Controllers\CandidateApplicationController::class, 'update']);
         Route::post('/applications/{application}/reject', [\App\Modules\Recruitment\Controllers\CandidateApplicationController::class, 'reject']);
         Route::post('/applications/{application}/withdraw', [\App\Modules\Recruitment\Controllers\CandidateApplicationController::class, 'withdraw']);
+    });
+
+    // Shortlist is a flag on the application (D2) — toggle lives behind
+    // its own permission so an admin can give a hiring manager "I can
+    // flag my picks" without granting the broader manage-candidates
+    // write surface.
+    Route::middleware('permission:shortlist-candidates')->group(function () {
+        Route::post('/applications/{application}/shortlist', [\App\Modules\Recruitment\Controllers\CandidateShortlistController::class, 'add']);
+        Route::delete('/applications/{application}/shortlist', [\App\Modules\Recruitment\Controllers\CandidateShortlistController::class, 'remove']);
+    });
+    Route::middleware('permission:view-candidates')->group(function () {
+        Route::get('/jobs/{job}/shortlist', [\App\Modules\Recruitment\Controllers\CandidateShortlistController::class, 'indexForJob']);
+    });
+
+    // Screening — scorecard against the stage's schema. The schema peek
+    // is behind the same permission as the write because the screening
+    // officer needs it to render the form.
+    Route::middleware('permission:screen-candidates')->group(function () {
+        Route::post('/applications/{application}/screening', [\App\Modules\Recruitment\Controllers\CandidateScreeningController::class, 'store']);
+        Route::patch('/applications/{application}/screening', [\App\Modules\Recruitment\Controllers\CandidateScreeningController::class, 'store']);
+        Route::get('/recruitment-pipelines/{pipeline}/stages/{stage}/screening-schema', [\App\Modules\Recruitment\Controllers\CandidateScreeningController::class, 'schema']);
     });
 });

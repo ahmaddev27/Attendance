@@ -31,6 +31,7 @@ class RecruitmentPipelineStage extends Model
         'task_title_template',
         'task_priority',
         'requires_fields',
+        'screening_schema',
         'is_terminal',
     ];
 
@@ -45,6 +46,10 @@ class RecruitmentPipelineStage extends Model
             'auto_generate_task' => 'boolean',
             'is_terminal' => 'boolean',
             'requires_fields' => 'array',
+            // Phase 2 — scorecard template read by CandidateScreeningService.
+            // Admins edit this JSON from the stage editor; the service
+            // validates every submitted screening against it.
+            'screening_schema' => 'array',
             'owner_rule_type' => StageOwnerRule::class,
         ];
     }
