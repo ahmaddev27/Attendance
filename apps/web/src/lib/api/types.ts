@@ -144,6 +144,13 @@ export type MonthlyAttendanceSummary = {
   weekend_days: number;
   total_minutes: number;
   expected_minutes: number;
+  /**
+   * The schedule's `monthly_hours` target expressed as minutes, or null
+   * when no target is set. Used by the per-employee monthly page to
+   * colour the "إجمالي ساعات العمل" tile green/red (owner's rule from
+   * commit `be31f25`, extended per the 2026-10-03 feedback).
+   */
+  expected_monthly_minutes: number | null;
   difference_minutes: number;
   overtime_minutes: number;
   late_minutes: number;

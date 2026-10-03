@@ -188,6 +188,7 @@ class WorkingHoursCalculator
             weekendDays: $weekendDays,
             totalMinutes: $totalMinutes,
             expectedMinutes: $expectedMinutes,
+            expectedMonthlyMinutes: $schedule->expectedMonthlyMinutes(),
             differenceMinutes: $totalMinutes - $expectedMinutes,
             overtimeMinutes: $overtimeMinutes,
             lateMinutes: $lateMinutes,

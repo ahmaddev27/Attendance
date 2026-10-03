@@ -22,7 +22,7 @@ function currentYearMonth() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
-type KpiCard = { label: string; value: string };
+type KpiCard = { label: string; value: string; tone?: 'default' | 'success' | 'danger' };
 
 export default function EmployeeMonthlyAttendancePage() {
   const params = useParams<{ id: string }>();
@@ -54,6 +54,16 @@ export default function EmployeeMonthlyAttendancePage() {
     return map;
   }, [monthAttendance]);
 
+  // Owner's rule 2026-10-03: colour the total-hours tile against the
+  // schedule's monthly target when one is set. Green = met-or-beat the
+  // target, red = short, neutral = no target configured so no judgement.
+  const totalHoursTone: KpiCard['tone'] =
+    summary && summary.expected_monthly_minutes !== null && summary.expected_monthly_minutes > 0
+      ? summary.total_minutes >= summary.expected_monthly_minutes
+        ? 'success'
+        : 'danger'
+      : 'default';
+
   const kpiCards: KpiCard[] = summary
     ? [
         { label: 'أيام العمل المتوقعة', value: String(summary.total_working_days) },
@@ -62,7 +72,14 @@ export default function EmployeeMonthlyAttendancePage() {
         { label: 'أيام الإجازة', value: String(summary.leave_days) },
         { label: 'أيام العطل', value: String(summary.holiday_days) },
         { label: 'نسبة الحضور', value: `${summary.attendance_percentage.toFixed(1)}%` },
-        { label: 'إجمالي ساعات العمل', value: formatMinutesAsHours(summary.total_minutes) },
+        {
+          label:
+            summary.expected_monthly_minutes !== null && summary.expected_monthly_minutes > 0
+              ? `إجمالي ساعات العمل / ${formatMinutesAsHours(summary.expected_monthly_minutes)}`
+              : 'إجمالي ساعات العمل',
+          value: formatMinutesAsHours(summary.total_minutes),
+          tone: totalHoursTone,
+        },
         { label: 'الساعات المتوقعة', value: formatMinutesAsHours(summary.expected_minutes) },
         { label: 'الفارق', value: formatMinutesAsHours(summary.difference_minutes) },
         { label: 'الوقت الإضافي', value: formatMinutesAsHours(summary.overtime_minutes) },
@@ -129,16 +146,24 @@ export default function EmployeeMonthlyAttendancePage() {
       ) : summary ? (
         <>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {kpiCards.map((kpi) => (
-              <Card key={kpi.label} className="border-hairline bg-surface shadow-none">
-                <CardContent className="p-4">
-                  <p className="text-xs text-muted">{kpi.label}</p>
-                  <p className="num mt-1.5 text-xl font-bold text-ink" dir="ltr">
-                    {kpi.value}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
+            {kpiCards.map((kpi) => {
+              const toneClass =
+                kpi.tone === 'success'
+                  ? 'text-success'
+                  : kpi.tone === 'danger'
+                    ? 'text-danger'
+                    : 'text-ink';
+              return (
+                <Card key={kpi.label} className="border-hairline bg-surface shadow-none">
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted">{kpi.label}</p>
+                    <p className={`num mt-1.5 text-xl font-bold ${toneClass}`} dir="ltr">
+                      {kpi.value}
+                    </p>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
 
           <Card className="mt-4 border-hairline bg-surface shadow-none">

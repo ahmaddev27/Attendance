@@ -31,10 +31,18 @@ final class MonthlyAttendanceSummary
         public readonly int $lateMinutes,
         public readonly int $earlyLeaveMinutes,
         public readonly float $attendancePercentage,
+        /**
+         * The schedule's `monthly_hours` target expressed as minutes, or
+         * null when no target is set. The FE uses this (not
+         * `expectedMinutes`, which is derived from workday count × daily
+         * minimum) to colour the "إجمالي ساعات العمل" tile green/red —
+         * see docs commit `be31f25`.
+         */
+        public readonly ?int $expectedMonthlyMinutes = null,
     ) {}
 
     /**
-     * @return array<string, int|float>
+     * @return array<string, int|float|null>
      */
     public function toArray(): array
     {
@@ -50,6 +58,7 @@ final class MonthlyAttendanceSummary
             'total_minutes' => $this->totalMinutes,
             'total_hours' => round($this->totalMinutes / 60, 2),
             'expected_minutes' => $this->expectedMinutes,
+            'expected_monthly_minutes' => $this->expectedMonthlyMinutes,
             'difference_minutes' => $this->differenceMinutes,
             'overtime_minutes' => $this->overtimeMinutes,
             'late_minutes' => $this->lateMinutes,
