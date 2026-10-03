@@ -13,6 +13,13 @@ export type AttendanceReportRow = {
   total_minutes: number;
   overtime_minutes: number;
   late_minutes: number;
+  /**
+   * The schedule's monthly target in minutes, or `null` when the employee
+   * has no schedule or the schedule has no monthly target. The UI uses
+   * this to colour the "hours" cell green when the worked total meets the
+   * target and red when it falls short — null leaves the cell neutral.
+   */
+  expected_monthly_minutes: number | null;
 };
 
 export type AttendanceMonthlyParams = {

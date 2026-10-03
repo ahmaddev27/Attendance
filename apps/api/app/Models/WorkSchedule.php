@@ -23,6 +23,7 @@ class WorkSchedule extends Model
         'check_in_time',
         'check_out_time',
         'min_hours_per_day',
+        'monthly_hours',
         'grace_late_minutes',
         'grace_early_leave_minutes',
         'workdays',
@@ -37,6 +38,7 @@ class WorkSchedule extends Model
             'check_in_time' => 'datetime:H:i',
             'check_out_time' => 'datetime:H:i',
             'min_hours_per_day' => 'decimal:2',
+            'monthly_hours' => 'decimal:2',
             'grace_late_minutes' => 'integer',
             'grace_early_leave_minutes' => 'integer',
             'is_flexible' => 'boolean',
@@ -66,6 +68,21 @@ class WorkSchedule extends Model
         return (int) round(((float) $this->min_hours_per_day) * 60);
     }
 
+    /**
+     * The monthly hours target expressed as minutes, or null when no target
+     * has been set for the schedule — callers (notably the attendance report)
+     * use null as "don't compare" rather than falling back to any derived
+     * value, so an admin's "no monthly contract" case stays explicit.
+     */
+    public function expectedMonthlyMinutes(): ?int
+    {
+        if ($this->monthly_hours === null) {
+            return null;
+        }
+
+        return (int) round(((float) $this->monthly_hours) * 60);
+    }
+
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
@@ -75,6 +92,7 @@ class WorkSchedule extends Model
                 'check_in_time',
                 'check_out_time',
                 'min_hours_per_day',
+                'monthly_hours',
                 'grace_late_minutes',
                 'grace_early_leave_minutes',
                 'workdays',

@@ -24,6 +24,10 @@ class UpdateWorkScheduleRequest extends FormRequest
             'check_in_time' => ['sometimes', 'nullable', 'date_format:H:i'],
             'check_out_time' => ['sometimes', 'nullable', 'date_format:H:i'],
             'min_hours_per_day' => ['sometimes', 'numeric', 'min:0', 'max:24'],
+            // See Store request — null wipes the monthly target back to
+            // "not set". `sometimes` + `nullable` keeps PATCH-style updates
+            // valid when the caller omits the field entirely.
+            'monthly_hours' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:744'],
             'grace_late_minutes' => ['sometimes', 'integer', 'min:0'],
             'grace_early_leave_minutes' => ['sometimes', 'integer', 'min:0'],
             'workdays' => ['sometimes', 'array', 'min:1'],

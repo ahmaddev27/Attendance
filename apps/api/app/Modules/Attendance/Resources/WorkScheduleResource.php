@@ -25,12 +25,17 @@ class WorkScheduleResource extends JsonResource
             'check_in_time' => $this->check_in_time?->format('H:i'),
             'check_out_time' => $this->check_out_time?->format('H:i'),
             'min_hours_per_day' => (float) $this->min_hours_per_day,
+            // Null when the admin hasn't set a monthly target — the FE
+            // uses this to decide whether to colour the hours cell on the
+            // attendance report (green/red) or leave it neutral.
+            'monthly_hours' => $this->monthly_hours === null ? null : (float) $this->monthly_hours,
             'grace_late_minutes' => $this->grace_late_minutes,
             'grace_early_leave_minutes' => $this->grace_early_leave_minutes,
             'workdays' => $this->workdays,
             'is_flexible' => $this->is_flexible,
             'is_active' => $this->is_active,
             'expected_minutes' => $this->expectedMinutes(),
+            'expected_monthly_minutes' => $this->expectedMonthlyMinutes(),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];

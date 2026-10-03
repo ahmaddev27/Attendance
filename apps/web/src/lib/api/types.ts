@@ -219,11 +219,19 @@ export type WorkSchedule = {
   check_in_time: string | null;
   check_out_time: string | null;
   min_hours_per_day: number;
+  /**
+   * Monthly hours target. `null` means "no target set" — the attendance
+   * report then leaves the hours cell neutral instead of colouring it
+   * green/red against a derived figure.
+   */
+  monthly_hours: number | null;
   grace_late_minutes: number;
   grace_early_leave_minutes: number;
   workdays: number[];
   is_flexible: boolean;
   is_active: boolean;
+  expected_minutes?: number;
+  expected_monthly_minutes: number | null;
   /**
    * Not part of the spec's base shape, but useful for the schedules card
    * grid ("employees count"). Optional because the backend may not send it
@@ -238,6 +246,7 @@ export type WorkSchedulePayload = {
   check_in_time?: string | null;
   check_out_time?: string | null;
   min_hours_per_day: number;
+  monthly_hours?: number | null;
   grace_late_minutes: number;
   grace_early_leave_minutes: number;
   workdays: number[];

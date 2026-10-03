@@ -272,8 +272,13 @@ export default function AttendanceReportPage() {
                     <Td className="num text-center text-warn-ink" dir="ltr">{r.late_days || '—'}</Td>
                     <Td className="num text-center text-danger" dir="ltr">{r.absent_days || '—'}</Td>
                     <Td className="num text-center" dir="ltr">{r.leave_days || '—'}</Td>
-                    <Td className="num text-center" dir="ltr">
+                    <Td className={`num text-center ${hoursToneClass(r.total_minutes, r.expected_monthly_minutes)}`} dir="ltr">
                       {Math.round(r.total_minutes / 60)}
+                      {r.expected_monthly_minutes !== null && r.expected_monthly_minutes > 0 && (
+                        <span className="text-muted">
+                          {' / '}{Math.round(r.expected_monthly_minutes / 60)}
+                        </span>
+                      )}
                     </Td>
                     <Td className="num text-center text-success" dir="ltr">
                       {r.overtime_minutes ? Math.round(r.overtime_minutes / 60) : '—'}
@@ -311,4 +316,19 @@ function TotalCell({ label, value, tone }: { label: string; value: number; tone?
       <p className={`num mt-1 text-2xl font-bold ${toneClass}`} dir="ltr">{value}</p>
     </Card>
   );
+}
+
+/**
+ * Hours cell colouring rule:
+ *   - no monthly target set / target is 0 → neutral (no colour)
+ *   - worked minutes >= target → success (green)
+ *   - worked minutes <  target → danger (red)
+ * This is the operational signal the admin asked for: a glance at the
+ * column tells them who hit their monthly contract and who didn't.
+ */
+function hoursToneClass(worked: number, target: number | null): string {
+  if (target === null || target <= 0) {
+    return 'text-ink';
+  }
+  return worked >= target ? 'text-success font-semibold' : 'text-danger font-semibold';
 }

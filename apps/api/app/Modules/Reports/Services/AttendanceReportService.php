@@ -36,6 +36,7 @@ class AttendanceReportService
      *   total_minutes: int,
      *   overtime_minutes: int,
      *   late_minutes: int,
+     *   expected_monthly_minutes: ?int,
      * }>
      */
     public function monthly(int $year, int $month, ?int $departmentId = null, ?int $employeeId = null, ?int $companyId = null): Collection
@@ -73,7 +74,7 @@ class AttendanceReportService
         // still shown with zeros (matches how payroll expects the report).
         $employees = Employee::query()
             ->staffOnly()
-            ->with('department:id,name')
+            ->with(['department:id,name', 'workSchedule:id,monthly_hours'])
             ->when($departmentId, fn ($q) => $q->where('department_id', $departmentId))
             ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
             ->when($employeeId, fn ($q) => $q->where('id', $employeeId))
@@ -107,6 +108,11 @@ class AttendanceReportService
                     'total_minutes' => (int) $employeeRows->sum('total_minutes'),
                     'overtime_minutes' => (int) $employeeRows->sum('overtime_minutes'),
                     'late_minutes' => (int) $employeeRows->sum('late_minutes'),
+                    // Null when the employee has no schedule, or the
+                    // schedule has no monthly target — the FE then skips
+                    // the green/red colouring on the hours cell rather
+                    // than defaulting to any derived figure.
+                    'expected_monthly_minutes' => $employee->workSchedule?->expectedMonthlyMinutes(),
                 ];
             })
             ->filter()

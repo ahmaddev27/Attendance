@@ -42,6 +42,9 @@ type ScheduleFormState = {
   check_in_time: string;
   check_out_time: string;
   min_hours_per_day: string;
+  // Kept as a string so the input can hold an empty value — the submit
+  // converts "" → null, which the API treats as "no monthly target set".
+  monthly_hours: string;
   grace_late_minutes: string;
   grace_early_leave_minutes: string;
   is_active: boolean;
@@ -54,6 +57,7 @@ const EMPTY_FORM: ScheduleFormState = {
   check_in_time: '08:00',
   check_out_time: '16:00',
   min_hours_per_day: '8',
+  monthly_hours: '',
   grace_late_minutes: '10',
   grace_early_leave_minutes: '10',
   is_active: true,
@@ -67,6 +71,7 @@ function scheduleToForm(schedule: WorkSchedule): ScheduleFormState {
     check_in_time: schedule.check_in_time ?? '08:00',
     check_out_time: schedule.check_out_time ?? '16:00',
     min_hours_per_day: String(schedule.min_hours_per_day),
+    monthly_hours: schedule.monthly_hours === null ? '' : String(schedule.monthly_hours),
     grace_late_minutes: String(schedule.grace_late_minutes),
     grace_early_leave_minutes: String(schedule.grace_early_leave_minutes),
     is_active: schedule.is_active,
@@ -74,11 +79,13 @@ function scheduleToForm(schedule: WorkSchedule): ScheduleFormState {
 }
 
 function formToPayload(form: ScheduleFormState): WorkSchedulePayload {
+  const monthlyRaw = form.monthly_hours.trim();
   return {
     name: form.name.trim(),
     check_in_time: form.is_flexible ? null : form.check_in_time,
     check_out_time: form.is_flexible ? null : form.check_out_time,
     min_hours_per_day: Number(form.min_hours_per_day) || 0,
+    monthly_hours: monthlyRaw === '' ? null : Number(monthlyRaw),
     grace_late_minutes: Number(form.grace_late_minutes) || 0,
     grace_early_leave_minutes: Number(form.grace_early_leave_minutes) || 0,
     workdays: [...form.workdays].sort((a, b) => a - b),
@@ -241,6 +248,12 @@ export default function WorkSchedulesPage() {
                     </span>
                   </p>
                   <p>
+                    ساعات شهرية:{' '}
+                    <span className="num font-semibold text-ink" dir="ltr">
+                      {schedule.monthly_hours ?? '—'}
+                    </span>
+                  </p>
+                  <p>
                     سماحية التأخير:{' '}
                     <span className="num font-semibold text-ink" dir="ltr">
                       {schedule.grace_late_minutes} د
@@ -334,9 +347,9 @@ export default function WorkSchedulesPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs font-semibold text-ink-2">الحد الأدنى للساعات</Label>
+                <Label className="text-xs font-semibold text-ink-2">الحد الأدنى للساعات (يومياً)</Label>
                 <Input
                   type="number"
                   min={0}
@@ -347,6 +360,26 @@ export default function WorkSchedulesPage() {
                   dir="ltr"
                 />
               </div>
+              <div>
+                <Label className="text-xs font-semibold text-ink-2">عدد الساعات الشهرية</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={744}
+                  step="0.5"
+                  placeholder="اختياري"
+                  value={form.monthly_hours}
+                  onChange={(e) => setForm({ ...form, monthly_hours: e.target.value })}
+                  className="mt-1.5 num"
+                  dir="ltr"
+                />
+                <p className="mt-1 text-[10px] text-muted">
+                  اتركه فارغاً إذا لا يوجد هدف شهري — عندها لن يُلوّن عمود الساعات في التقرير.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs font-semibold text-ink-2">سماحية التأخير (د)</Label>
                 <Input

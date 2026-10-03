@@ -24,6 +24,10 @@ class StoreWorkScheduleRequest extends FormRequest
             'check_in_time' => ['nullable', 'date_format:H:i'],
             'check_out_time' => ['nullable', 'date_format:H:i'],
             'min_hours_per_day' => ['nullable', 'numeric', 'min:0', 'max:24'],
+            // Monthly target in hours. Upper bound at 24 × 31 = 744 so a
+            // typo cannot land an impossible value in the DB — null means
+            // "no target set" and callers skip the hours comparison.
+            'monthly_hours' => ['nullable', 'numeric', 'min:0', 'max:744'],
             'grace_late_minutes' => ['nullable', 'integer', 'min:0'],
             'grace_early_leave_minutes' => ['nullable', 'integer', 'min:0'],
             'workdays' => ['required', 'array', 'min:1'],
