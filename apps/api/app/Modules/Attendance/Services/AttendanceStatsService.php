@@ -168,8 +168,24 @@ class AttendanceStatsService
         return Attendance::query()
             ->when($filters['employee_id'] ?? null, fn (Builder $q, $employeeId) => $q->where('employee_id', $employeeId))
             ->when($filters['status'] ?? null, fn (Builder $q, $status) => $q->where('status', $status))
-            ->when($filters['date_from'] ?? null, fn (Builder $q, $date) => $q->where('date', '>=', $date))
-            ->when($filters['date_to'] ?? null, fn (Builder $q, $date) => $q->where('date', '<=', $date))
+            // date_from / date_to normalised to datetime bounds — the
+            // Laravel `date` cast stores "YYYY-MM-DD 00:00:00" on SQLite,
+            // so a naive `<= '2026-10-03'` compares as string and
+            // EXCLUDES rows at `2026-10-03 00:00:00` (which are strictly
+            // greater). The default admin filter is today→today, so the
+            // bug would land as "stat tiles always zero" in that case.
+            // Normalising to full-day bounds also matches
+            // AdminDashboardService::todayAttendance and
+            // ScanController::record (last fixed in commits 95a2cd2 /
+            // 50e4e63).
+            ->when(
+                $filters['date_from'] ?? null,
+                fn (Builder $q, $date) => $q->where('date', '>=', \Carbon\Carbon::parse((string) $date)->startOfDay()),
+            )
+            ->when(
+                $filters['date_to'] ?? null,
+                fn (Builder $q, $date) => $q->where('date', '<', \Carbon\Carbon::parse((string) $date)->startOfDay()->addDay()),
+            )
             ->when(! empty($filters['company_id']), fn (Builder $q) => $q->whereIn(
                 'employee_id',
                 Employee::withTrashed()->select('id')->where('company_id', $filters['company_id']),

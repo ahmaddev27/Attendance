@@ -48,7 +48,7 @@ test('employee counts split active vs inactive', function () {
         ->assertJsonPath('data.employees.inactive', 4); // everything not 'active'
 });
 
-test('today attendance groups late+early_leave and folds remote/mission into present', function () {
+test('today attendance folds late + remote + mission into present and still reports late as a sub-count', function () {
     actingAsAdmin();
     $today = now()->toDateString();
     $employees = Employee::factory()->count(6)->create();
@@ -60,9 +60,13 @@ test('today attendance groups late+early_leave and folds remote/mission into pre
     Attendance::factory()->for($employees[4])->create(['date' => $today, 'status' => AttendanceStatus::Absent]);
     Attendance::factory()->for($employees[5])->create(['date' => $today, 'status' => AttendanceStatus::OnLeave]);
 
+    // Owner's rule 2026-10-03: a late check-in IS present. The dashboard
+    // reads `present` as "how many are here?" (4 = Present + Remote +
+    // Late + EarlyLeave) and `late` separately as the sub-count of
+    // present-but-late (2 = Late + EarlyLeave).
     $this->getJson('/api/admin/dashboard/kpis')
-        ->assertJsonPath('data.today.present', 2)   // Present + Remote (business mission not created)
-        ->assertJsonPath('data.today.late', 2)      // Late + EarlyLeave
+        ->assertJsonPath('data.today.present', 4)
+        ->assertJsonPath('data.today.late', 2)
         ->assertJsonPath('data.today.absent', 1)
         ->assertJsonPath('data.today.on_leave', 1);
 });

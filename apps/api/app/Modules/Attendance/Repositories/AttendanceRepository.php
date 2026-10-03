@@ -95,8 +95,18 @@ class AttendanceRepository
             ->when($filters['status'] ?? null, fn (Builder $query, $status) => $query->where('status', $status))
             // Bare where() so the composite (employee_id, status, date)
             // index actually gets used — DATE() wrappers disqualify it.
-            ->when($filters['date_from'] ?? null, fn (Builder $query, $date) => $query->where('date', '>=', $date))
-            ->when($filters['date_to'] ?? null, fn (Builder $query, $date) => $query->where('date', '<=', $date));
+            // date_from / date_to normalised to datetime bounds so the
+            // Laravel `date` cast's "YYYY-MM-DD 00:00:00" storage on
+            // SQLite doesn't fall outside a `<= 'YYYY-MM-DD'` comparison.
+            // Matches the AttendanceStatsService fix (same bug family).
+            ->when(
+                $filters['date_from'] ?? null,
+                fn (Builder $query, $date) => $query->where('date', '>=', \Carbon\Carbon::parse((string) $date)->startOfDay()),
+            )
+            ->when(
+                $filters['date_to'] ?? null,
+                fn (Builder $query, $date) => $query->where('date', '<', \Carbon\Carbon::parse((string) $date)->startOfDay()->addDay()),
+            );
 
         $this->applyCompanyScope($query, $filters);
 

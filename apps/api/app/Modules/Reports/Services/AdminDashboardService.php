@@ -42,11 +42,10 @@ class AdminDashboardService
     public function kpis(?CarbonImmutable $today = null, ?int $companyId = null): array
     {
         $today ??= CarbonImmutable::now()->startOfDay();
-        $todayDate = $today->toDateString();
 
         return [
             'employees' => $this->employeeCounts($companyId),
-            'today' => $this->todayAttendance($todayDate, $companyId),
+            'today' => $this->todayAttendance($today, $companyId),
             'pending' => $this->pendingApprovals($companyId),
             'tasks' => $this->taskCounts($today, $companyId),
         ];
@@ -82,10 +81,17 @@ class AdminDashboardService
     /**
      * @return array{date: string, present: int, late: int, absent: int, on_leave: int}
      */
-    private function todayAttendance(string $todayDate, ?int $companyId): array
+    private function todayAttendance(CarbonImmutable $today, ?int $companyId): array
     {
+        // Half-open range on `date` instead of a bare equality — the
+        // Laravel `date` cast stores "YYYY-MM-DD 00:00:00" on SQLite, so
+        // `where('date', '2026-10-03')` matches nothing and the whole
+        // widget silently reads zeros. AttendanceService::checkIn,
+        // ScanController::record and ScanController::status all use the
+        // same pattern (last fixed in commit `50e4e63`).
         $counts = Attendance::query()
-            ->where('date', $todayDate)
+            ->where('date', '>=', $today)
+            ->where('date', '<', $today->addDay())
             ->when($companyId, function ($q) use ($companyId): void {
                 $q->whereIn(
                     'employee_id',
@@ -96,13 +102,23 @@ class AdminDashboardService
             ->groupBy('status')
             ->pluck('c', 'status');
 
+        // Owner's rule: a late check-in STILL means the person showed up,
+        // so they count toward both `present` AND the `late` sub-count.
+        // The two numbers answer different questions on the dashboard —
+        // "how many are here?" vs "how many came in late?" — and the
+        // business reads them that way, not as mutually exclusive buckets.
+        $late = (int) ($counts[AttendanceStatus::Late->value] ?? 0)
+            + (int) ($counts[AttendanceStatus::EarlyLeave->value] ?? 0);
+
+        $present = (int) ($counts[AttendanceStatus::Present->value] ?? 0)
+            + (int) ($counts[AttendanceStatus::Remote->value] ?? 0)
+            + (int) ($counts[AttendanceStatus::BusinessMission->value] ?? 0)
+            + $late;
+
         return [
-            'date' => $todayDate,
-            'present' => (int) ($counts[AttendanceStatus::Present->value] ?? 0)
-                + (int) ($counts[AttendanceStatus::Remote->value] ?? 0)
-                + (int) ($counts[AttendanceStatus::BusinessMission->value] ?? 0),
-            'late' => (int) ($counts[AttendanceStatus::Late->value] ?? 0)
-                + (int) ($counts[AttendanceStatus::EarlyLeave->value] ?? 0),
+            'date' => $today->toDateString(),
+            'present' => $present,
+            'late' => $late,
             'absent' => (int) ($counts[AttendanceStatus::Absent->value] ?? 0),
             'on_leave' => (int) ($counts[AttendanceStatus::OnLeave->value] ?? 0),
         ];

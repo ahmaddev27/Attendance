@@ -81,7 +81,11 @@ const TableHead = React.forwardRef<
       // `text-start` (not `text-left`) so headers naturally right-align
       // under `dir="rtl"`; `px-3` + `h-11` give the header a bit more
       // breathing room to sit above the padded cells below.
-      "h-11 px-3 text-start align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+      // The checkbox-column shim uses `pe-0` (padding-inline-end) rather
+      // than `pr-0` — in RTL `pr-0` strips the START padding instead,
+      // which pushed the checkbox out of the row's visual boundary. See
+      // owner feedback 2026-10-03 ("التشيك طالع برا الجدول").
+      "h-11 px-3 text-start align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pe-0 [&>[role=checkbox]]:translate-y-[2px]",
       className
     )}
     {...props}
@@ -98,7 +102,8 @@ const TableCell = React.forwardRef<
     className={cn(
       // `text-start` mirrors TableHead; `px-3 py-3` gives cells a taller
       // rhythm so avatar + two lines of text (name + email) don't crowd.
-      "px-3 py-3 align-middle text-start [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+      // See TableHead above for the pe-0 (not pr-0) reasoning.
+      "px-3 py-3 align-middle text-start [&:has([role=checkbox])]:pe-0 [&>[role=checkbox]]:translate-y-[2px]",
       className
     )}
     {...props}
