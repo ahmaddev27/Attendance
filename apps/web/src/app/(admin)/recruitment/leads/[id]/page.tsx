@@ -4,7 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRightLeft, ChevronRight, Mail, MapPin, Pencil, Phone, Plus, User } from 'lucide-react';
+import { ArrowRightLeft, ChevronLeft, Mail, MapPin, Pencil, Phone, Plus, User } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -70,7 +70,8 @@ export default function LeadDetailPage() {
         <Link href="/recruitment/leads" className="hover:text-brand-ink">
           العملاء المحتملون
         </Link>
-        <ChevronRight className="h-3 w-3" />
+        {/* RTL: breadcrumb separator points LEFT (reading-forward), ChevronLeft is correct in RTL */}
+        <ChevronLeft className="h-3 w-3" />
         <span className="num" dir="ltr">
           {lead.lead_number}
         </span>

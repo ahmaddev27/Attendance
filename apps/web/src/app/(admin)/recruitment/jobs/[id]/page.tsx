@@ -4,7 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, Ban, Check, ChevronRight, Circle, Pencil } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Ban, Check, ChevronLeft, Circle, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -84,7 +84,8 @@ export default function JobDetailPage() {
     <div className="space-y-6">
       <nav className="flex items-center gap-1 text-xs text-muted">
         <Link href="/recruitment/jobs" className="hover:text-brand-ink">الوظائف</Link>
-        <ChevronRight className="h-3 w-3" />
+        {/* RTL: breadcrumb separator points LEFT (reading-forward), ChevronLeft is correct in RTL */}
+        <ChevronLeft className="h-3 w-3" />
         <span className="num" dir="ltr">{job.job_number}</span>
       </nav>
 

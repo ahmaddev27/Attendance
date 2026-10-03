@@ -4,7 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronRight, Pencil } from 'lucide-react';
+import { ChevronLeft, Pencil } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -46,7 +46,8 @@ export default function CaseDetailPage() {
         <Link href="/recruitment/cases" className="hover:text-brand-ink">
           الحملات
         </Link>
-        <ChevronRight className="h-3 w-3" />
+        {/* RTL: breadcrumb separator points LEFT (reading-forward), ChevronLeft is correct in RTL */}
+        <ChevronLeft className="h-3 w-3" />
         <span className="num" dir="ltr">
           {c.case_number}
         </span>

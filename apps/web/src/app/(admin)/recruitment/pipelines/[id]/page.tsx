@@ -4,7 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronRight, Flag, GripVertical, ListOrdered, Pencil, Plus, Star, Timer, Trash2 } from 'lucide-react';
+import { ChevronLeft, Flag, GripVertical, ListOrdered, Pencil, Plus, Star, Timer, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -102,7 +102,8 @@ export default function PipelineDetailPage() {
     <div className="space-y-6">
       <nav className="flex items-center gap-1 text-xs text-muted">
         <Link href="/recruitment/pipelines" className="hover:text-brand-ink">مسارات التوظيف</Link>
-        <ChevronRight className="h-3 w-3" />
+        {/* RTL: breadcrumb separator points LEFT (reading-forward), ChevronLeft is correct in RTL */}
+        <ChevronLeft className="h-3 w-3" />
         <span>{pipeline.name}</span>
       </nav>
 

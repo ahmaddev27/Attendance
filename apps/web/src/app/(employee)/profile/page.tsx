@@ -124,7 +124,7 @@ function NotificationPreferencesLink() {
             </p>
           </div>
         </div>
-        <ChevronLeft className="mt-1 h-4 w-4 text-muted rtl:rotate-180" />
+        <ChevronLeft className="mt-1 h-4 w-4 text-muted" />
       </Link>
     </Card>
   );
