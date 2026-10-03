@@ -113,6 +113,16 @@ class RateLimiterServiceProvider extends ServiceProvider
             return Limit::perHour(60)->by(optional($request->user())->id ?: $request->ip());
         });
 
+        // Bulk comms (admin Employees page): 3 per hour per admin for BOTH
+        // bulk-email and bulk-SMS combined — SMS is metered through MTC and
+        // email is cheap but still a noisy fan-out, so one shared bucket
+        // caps blast radius regardless of channel. Keyed by user id so a
+        // compromised admin session can't rotate between endpoints to
+        // double the budget. Attach with `->middleware('throttle:bulk-comms')`.
+        RateLimiter::for('bulk-comms', function (Request $request) {
+            return Limit::perHour(3)->by(optional($request->user())->id ?: $request->ip());
+        });
+
         // Lead creation (Recruitment M11): 30 per hour per sales rep.
         // Caps how quickly a single compromised or misconfigured
         // integration (e.g. a broken LinkedIn scraper) can flood the

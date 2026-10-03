@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Modules\Employees\Requests;
 
+use App\Modules\Employees\Services\EmployeeFileService;
 use App\Shared\Enums\EmployeeStatus;
 use App\Shared\Enums\EmploymentType;
 use App\Shared\Enums\Gender;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 
 class StoreEmployeeRequest extends FormRequest
@@ -57,6 +59,26 @@ class StoreEmployeeRequest extends FormRequest
             'employment_type' => ['required', new Enum(EmploymentType::class)],
             'joining_date' => ['required', 'date'],
             'birth_date' => ['nullable', 'date'],
+            // One physical person = one national ID. Uniqueness lives at the
+            // DB too; validate here so the admin sees a clean 422 field
+            // error instead of a QueryException bubbling as a 500.
+            'national_id' => [
+                'nullable', 'string', 'max:50',
+                Rule::unique('employees', 'national_id'),
+            ],
+            // Paths handed back by the upload endpoints — storage keys on
+            // the private `local` disk. We refuse any value that isn't under
+            // employee-files/, that references a non-existent file, or that
+            // contains a path-traversal segment — otherwise an attacker
+            // could write any string here and reference an unrelated file.
+            'national_id_image_path' => [
+                'nullable', 'string', 'max:255',
+                EmployeeFileService::pathValidationRule(),
+            ],
+            'employment_contract_path' => [
+                'nullable', 'string', 'max:255',
+                EmployeeFileService::pathValidationRule(),
+            ],
             'gender' => ['nullable', new Enum(Gender::class)],
             'avatar_path' => ['nullable', 'string'],
             'status' => ['sometimes', new Enum(EmployeeStatus::class)],

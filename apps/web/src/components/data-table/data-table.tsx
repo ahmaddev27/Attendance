@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import type { PaginatedResponse } from '@/lib/api/types';
 
@@ -32,6 +33,20 @@ export type DataTableRowAction<T> = {
   hidden?: (row: T) => boolean;
 };
 
+/**
+ * Row-selection contract (opt-in): consumers pass the current selected ids
+ * (as a Set) + an onChange, plus a predicate that strips rows the user
+ * isn't allowed to action — e.g. the "select all" header checkbox skips
+ * rows a non-admin couldn't bulk-message anyway. Keyed by the same
+ * `rowKey` function the rest of the table uses so the semantics line up.
+ */
+export type DataTableSelection<T> = {
+  selectedIds: Set<React.Key>;
+  onChange: (next: Set<React.Key>) => void;
+  /** Rows the user may NOT select (returns true to disable). */
+  isDisabled?: (row: T) => boolean;
+};
+
 type DataTableProps<T> = {
   columns: DataTableColumn<T>[];
   data: T[];
@@ -39,6 +54,7 @@ type DataTableProps<T> = {
   isLoading?: boolean;
   emptyMessage?: string;
   actions?: DataTableRowAction<T>[];
+  selection?: DataTableSelection<T>;
   pagination?: {
     meta: PaginatedResponse<unknown>['meta'];
     onPageChange: (page: number) => void;
@@ -58,17 +74,74 @@ export function DataTable<T>({
   isLoading = false,
   emptyMessage = 'لا توجد بيانات لعرضها',
   actions,
+  selection,
   pagination,
   skeletonRows = 5,
 }: DataTableProps<T>) {
   const hasActions = !!actions?.length;
-  const colSpan = columns.length + (hasActions ? 1 : 0);
+  const hasSelection = !!selection;
+  const colSpan = columns.length + (hasActions ? 1 : 0) + (hasSelection ? 1 : 0);
+
+  // Rows the current page's "select all" checkbox will touch — everything
+  // visible that isn't explicitly disabled by the consumer predicate.
+  const selectableRows = React.useMemo(
+    () => (selection ? data.filter((row) => !selection.isDisabled?.(row)) : []),
+    [data, selection],
+  );
+
+  const selectedCountOnPage = React.useMemo(() => {
+    if (!selection) return 0;
+    return selectableRows.filter((row) => selection.selectedIds.has(rowKey(row))).length;
+  }, [selection, selectableRows, rowKey]);
+
+  const headerState: 'checked' | 'indeterminate' | 'unchecked' =
+    selectableRows.length > 0 && selectedCountOnPage === selectableRows.length
+      ? 'checked'
+      : selectedCountOnPage > 0
+        ? 'indeterminate'
+        : 'unchecked';
+
+  const toggleAllOnPage = () => {
+    if (!selection) return;
+    const next = new Set(selection.selectedIds);
+    if (headerState === 'checked') {
+      for (const row of selectableRows) next.delete(rowKey(row));
+    } else {
+      for (const row of selectableRows) next.add(rowKey(row));
+    }
+    selection.onChange(next);
+  };
+
+  const toggleRow = (row: T) => {
+    if (!selection) return;
+    const key = rowKey(row);
+    const next = new Set(selection.selectedIds);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    selection.onChange(next);
+  };
 
   return (
     <div className="overflow-hidden rounded-xl border border-hairline bg-surface">
       <Table>
         <TableHeader>
           <TableRow className="border-hairline hover:bg-transparent">
+            {hasSelection && (
+              <TableHead className="w-10">
+                <Checkbox
+                  aria-label="تحديد الكل"
+                  checked={
+                    headerState === 'checked'
+                      ? true
+                      : headerState === 'indeterminate'
+                        ? 'indeterminate'
+                        : false
+                  }
+                  disabled={selectableRows.length === 0}
+                  onCheckedChange={toggleAllOnPage}
+                />
+              </TableHead>
+            )}
             {columns.map((col) => (
               <TableHead
                 key={col.key}
@@ -93,6 +166,11 @@ export function DataTable<T>({
           {isLoading &&
             Array.from({ length: skeletonRows }).map((_, i) => (
               <TableRow key={`skeleton-${i}`} className="border-hairline hover:bg-transparent">
+                {hasSelection && (
+                  <TableCell>
+                    <Skeleton className="h-4 w-4" />
+                  </TableCell>
+                )}
                 {columns.map((col) => (
                   <TableCell key={col.key}>
                     <Skeleton className="h-4 w-full max-w-[140px]" />
@@ -118,49 +196,64 @@ export function DataTable<T>({
           )}
 
           {!isLoading &&
-            data.map((row) => (
-              <TableRow key={rowKey(row)} className="border-hairline">
-                {columns.map((col) => (
-                  <TableCell
-                    key={col.key}
-                    className={cn(
-                      col.align === 'center' && 'text-center',
-                      col.align === 'end' && 'text-end',
-                      col.className
-                    )}
-                  >
-                    {col.cell(row)}
-                  </TableCell>
-                ))}
-                {hasActions && (
-                  <TableCell>
-                    <div className="flex items-center justify-end gap-1">
-                      {actions
-                        .filter((action) => !action.hidden?.(row))
-                        .map((action) => (
-                          <Button
-                            key={action.label}
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className={cn(
-                              'h-8 w-8',
-                              action.variant === 'destructive'
-                                ? 'text-danger hover:bg-danger-soft hover:text-danger'
-                                : 'text-ink-2 hover:bg-brand-soft hover:text-brand-ink'
-                            )}
-                            title={action.label}
-                            aria-label={action.label}
-                            onClick={() => action.onClick(row)}
-                          >
-                            <action.icon className="h-4 w-4" />
-                          </Button>
-                        ))}
-                    </div>
-                  </TableCell>
-                )}
-              </TableRow>
-            ))}
+            data.map((row) => {
+              const key = rowKey(row);
+              const isSelected = selection?.selectedIds.has(key) ?? false;
+              const isDisabled = selection?.isDisabled?.(row) ?? false;
+              return (
+                <TableRow key={key} className="border-hairline">
+                  {hasSelection && (
+                    <TableCell>
+                      <Checkbox
+                        aria-label="تحديد الصف"
+                        checked={isSelected}
+                        disabled={isDisabled}
+                        onCheckedChange={() => toggleRow(row)}
+                      />
+                    </TableCell>
+                  )}
+                  {columns.map((col) => (
+                    <TableCell
+                      key={col.key}
+                      className={cn(
+                        col.align === 'center' && 'text-center',
+                        col.align === 'end' && 'text-end',
+                        col.className
+                      )}
+                    >
+                      {col.cell(row)}
+                    </TableCell>
+                  ))}
+                  {hasActions && (
+                    <TableCell>
+                      <div className="flex items-center justify-end gap-1">
+                        {actions
+                          .filter((action) => !action.hidden?.(row))
+                          .map((action) => (
+                            <Button
+                              key={action.label}
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className={cn(
+                                'h-8 w-8',
+                                action.variant === 'destructive'
+                                  ? 'text-danger hover:bg-danger-soft hover:text-danger'
+                                  : 'text-ink-2 hover:bg-brand-soft hover:text-brand-ink'
+                              )}
+                              title={action.label}
+                              aria-label={action.label}
+                              onClick={() => action.onClick(row)}
+                            >
+                              <action.icon className="h-4 w-4" />
+                            </Button>
+                          ))}
+                      </div>
+                    </TableCell>
+                  )}
+                </TableRow>
+              );
+            })}
         </TableBody>
       </Table>
 

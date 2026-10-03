@@ -3,13 +3,15 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { CalendarDays, KeyRound, Pencil, Plus, QrCode, ShieldCheck, Trash2 } from 'lucide-react';
+import { CalendarDays, KeyRound, Mail, MessageSquareText, Pencil, Plus, QrCode, ShieldCheck, Trash2, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { DataTable, type DataTableColumn } from '@/components/data-table/data-table';
 import { FilterBar } from '@/components/data-table/filter-bar';
 import { FilterSelect } from '@/components/data-table/filter-select';
 import { EmployeeAvatar } from '@/components/employees/employee-avatar';
+import { BulkEmailDialog } from '@/components/employees/bulk-email-dialog';
+import { BulkSmsDialog } from '@/components/employees/bulk-sms-dialog';
 import { DeleteEmployeeDialog } from '@/components/employees/delete-employee-dialog';
 import { EmployeeFormDialog } from '@/components/employees/employee-form-dialog';
 import { ResetPasswordDialog } from '@/components/employees/reset-password-dialog';
@@ -97,6 +99,13 @@ export default function EmployeesPage() {
   const [resetScanPinEmployee, setResetScanPinEmployee] = React.useState<Employee | null>(null);
   const [scanPinsOpen, setScanPinsOpen] = React.useState(false);
   const [roleEmployee, setRoleEmployee] = React.useState<Employee | null>(null);
+  // Row selection: keyed by employee id. Cleared on filter change AND on
+  // every successful bulk send so the admin doesn't accidentally re-send
+  // to the same batch twice. Values live outside the fetched page so a
+  // paginate-then-return keeps earlier selections intact.
+  const [selectedIds, setSelectedIds] = React.useState<Set<React.Key>>(() => new Set());
+  const [bulkEmailOpen, setBulkEmailOpen] = React.useState(false);
+  const [bulkSmsOpen, setBulkSmsOpen] = React.useState(false);
 
   const debouncedSearch = useDebouncedValue(search);
   // Soft Company Scoping — the header switcher writes to this store; the
@@ -104,9 +113,13 @@ export default function EmployeesPage() {
   // query key below.
   const scopedCompanyId = useScopedCompanyId();
 
-  // Any filter change invalidates the current page number.
+  // Any filter change invalidates the current page number AND the row
+  // selection — the admin's "I selected 5 engineers" intent doesn't
+  // survive switching to "ops, status=terminated" since the user is
+  // reasoning about a different roster.
   React.useEffect(() => {
     setPage(1);
+    setSelectedIds(new Set());
   }, [debouncedSearch, departmentId, teamId, status, scopedCompanyId]);
 
   const { data: departments } = useQuery({
@@ -259,12 +272,65 @@ export default function EmployeesPage() {
         />
       </FilterBar>
 
+      {/* Bulk action bar — appears when at least one row is checked. The
+          selected set lives outside the fetched page so paginating through
+          the list keeps earlier selections intact until the admin either
+          sends or changes a filter. */}
+      {canManageUsers && selectedIds.size > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand/40 bg-brand-soft px-4 py-3">
+          <div className="flex items-center gap-3 text-sm text-brand-ink">
+            <span className="num font-semibold">{selectedIds.size}</span>
+            <span>موظف محدد</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={() => setBulkEmailOpen(true)}
+            >
+              <Mail className="h-4 w-4" />
+              إرسال بريد جماعي
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={() => setBulkSmsOpen(true)}
+            >
+              <MessageSquareText className="h-4 w-4" />
+              إرسال SMS جماعي
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="gap-2 text-ink-2"
+              onClick={() => setSelectedIds(new Set())}
+            >
+              <X className="h-4 w-4" />
+              إلغاء التحديد
+            </Button>
+          </div>
+        </div>
+      )}
+
       <DataTable
         columns={columns}
         data={data?.data ?? []}
         rowKey={(employee) => employee.id}
         isLoading={isLoading}
         emptyMessage="لا يوجد موظفون مطابقون لبحثك"
+        selection={
+          canManageUsers
+            ? {
+                selectedIds,
+                onChange: setSelectedIds,
+              }
+            : undefined
+        }
         actions={[
           {
             label: 'عرض الإجازات',
@@ -319,6 +385,23 @@ export default function EmployeesPage() {
         employee={deletingEmployee}
         open={!!deletingEmployee}
         onOpenChange={(open) => !open && setDeletingEmployee(null)}
+      />
+
+      {/* Bulk comms — reads straight from the selected rows on the current
+          page's data. When the admin paginates and selects more rows the
+          dialog sees the full union because `selectedIds` outlives the
+          page fetch. */}
+      <BulkEmailDialog
+        open={bulkEmailOpen}
+        onOpenChange={setBulkEmailOpen}
+        recipients={(data?.data ?? []).filter((e) => selectedIds.has(e.id))}
+        onSent={() => setSelectedIds(new Set())}
+      />
+      <BulkSmsDialog
+        open={bulkSmsOpen}
+        onOpenChange={setBulkSmsOpen}
+        recipients={(data?.data ?? []).filter((e) => selectedIds.has(e.id))}
+        onSent={() => setSelectedIds(new Set())}
       />
     </div>
   );

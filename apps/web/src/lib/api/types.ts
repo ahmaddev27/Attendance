@@ -357,6 +357,15 @@ export type Employee = {
   status: EmployeeStatus;
   joining_date: string;
   birth_date: string | null;
+  national_id: string | null;
+  // Private-disk files. The server emits a short-lived signed URL (30 min)
+  // for both; refresh the resource to get a fresh one if the page is open
+  // longer than that. The boolean mirrors "is there a file at all" without
+  // leaking the storage path to the client.
+  has_national_id_image: boolean;
+  has_employment_contract: boolean;
+  national_id_image_url: string | null;
+  employment_contract_url: string | null;
   avatar_url: string | null;
   position: Position | null;
   department: Department | null;
@@ -400,8 +409,41 @@ export type EmployeeInput = {
   work_schedule_id?: number | null;
   employment_type: EmploymentType;
   joining_date: string;
+  birth_date?: string | null;
   gender?: Gender | null;
   direct_manager_id?: number | null;
+  national_id?: string | null;
+  // Storage paths returned by the two file-upload endpoints. The FE never
+  // builds these — it uploads first, receives the path back, then sends
+  // the path on the next Save. Omit from the payload to leave the stored
+  // value unchanged; send null to clear it.
+  national_id_image_path?: string | null;
+  employment_contract_path?: string | null;
+};
+
+export type EmployeeFileUploadResponse = {
+  path: string;
+};
+
+export type BulkEmailPayload = {
+  employee_ids: number[];
+  subject: string;
+  body: string;
+};
+
+export type BulkEmailResult = {
+  queued: number;
+  skipped_no_email: number;
+};
+
+export type BulkSmsPayload = {
+  employee_ids: number[];
+  body: string;
+};
+
+export type BulkSmsResult = {
+  queued: number;
+  skipped_no_phone: number;
 };
 
 export type EmployeeListParams = {

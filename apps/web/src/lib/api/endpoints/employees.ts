@@ -1,7 +1,12 @@
 import { apiClient } from '@/lib/api/client';
 import type {
   ApiResource,
+  BulkEmailPayload,
+  BulkEmailResult,
+  BulkSmsPayload,
+  BulkSmsResult,
   Employee,
+  EmployeeFileUploadResponse,
   EmployeeInput,
   EmployeeListParams,
   MyProfile,
@@ -31,6 +36,47 @@ export const employeesApi = {
    */
   myTeam: (search?: string) =>
     apiClient.get<{ data: Employee[] }>('/me/team', { params: { search } }),
+
+  /**
+   * Upload the national ID scan for an employee. The server stores the file
+   * on the PRIVATE disk and returns the storage path, which is persisted on
+   * the employee row inside the same request — the FE needs the path only
+   * if it wants to echo it back (e.g. a two-step wizard); the main form
+   * refetches the employee after upload to pick up the new signed URL.
+   */
+  uploadNationalIdImage: (id: number, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return apiClient.post<ApiResource<EmployeeFileUploadResponse>>(
+      `/employees/${id}/national-id-image`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+  },
+  deleteNationalIdImage: (id: number) =>
+    apiClient.delete(`/employees/${id}/national-id-image`),
+
+  uploadEmploymentContract: (id: number, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return apiClient.post<ApiResource<EmployeeFileUploadResponse>>(
+      `/employees/${id}/employment-contract`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+  },
+  deleteEmploymentContract: (id: number) =>
+    apiClient.delete(`/employees/${id}/employment-contract`),
+
+  /**
+   * Admin bulk comms — fan one email to a selected set of employees. The
+   * server returns {queued, skipped_no_email} so the FE can show both
+   * numbers in the toast ("sent to 42 out of 50; 8 had no email").
+   */
+  bulkEmail: (payload: BulkEmailPayload) =>
+    apiClient.post<ApiResource<BulkEmailResult>>('/admin/employees/bulk-email', payload),
+  bulkSms: (payload: BulkSmsPayload) =>
+    apiClient.post<ApiResource<BulkSmsResult>>('/admin/employees/bulk-sms', payload),
 };
 
 /**

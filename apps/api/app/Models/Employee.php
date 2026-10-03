@@ -62,6 +62,9 @@ class Employee extends Model
         'employment_type',
         'joining_date',
         'birth_date',
+        'national_id',
+        'national_id_image_path',
+        'employment_contract_path',
         'gender',
         'avatar_path',
         'status',
@@ -297,6 +300,14 @@ class Employee extends Model
                 'joining_date',
                 'status',
                 'work_schedule_id',
+                // National ID — the number itself goes in the activity log so
+                // admins can see WHEN it was set/changed. The uploaded files
+                // (national_id_image_path, employment_contract_path) are
+                // deliberately NOT logged — the storage path is both PII
+                // (filename leaks the UUID) and useless as a diff signal:
+                // changing files writes a new path, which looks like churn
+                // in the audit log without conveying intent.
+                'national_id',
             ])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()

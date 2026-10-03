@@ -101,6 +101,7 @@ test('employee create, update and delete are logged with the acting admin and on
     $audited = [
         'employee_number', 'first_name', 'last_name', 'email', 'phone', 'position_id', 'department_id',
         'team_id', 'company_id', 'direct_manager_id', 'employment_type', 'joining_date', 'status', 'work_schedule_id',
+        'national_id',
     ];
 
     expect($trail->pluck('event')->all())->toBe(['created', 'updated', 'deleted'])

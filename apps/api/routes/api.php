@@ -11,7 +11,9 @@ use App\Modules\Attendance\Controllers\ScanPinController;
 use App\Modules\Attendance\Controllers\WorkScheduleController;
 use App\Modules\Auth\Controllers\AuthController;
 use App\Modules\Auth\Controllers\PasswordResetController;
+use App\Modules\Employees\Controllers\EmployeeBulkCommsController;
 use App\Modules\Employees\Controllers\EmployeeController;
+use App\Modules\Employees\Controllers\EmployeeFileController;
 use App\Modules\Employees\Controllers\EmployeeRoleController;
 use App\Modules\Employees\Controllers\MyProfileController;
 use App\Modules\Leaves\Controllers\EmployeeLeavesController;
@@ -152,7 +154,35 @@ Route::middleware('auth:sanctum')->group(function () {
         // session cannot rotate every employee's PIN in one burst.
         Route::post('/employees/{employee}/scan-pin', [ScanPinController::class, 'reset'])
             ->middleware('throttle:10,1,scan-pin-reset');
+
+        // Per-employee file slots: national ID scan + employment contract.
+        // Both files live on the PRIVATE `local` disk; the download routes
+        // below are signed and additionally authorize admin OR self.
+        Route::post('/employees/{employee}/national-id-image', [EmployeeFileController::class, 'uploadNationalId']);
+        Route::delete('/employees/{employee}/national-id-image', [EmployeeFileController::class, 'deleteNationalId']);
+        Route::post('/employees/{employee}/employment-contract', [EmployeeFileController::class, 'uploadContract']);
+        Route::delete('/employees/{employee}/employment-contract', [EmployeeFileController::class, 'deleteContract']);
     });
+
+    // Signed download routes for the two private-disk files. Placed OUTSIDE
+    // the manage-users group so the employee themselves (self) can fetch
+    // their own files — the controller enforces admin OR self.
+    Route::get('/employees/{employee}/national-id-image/download', [EmployeeFileController::class, 'downloadNationalId'])
+        ->name('employees.national-id.download')
+        ->middleware('signed');
+    Route::get('/employees/{employee}/employment-contract/download', [EmployeeFileController::class, 'downloadContract'])
+        ->name('employees.employment-contract.download')
+        ->middleware('signed');
+
+    // Bulk comms (admin Employees page). Rate-limiter is a shared 3/hour
+    // bucket per admin covering both channels — the single most sensitive
+    // call vector into the SMS budget.
+    Route::middleware(['permission:manage-users', 'throttle:bulk-comms'])
+        ->prefix('admin/employees')
+        ->group(function () {
+            Route::post('/bulk-email', [EmployeeBulkCommsController::class, 'bulkEmail']);
+            Route::post('/bulk-sms', [EmployeeBulkCommsController::class, 'bulkSms']);
+        });
 });
 
 // M3 — Attendance + Working Hours Engine.

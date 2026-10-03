@@ -7,12 +7,21 @@ namespace App\Modules\Employees\Resources;
 use App\Models\Employee;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\URL;
 
 /**
  * @mixin Employee
  */
 class EmployeeResource extends JsonResource
 {
+    /**
+     * Signed-URL lifetime for the private employee files (national ID scan,
+     * employment contract). Matches LeaveRequestResource so both surfaces
+     * behave the same from the client's perspective — a page open longer
+     * than this just refetches the resource to get a fresh link.
+     */
+    private const FILE_LINK_LIFETIME_MINUTES = 30;
+
     /**
      * @return array<string, mixed>
      */
@@ -31,6 +40,27 @@ class EmployeeResource extends JsonResource
             'gender' => $this->gender?->value,
             'joining_date' => $this->joining_date?->toDateString(),
             'birth_date' => $this->birth_date?->toDateString(),
+            'national_id' => $this->national_id,
+            // Private-disk storage keys are kept server-side only — the FE
+            // uses `*_url` for download/preview and the raw column name to
+            // detect presence. Keeping the path off the payload prevents
+            // leaking the UUID portion in client-side logs or screenshots.
+            'has_national_id_image' => $this->national_id_image_path !== null,
+            'has_employment_contract' => $this->employment_contract_path !== null,
+            'national_id_image_url' => $this->national_id_image_path
+                ? URL::temporarySignedRoute(
+                    'employees.national-id.download',
+                    now()->addMinutes(self::FILE_LINK_LIFETIME_MINUTES),
+                    ['employee' => $this->id],
+                )
+                : null,
+            'employment_contract_url' => $this->employment_contract_path
+                ? URL::temporarySignedRoute(
+                    'employees.employment-contract.download',
+                    now()->addMinutes(self::FILE_LINK_LIFETIME_MINUTES),
+                    ['employee' => $this->id],
+                )
+                : null,
             // `avatar_path` is an internal storage key. The frontend
             // only ever renders the resolved public URL, so expose that
             // instead of the raw column.

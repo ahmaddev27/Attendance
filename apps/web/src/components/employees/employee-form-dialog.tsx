@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { arSA } from 'date-fns/locale';
-import { CalendarIcon } from 'lucide-react';
+import { CalendarIcon, FileText, ImageIcon, Trash2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -51,6 +51,12 @@ import type { Department, Employee, EmployeeInput, EmployeeMini, Team } from '@/
 import { EMPLOYMENT_TYPE_LABELS, GENDER_LABELS } from '@/lib/constants/employee-options';
 import { cn } from '@/lib/utils';
 
+// Server-side file-size caps mirrored from UploadNationalIdImageRequest /
+// UploadEmploymentContractRequest. Checked client-side so the user sees
+// the limit before the upload round-trips with a 422.
+const MAX_ID_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_CONTRACT_BYTES = 10 * 1024 * 1024;
+
 const employeeFormSchema = z
   .object({
     first_name: z.string().trim().min(1, 'الاسم الأول مطلوب').max(100, 'الاسم الأول طويل جداً'),
@@ -79,7 +85,14 @@ const employeeFormSchema = z
       required_error: 'نوع التوظيف مطلوب',
     }),
     joining_date: z.date({ required_error: 'تاريخ الالتحاق مطلوب' }),
+    birth_date: z.date().nullable(),
     gender: z.enum(['male', 'female']).nullable(),
+    national_id: z
+      .string()
+      .trim()
+      .max(50, 'الرقم الوطني طويل جداً')
+      .optional()
+      .or(z.literal('')),
   })
   .refine((data) => data.department_id !== null, {
     message: 'القسم مطلوب',
@@ -105,7 +118,9 @@ function buildDefaultValues(employee?: Employee | null): EmployeeFormValues {
       work_schedule_id: null,
       employment_type: 'full_time',
       joining_date: new Date(),
+      birth_date: null,
       gender: null,
+      national_id: '',
     };
   }
 
@@ -120,7 +135,9 @@ function buildDefaultValues(employee?: Employee | null): EmployeeFormValues {
     work_schedule_id: employee.work_schedule_id ?? null,
     employment_type: employee.employment_type,
     joining_date: parseISO(employee.joining_date),
+    birth_date: employee.birth_date ? parseISO(employee.birth_date) : null,
     gender: employee.gender,
+    national_id: employee.national_id ?? '',
   };
 }
 
@@ -263,7 +280,9 @@ export function EmployeeFormDialog({ open, onOpenChange, employee }: EmployeeFor
         work_schedule_id: values.work_schedule_id,
         employment_type: values.employment_type,
         joining_date: format(values.joining_date, 'yyyy-MM-dd'),
+        birth_date: values.birth_date ? format(values.birth_date, 'yyyy-MM-dd') : null,
         gender: values.gender,
+        national_id: values.national_id ? values.national_id.trim() : null,
         direct_manager_id: directManager?.id ?? null,
       };
       // Soft Company Scoping: on create, pin the new employee to the active
@@ -639,6 +658,94 @@ export function EmployeeFormDialog({ open, onOpenChange, employee }: EmployeeFor
               />
             </div>
 
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="birth_date"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>تاريخ الميلاد (اختياري)</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className={cn(
+                              'justify-start text-right font-normal',
+                              !field.value && 'text-muted-foreground'
+                            )}
+                          >
+                            <CalendarIcon className="h-4 w-4 opacity-60" />
+                            {field.value
+                              ? format(field.value, 'd MMMM yyyy', { locale: arSA })
+                              : 'اختر التاريخ'}
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value ?? undefined}
+                          defaultMonth={field.value ?? undefined}
+                          onSelect={(date) => field.onChange(date ?? null)}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="national_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>الرقم الوطني (اختياري)</FormLabel>
+                    <FormControl>
+                      <Input
+                        dir="ltr"
+                        inputMode="numeric"
+                        className="num text-right"
+                        placeholder="مثال: 199912345"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* The two uploads are per-employee endpoints — only available in
+                edit mode. On create, the admin saves first then re-opens the
+                dialog to attach files. */}
+            {isEdit && employee && (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <EmployeeFileField
+                  employeeId={employee.id}
+                  label="صورة الهوية (اختياري)"
+                  hint="JPG / PNG / PDF — حتى 5 ميغابايت"
+                  accept="image/jpeg,image/png,image/webp,application/pdf"
+                  maxBytes={MAX_ID_IMAGE_BYTES}
+                  initialUrl={employee.national_id_image_url}
+                  hasFile={employee.has_national_id_image}
+                  kind="national_id"
+                />
+                <EmployeeFileField
+                  employeeId={employee.id}
+                  label="عقد التوظيف (اختياري)"
+                  hint="PDF أو صورة — حتى 10 ميغابايت"
+                  accept="application/pdf,image/jpeg,image/png,image/webp"
+                  maxBytes={MAX_CONTRACT_BYTES}
+                  initialUrl={employee.employment_contract_url}
+                  hasFile={employee.has_employment_contract}
+                  kind="contract"
+                />
+              </div>
+            )}
+
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 إلغاء
@@ -656,5 +763,205 @@ export function EmployeeFormDialog({ open, onOpenChange, employee }: EmployeeFor
         </Form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * One file slot per employee: upload, preview (image → thumbnail, PDF →
+ * "عرض الملف" link), replace, or remove. Each slot talks to its own
+ * endpoint, so the parent form doesn't have to track a per-file state
+ * machine or send paths back on Save — the server persists the column in
+ * the same request that writes the file.
+ */
+function EmployeeFileField({
+  employeeId,
+  label,
+  hint,
+  accept,
+  maxBytes,
+  initialUrl,
+  hasFile: initialHasFile,
+  kind,
+}: {
+  employeeId: number;
+  label: string;
+  hint: string;
+  accept: string;
+  maxBytes: number;
+  initialUrl: string | null;
+  hasFile: boolean;
+  kind: 'national_id' | 'contract';
+}) {
+  const queryClient = useQueryClient();
+  const inputRef = React.useRef<HTMLInputElement | null>(null);
+  // Local mirror of server state — flipped on a successful upload/delete so
+  // the UI reflects the new state without waiting for the parent list
+  // query to refetch. The signed URL has a 30-min TTL; we don't bother
+  // refreshing it mid-dialog, the next list refetch brings a fresh one.
+  const [hasFile, setHasFile] = React.useState(initialHasFile);
+  const [currentUrl, setCurrentUrl] = React.useState<string | null>(initialUrl);
+  const [uploading, setUploading] = React.useState(false);
+
+  React.useEffect(() => {
+    setHasFile(initialHasFile);
+    setCurrentUrl(initialUrl);
+  }, [employeeId, initialHasFile, initialUrl]);
+
+  const invalidateEmployeeQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ['employees'] });
+  };
+
+  const onPickFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) return;
+
+    if (file.size > maxBytes) {
+      toast.error('حجم الملف يتجاوز الحد المسموح به');
+      if (inputRef.current) inputRef.current.value = '';
+      return;
+    }
+
+    setUploading(true);
+    const uploader =
+      kind === 'national_id'
+        ? employeesApi.uploadNationalIdImage(employeeId, file)
+        : employeesApi.uploadEmploymentContract(employeeId, file);
+
+    uploader
+      .then(() => {
+        toast.success('تم رفع الملف بنجاح');
+        setHasFile(true);
+        // Server returns the raw path, not a signed URL — invalidate so the
+        // list refetch brings back the fresh signed URL for preview.
+        setCurrentUrl(null);
+        invalidateEmployeeQueries();
+      })
+      .catch((err: unknown) => {
+        const message =
+          (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          'تعذر رفع الملف';
+        toast.error(message);
+      })
+      .finally(() => {
+        setUploading(false);
+        if (inputRef.current) inputRef.current.value = '';
+      });
+  };
+
+  const onRemove = () => {
+    setUploading(true);
+    const remover =
+      kind === 'national_id'
+        ? employeesApi.deleteNationalIdImage(employeeId)
+        : employeesApi.deleteEmploymentContract(employeeId);
+
+    remover
+      .then(() => {
+        toast.success('تم حذف الملف');
+        setHasFile(false);
+        setCurrentUrl(null);
+        invalidateEmployeeQueries();
+      })
+      .catch(() => toast.error('تعذر حذف الملف'))
+      .finally(() => setUploading(false));
+  };
+
+  // Guess "is this a renderable image preview?" from the URL extension —
+  // the signed URL is to a storage key whose extension we preserved on
+  // upload. PDFs and other blobs fall back to a plain "open" link.
+  const isImagePreview = React.useMemo(() => {
+    if (!currentUrl) return false;
+    const lower = currentUrl.toLowerCase();
+    return ['.jpg', '.jpeg', '.png', '.webp'].some((ext) => lower.includes(ext));
+  }, [currentUrl]);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <Label>{label}</Label>
+      <div className="rounded-lg border border-hairline bg-surface-muted p-3">
+        {hasFile ? (
+          <div className="flex items-center gap-3">
+            {isImagePreview && currentUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={currentUrl}
+                alt={label}
+                className="h-16 w-16 rounded-md border border-hairline object-cover"
+              />
+            ) : (
+              <div className="flex h-16 w-16 items-center justify-center rounded-md border border-hairline bg-surface text-ink-2">
+                {kind === 'national_id' ? (
+                  <ImageIcon className="h-6 w-6" />
+                ) : (
+                  <FileText className="h-6 w-6" />
+                )}
+              </div>
+            )}
+            <div className="flex flex-1 flex-col gap-1 text-xs">
+              <span className="font-semibold text-success">● الملف مرفوع</span>
+              {currentUrl && (
+                <a
+                  href={currentUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-brand underline"
+                >
+                  عرض الملف
+                </a>
+              )}
+            </div>
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={uploading}
+                onClick={() => inputRef.current?.click()}
+                title="استبدال الملف"
+              >
+                <Upload className="h-3.5 w-3.5" />
+                استبدال
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                disabled={uploading}
+                onClick={onRemove}
+                title="حذف الملف"
+                className="text-danger hover:bg-danger-soft hover:text-danger"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-col gap-1 text-xs text-muted">
+              <span>لا يوجد ملف مرفوع</span>
+              <span>{hint}</span>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={uploading}
+              onClick={() => inputRef.current?.click()}
+            >
+              {uploading && <Spinner className="h-3 w-3" />}
+              <Upload className="h-3.5 w-3.5" />
+              رفع
+            </Button>
+          </div>
+        )}
+      </div>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        className="hidden"
+        onChange={onPickFile}
+      />
+    </div>
   );
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Employees\Requests;
 
+use App\Modules\Employees\Services\EmployeeFileService;
 use App\Shared\Enums\EmployeeStatus;
 use App\Shared\Enums\EmploymentType;
 use App\Shared\Enums\Gender;
@@ -48,6 +49,21 @@ class UpdateEmployeeRequest extends FormRequest
             'employment_type' => ['sometimes', new Enum(EmploymentType::class)],
             'joining_date' => ['sometimes', 'date'],
             'birth_date' => ['nullable', 'date'],
+            // One physical person = one national ID. On update we ignore the
+            // employee's own current row so re-saving an unchanged value is
+            // accepted; a collision with any OTHER employee row is rejected.
+            'national_id' => [
+                'nullable', 'string', 'max:50',
+                Rule::unique('employees', 'national_id')->ignore($this->route('employee')),
+            ],
+            'national_id_image_path' => [
+                'nullable', 'string', 'max:255',
+                EmployeeFileService::pathValidationRule(),
+            ],
+            'employment_contract_path' => [
+                'nullable', 'string', 'max:255',
+                EmployeeFileService::pathValidationRule(),
+            ],
             'gender' => ['nullable', new Enum(Gender::class)],
             'avatar_path' => ['nullable', 'string'],
             'status' => ['sometimes', new Enum(EmployeeStatus::class)],
