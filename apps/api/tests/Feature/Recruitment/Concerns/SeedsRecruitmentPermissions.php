@@ -42,9 +42,15 @@ trait SeedsRecruitmentPermissions
         'prepare-contracts',
         'manage-recruitment-pipelines',
         'export-recruitment-data',
+        // Phase 2 — Candidate bank + Interview workflow.
+        'view-candidates',
+        'manage-candidates',
+        'shortlist-candidates',
+        'view-interviews',
+        'submit-interview-feedback',
     ];
 
-    protected function seedRecruitmentPermissions(): void
+    public function seedRecruitmentPermissions(): void
     {
         foreach (self::$recruitmentPermissions as $name) {
             Permission::findOrCreate($name, 'web');
@@ -58,7 +64,7 @@ trait SeedsRecruitmentPermissions
      *
      * @param  list<string>  $permissions
      */
-    protected function actingAsUserWithPermissions(array $permissions): User
+    public function actingAsUserWithPermissions(array $permissions): User
     {
         $this->seedRecruitmentPermissions();
 
@@ -78,7 +84,7 @@ trait SeedsRecruitmentPermissions
      * the `super-admin` role rather than direct grants so behaviour
      * matches the real seeder that assigns permissions to the role.
      */
-    protected function actingAsRecruitmentAdmin(): User
+    public function actingAsRecruitmentAdmin(): User
     {
         $this->seedRecruitmentPermissions();
 
@@ -99,7 +105,7 @@ trait SeedsRecruitmentPermissions
      * explicitly supplied. Idempotent — call from any test that opens
      * a job.
      */
-    protected function seedStandardPipeline(): RecruitmentPipeline
+    public function seedStandardPipeline(): RecruitmentPipeline
     {
         $pipeline = RecruitmentPipeline::firstOrCreate(
             ['code' => 'standard'],

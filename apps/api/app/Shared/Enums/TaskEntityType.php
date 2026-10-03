@@ -10,9 +10,9 @@ namespace App\Shared\Enums;
  * morph-map to a model class so a Model rename doesn't invalidate
  * historical rows; the string here is the durable identifier.
  *
- * Phase 1 recognises only the four Recruitment entities; candidates,
- * interviews, and contracts appear in later phases and their cases
- * will be added then.
+ * Phase 1 cases: Lead / Client / RecruitmentCase / JobRequirement.
+ * Phase 2 adds the ATS entities (Candidate, CandidateApplication,
+ * Interview) — contracts are still deferred to Phase 3.
  */
 enum TaskEntityType: string
 {
@@ -20,6 +20,9 @@ enum TaskEntityType: string
     case Client = 'client';
     case RecruitmentCase = 'recruitment_case';
     case JobRequirement = 'job_requirement';
+    case Candidate = 'candidate';
+    case CandidateApplication = 'candidate_application';
+    case Interview = 'interview';
 
     /**
      * Frontend route of the entity — the one place the web app's URL
@@ -32,6 +35,9 @@ enum TaskEntityType: string
             self::Client => "/recruitment/clients/{$id}",
             self::RecruitmentCase => "/recruitment/cases/{$id}",
             self::JobRequirement => "/recruitment/jobs/{$id}",
+            self::Candidate => "/recruitment/candidates/{$id}",
+            self::CandidateApplication => "/recruitment/applications/{$id}",
+            self::Interview => "/recruitment/interviews/{$id}",
         };
     }
 }

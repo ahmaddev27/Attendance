@@ -40,6 +40,15 @@ class RecruitmentPermissionSeeder extends Seeder
         'prepare-contracts',
         'manage-recruitment-pipelines',
         'export-recruitment-data',
+        // Phase 2 — Candidate bank + interview workflow (see
+        // docs/recruitment/05-phase-2-plan.md §10). `screen-candidates`
+        // + `schedule-interviews` already existed from Phase 1 and keep
+        // their meaning.
+        'view-candidates',
+        'manage-candidates',
+        'shortlist-candidates',
+        'view-interviews',
+        'submit-interview-feedback',
     ];
 
     /**
@@ -61,12 +70,18 @@ class RecruitmentPermissionSeeder extends Seeder
             'view-jobs', 'manage-jobs', 'advance-job-stage',
             'screen-candidates', 'schedule-interviews', 'prepare-contracts',
             'view-recruitment-cases', 'view-clients', 'export-recruitment-data',
+            // Phase 2 — the recruiter owns the Candidate bank end-to-end.
+            'view-candidates', 'manage-candidates', 'shortlist-candidates',
+            'view-interviews', 'submit-interview-feedback',
         ],
         'job-publisher' => [
             'view-jobs', 'advance-job-stage', 'publish-jobs',
         ],
         'management' => [
             'view-leads', 'view-clients', 'view-recruitment-cases', 'view-jobs', 'export-recruitment-data',
+            // Phase 2 read-only visibility — management reviews candidates
+            // and interviews but does not score / schedule / shortlist.
+            'view-candidates', 'view-interviews',
         ],
     ];
 

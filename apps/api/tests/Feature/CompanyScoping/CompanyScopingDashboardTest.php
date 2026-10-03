@@ -78,13 +78,12 @@ test('dashboard kpis filter today attendance by company_id', function (): void {
     $empA = Employee::factory()->create(['company_id' => $orgA['company']->id]);
     $empB = Employee::factory()->create(['company_id' => $orgB['company']->id]);
 
-    // Insert attendance rows via DB::table to sidestep the Attendance
-    // model's `date` Eloquent cast — on SQLite the cast widens the value
-    // to `Y-m-d 00:00:00`, and the service's
-    // `->where('date', $todayDate)` then misses it. See the dev-workflow
-    // memory for the pre-existing AdminDashboardTest flake with the same
-    // root cause (green on MySQL CI, local SQLite only).
-    $today = now()->toDateString();
+    // Match the Attendance model's `date` cast storage format so the
+    // dashboard service's half-open range query (startOfDay → +1 day)
+    // finds the row. On SQLite the cast stores "Y-m-d 00:00:00"; on
+    // MySQL a DATE column strips the time, but either way the string
+    // compares correctly against the Carbon bounds the service uses.
+    $today = now()->startOfDay()->toDateTimeString();
     \Illuminate\Support\Facades\DB::table('attendances')->insert([
         [
             'employee_id' => $empA->id,

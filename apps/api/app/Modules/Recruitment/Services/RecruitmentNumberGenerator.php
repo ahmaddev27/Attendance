@@ -4,14 +4,19 @@ declare(strict_types=1);
 
 namespace App\Modules\Recruitment\Services;
 
+use App\Modules\Recruitment\Repositories\CandidateApplicationRepository;
+use App\Modules\Recruitment\Repositories\CandidateRepository;
 use App\Modules\Recruitment\Repositories\ClientRepository;
+use App\Modules\Recruitment\Repositories\InterviewRepository;
 use App\Modules\Recruitment\Repositories\JobRequirementRepository;
 use App\Modules\Recruitment\Repositories\LeadRepository;
 use App\Modules\Recruitment\Repositories\RecruitmentCaseRepository;
 
 /**
  * Mints the human-facing sequential identifiers each Recruitment
- * entity carries (L-YYYY-####, C-YYYY-####, RC-YYYY-####, J-YYYY-####).
+ * entity carries:
+ *   Phase 1 — L-YYYY-####, C-YYYY-####, RC-YYYY-####, J-YYYY-####.
+ *   Phase 2 — CAN-YYYY-####, APP-YYYY-#####, INT-YYYY-#####.
  *
  * Sequences restart at 0001 every calendar year. Must be called from
  * INSIDE the DB::transaction that inserts the row — the repository
@@ -28,6 +33,9 @@ class RecruitmentNumberGenerator
         private readonly ClientRepository $clients,
         private readonly RecruitmentCaseRepository $cases,
         private readonly JobRequirementRepository $jobs,
+        private readonly CandidateRepository $candidates,
+        private readonly CandidateApplicationRepository $applications,
+        private readonly InterviewRepository $interviews,
     ) {}
 
     public function nextLeadNumber(?int $year = null): string
@@ -58,8 +66,29 @@ class RecruitmentNumberGenerator
         return $this->format('J', $year, $this->jobs->highestSequenceForYear($year) + 1);
     }
 
-    private function format(string $prefix, int $year, int $sequence): string
+    public function nextCandidateNumber(?int $year = null): string
     {
-        return sprintf('%s-%d-%04d', $prefix, $year, $sequence);
+        $year ??= (int) date('Y');
+
+        return $this->format('CAN', $year, $this->candidates->highestSequenceForYear($year) + 1);
+    }
+
+    public function nextApplicationNumber(?int $year = null): string
+    {
+        $year ??= (int) date('Y');
+
+        return $this->format('APP', $year, $this->applications->highestSequenceForYear($year) + 1, width: 5);
+    }
+
+    public function nextInterviewNumber(?int $year = null): string
+    {
+        $year ??= (int) date('Y');
+
+        return $this->format('INT', $year, $this->interviews->highestSequenceForYear($year) + 1, width: 5);
+    }
+
+    private function format(string $prefix, int $year, int $sequence, int $width = 4): string
+    {
+        return sprintf("%s-%d-%0{$width}d", $prefix, $year, $sequence);
     }
 }

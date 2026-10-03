@@ -673,4 +673,42 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/funnel', [RecruitmentDashboardController::class, 'funnel']);
             Route::get('/leaderboard', [RecruitmentDashboardController::class, 'leaderboard']);
         });
+
+    // ---- Phase 2 — Candidate bank + Applications ----
+    // Candidate reads (shared pool, searchable).
+    Route::middleware('permission:view-candidates')->group(function () {
+        Route::get('/candidates', [\App\Modules\Recruitment\Controllers\CandidateController::class, 'index']);
+        Route::get('/candidates/{candidate}', [\App\Modules\Recruitment\Controllers\CandidateController::class, 'show']);
+        Route::get('/candidates/{candidate}/applications', [\App\Modules\Recruitment\Controllers\CandidateController::class, 'applications']);
+    });
+
+    // Candidate writes + application attach/update. The authorize() in
+    // each Form Request also enforces `manage-candidates`, so the
+    // middleware is belt-and-suspenders for a 403 before validation.
+    Route::middleware('permission:manage-candidates')->group(function () {
+        Route::post('/candidates', [\App\Modules\Recruitment\Controllers\CandidateController::class, 'store']);
+        Route::patch('/candidates/{candidate}', [\App\Modules\Recruitment\Controllers\CandidateController::class, 'update']);
+        Route::delete('/candidates/{candidate}', [\App\Modules\Recruitment\Controllers\CandidateController::class, 'destroy']);
+    });
+
+    // Applications per-job: list under view-jobs, attach under
+    // manage-candidates (same reason as above — the request authorises
+    // too, this is defence in depth).
+    Route::middleware('permission:view-jobs')->group(function () {
+        Route::get('/jobs/{job}/applications', [\App\Modules\Recruitment\Controllers\CandidateApplicationController::class, 'indexForJob']);
+    });
+    Route::middleware('permission:manage-candidates')->group(function () {
+        Route::post('/jobs/{job}/applications', [\App\Modules\Recruitment\Controllers\CandidateApplicationController::class, 'attach']);
+    });
+
+    // Single-application endpoints. view-candidates reads, manage-candidates
+    // writes — matches the Phase 2 RBAC matrix in the plan.
+    Route::middleware('permission:view-candidates')->group(function () {
+        Route::get('/applications/{application}', [\App\Modules\Recruitment\Controllers\CandidateApplicationController::class, 'show']);
+    });
+    Route::middleware('permission:manage-candidates')->group(function () {
+        Route::patch('/applications/{application}', [\App\Modules\Recruitment\Controllers\CandidateApplicationController::class, 'update']);
+        Route::post('/applications/{application}/reject', [\App\Modules\Recruitment\Controllers\CandidateApplicationController::class, 'reject']);
+        Route::post('/applications/{application}/withdraw', [\App\Modules\Recruitment\Controllers\CandidateApplicationController::class, 'withdraw']);
+    });
 });
