@@ -176,6 +176,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // Attendance read (admin dashboards). Employees see their own
     // attendance via /me/dashboard/kpis and /me/... routes.
     Route::middleware('permission:view-all-attendance')->group(function () {
+        // Stats row for the admin attendance list — same filters as index().
+        // Registered BEFORE the apiResource so the explicit path wins over
+        // the resource's /attendance/{attendance} show route (otherwise
+        // `stats` would be swallowed as a bound Attendance id).
+        Route::get('/admin/attendance/stats', [AttendanceController::class, 'stats']);
         Route::apiResource('attendance', AttendanceController::class)->only(['index', 'show']);
         Route::get('/attendance/employee/{employee}/monthly/{year}/{month}', [AttendanceController::class, 'monthlySummary']);
     });

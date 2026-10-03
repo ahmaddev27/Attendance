@@ -3,6 +3,7 @@ import { publicApiClient } from '../public-client';
 import type {
   ApiResource,
   Attendance,
+  AttendanceStatsSummary,
   AttendanceStatus,
   MonthlyAttendanceSummary,
   PaginatedResponse,
@@ -48,6 +49,16 @@ export const attendanceApi = {
     apiClient
       .get<PaginatedResponse<Attendance>>('/attendance', { params })
       .then((r) => r.data),
+
+  /**
+   * Date-range aggregates for the admin attendance table's stat tiles.
+   * Mounted under /admin so the permission guard stays explicit; honours
+   * the same filter set as list().
+   */
+  stats: (params: Omit<AttendanceListParams, 'page' | 'per_page'> = {}) =>
+    apiClient
+      .get<ApiResource<AttendanceStatsSummary>>('/admin/attendance/stats', { params })
+      .then((r) => r.data.data),
 
   get: (id: number) =>
     apiClient.get<ApiResource<Attendance>>(`/attendance/${id}`).then((r) => r.data.data),

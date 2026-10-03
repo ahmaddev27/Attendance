@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Attendance\Resources;
 
 use App\Models\Attendance;
+use App\Shared\Support\IpMatcher;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -44,9 +45,38 @@ class AttendanceResource extends JsonResource
             'early_leave_minutes' => $this->early_leave_minutes,
             'overtime_minutes' => $this->overtime_minutes,
             'status' => $this->status?->value,
+            'origin' => $this->resolveOrigin(),
             'notes' => $this->notes,
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * Display-only badge, decoupled from enforce_ip: even when the device
+     * is NOT enforcing an IP whitelist, we still surface whether the
+     * check-in came from inside or outside that whitelist so admins can
+     * spot remote punches at a glance.
+     *
+     * - onsite:  check_in_ip matches at least one whitelist entry.
+     * - remote:  check_in_ip is set, whitelist is non-empty, no match.
+     * - unknown: check-in device missing OR whitelist empty OR IP missing.
+     */
+    private function resolveOrigin(): string
+    {
+        $ip = $this->check_in_ip;
+        $device = $this->checkInDevice;
+
+        if ($ip === null || $device === null) {
+            return 'unknown';
+        }
+
+        $whitelist = $device->ip_whitelist;
+
+        if (empty($whitelist)) {
+            return 'unknown';
+        }
+
+        return IpMatcher::matchesAny($ip, $whitelist) ? 'onsite' : 'remote';
     }
 }

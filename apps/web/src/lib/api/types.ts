@@ -91,6 +91,13 @@ export type AttendanceStatus =
   | 'remote'
   | 'business_mission';
 
+/**
+ * Display-only badge: whether the check-in IP matched the device's
+ * ip_whitelist. Decoupled from enforce_ip so admins can SEE out-of-office
+ * punches even when enforcement is disabled.
+ */
+export type AttendanceOrigin = 'onsite' | 'remote' | 'unknown';
+
 export type Attendance = {
   id: number;
   employee_id: number;
@@ -103,8 +110,26 @@ export type Attendance = {
   early_leave_minutes: number | null;
   overtime_minutes: number;
   status: AttendanceStatus;
+  origin: AttendanceOrigin;
   check_in_ip: string | null;
   check_out_ip: string | null;
+};
+
+export type AttendanceStatsSummary = {
+  total_rows: number;
+  unique_employees: number;
+  present_count: number;
+  absent_count: number;
+  late_count: number;
+  on_leave_count: number;
+  holiday_count: number;
+  weekend_count: number;
+  total_hours: number;
+  total_overtime_hours: number;
+  avg_hours_per_day: number;
+  onsite_count: number;
+  remote_count: number;
+  unknown_origin_count: number;
 };
 
 export type MonthlyAttendanceSummary = {
