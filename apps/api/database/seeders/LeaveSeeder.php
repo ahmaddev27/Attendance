@@ -42,7 +42,11 @@ class LeaveSeeder extends Seeder
                 'default_annual_entitlement' => 21.00,
                 'allow_negative_balance' => false,
                 'requires_attachment' => false,
-                'min_notice_days' => 7,
+                // Owner's call 2026-10-03: at least one day's notice is
+                // enough for annual leave. The 7-day gate was too strict
+                // for a small org where most planning happens within the
+                // week. Admins can still bump this per-type via the UI.
+                'min_notice_days' => 1,
                 'color' => '#2678C4',
                 'sort_order' => 1,
             ],
