@@ -49,7 +49,11 @@ type SuccessPayload = {
 };
 
 const PIN_PATTERN = /^\d{4}$/;
-const SUCCESS_RESET_MS = 3500;
+// Owner's call 2026-10-04: the kiosk should sit on the success card long
+// enough that a passerby reads "تم تسجيل حضورك" + the time without
+// catching only the fade-out. 5 seconds is still short enough to clear
+// before the next scanner reaches the input.
+const SUCCESS_RESET_MS = 5000;
 
 function getCurrentPosition(): Promise<GeolocationPosition | null> {
   // Geolocation is best-effort: if the device doesn't have it or the user
@@ -447,23 +451,74 @@ export default function KioskScanPage() {
         )}
 
         {view === 'success' && success && (
-          <div className="flex animate-in flex-col items-center gap-4 zoom-in-50 duration-300">
-            {success.action === 'check-in' ? (
-              <LogIn className="h-20 w-20 text-success" />
-            ) : (
-              <LogOut className="h-20 w-20 text-amber-600" />
-            )}
-            <p className="text-center text-lg font-semibold text-ink">{success.message}</p>
-            {success.at && (
-              <p className="num text-4xl font-bold text-ink">{formatTime(success.at)}</p>
-            )}
-          </div>
+          <SuccessCard action={success.action} message={success.message} at={success.at} />
         )}
       </main>
 
       <footer className="border-t border-hairline py-4 text-center text-xs text-muted">
         {device?.device_name ?? ' '}
       </footer>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Success card                                                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Full-height confirmation after a successful scan — owner's 2026-10-04
+ * ask: "I want something that clearly shows the scan was recorded, and a
+ * beautiful confirmation when they clock out." The card doubles the icon
+ * size, lays the headline above the time, and tints the whole surface so
+ * someone walking past the kiosk reads the result from four feet away.
+ */
+function SuccessCard({
+  action,
+  message,
+  at,
+}: {
+  action: 'check-in' | 'check-out';
+  message: string;
+  at: string | null;
+}) {
+  const isCheckIn = action === 'check-in';
+  const Icon = isCheckIn ? LogIn : LogOut;
+  // Light surface tint + a solid accent ring. Keeps the brand palette the
+  // rest of the admin uses (success green for check-in, amber for
+  // check-out) without inventing a new background.
+  const surface = isCheckIn
+    ? 'bg-success-soft/50 ring-success/30 text-success'
+    : 'bg-amber-50 ring-amber-500/40 text-amber-700';
+  const headline = isCheckIn ? 'تم تسجيل حضورك' : 'تم تسجيل انصرافك';
+
+  return (
+    <div className="flex w-full max-w-sm animate-in flex-col items-center gap-6 zoom-in-50 duration-300">
+      <div
+        className={`flex w-full flex-col items-center gap-5 rounded-3xl p-10 shadow-sm ring-1 ${surface}`}
+      >
+        <div
+          className={`grid h-28 w-28 place-items-center rounded-full bg-white shadow-sm ${
+            isCheckIn ? 'ring-4 ring-success/30' : 'ring-4 ring-amber-500/40'
+          }`}
+        >
+          <Icon className="h-14 w-14" aria-hidden="true" />
+        </div>
+
+        <div className="flex flex-col items-center gap-2 text-center">
+          <p className="text-3xl font-bold text-ink">{headline}</p>
+          {at && (
+            <p className="num text-5xl font-black tracking-tight text-ink" dir="ltr">
+              {formatTime(at)}
+            </p>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+          <span>{message}</span>
+        </div>
+      </div>
     </div>
   );
 }
