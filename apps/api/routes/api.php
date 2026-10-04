@@ -162,6 +162,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/employees/{employee}/national-id-image', [EmployeeFileController::class, 'deleteNationalId']);
         Route::post('/employees/{employee}/employment-contract', [EmployeeFileController::class, 'uploadContract']);
         Route::delete('/employees/{employee}/employment-contract', [EmployeeFileController::class, 'deleteContract']);
+
+        // Avatar lives on the PUBLIC disk (shown inline everywhere), unlike
+        // the private files above.
+        Route::post('/employees/{employee}/avatar', [EmployeeFileController::class, 'uploadAvatar']);
+        Route::delete('/employees/{employee}/avatar', [EmployeeFileController::class, 'deleteAvatar']);
     });
 
     // Signed download routes for the two private-disk files. Placed OUTSIDE

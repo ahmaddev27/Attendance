@@ -7,8 +7,10 @@ namespace App\Modules\Employees\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\User;
+use App\Modules\Employees\Requests\UploadEmployeeAvatarRequest;
 use App\Modules\Employees\Requests\UploadEmploymentContractRequest;
 use App\Modules\Employees\Requests\UploadNationalIdImageRequest;
+use App\Modules\Employees\Services\EmployeeAvatarService;
 use App\Modules\Employees\Services\EmployeeFileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -27,6 +29,7 @@ class EmployeeFileController extends Controller
 {
     public function __construct(
         private readonly EmployeeFileService $files,
+        private readonly EmployeeAvatarService $avatars,
     ) {}
 
     public function uploadNationalId(UploadNationalIdImageRequest $request, Employee $employee): JsonResponse
@@ -51,6 +54,20 @@ class EmployeeFileController extends Controller
         );
 
         return response()->json(['data' => ['path' => $path]], 201);
+    }
+
+    public function uploadAvatar(UploadEmployeeAvatarRequest $request, Employee $employee): JsonResponse
+    {
+        $employee = $this->avatars->upload($employee, $request->file('avatar'));
+
+        return response()->json(['data' => ['avatar_url' => $employee->avatar_url]], 201);
+    }
+
+    public function deleteAvatar(Employee $employee): JsonResponse
+    {
+        $this->avatars->delete($employee);
+
+        return response()->json(null, 204);
     }
 
     public function deleteNationalId(Employee $employee): JsonResponse
