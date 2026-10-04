@@ -30,6 +30,12 @@ type ViewState =
   | 'entering-number'
   | 'checking-status'
   | 'ready'
+  // Owner's rule 2026-10-04: check-in is one tap (instant), but check-out
+  // asks the employee to confirm first — ending the day is one-way, so
+  // a mistyped PIN on a shared kiosk should never silently close someone
+  // else's shift. The confirm screen shows the check-in time so the
+  // employee verifies before committing.
+  | 'checkout-confirm'
   | 'locating'
   | 'success'
   | 'day-complete';
@@ -46,6 +52,19 @@ type SuccessPayload = {
   // just-written attendance row).
   at: string | null;
   message: string;
+};
+
+/**
+ * The checkout-confirm state carries the PIN forward from the entry
+ * screen (so the "تأكيد" tap can submit the record call without the
+ * employee re-typing) plus the earlier check-in time so the card can
+ * show "you clocked in at X — close the day?". The pin is cleared the
+ * moment the confirm screen leaves, same as every other PIN handling
+ * path, so it never lingers on a shared kiosk.
+ */
+type CheckoutConfirmPayload = {
+  pin: string;
+  checkInAt: string | null;
 };
 
 const PIN_PATTERN = /^\d{4}$/;
@@ -89,6 +108,7 @@ export default function KioskScanPage() {
   const [pinInput, setPinInput] = useState('');
   const [ready, setReady] = useState<ReadyPayload | null>(null);
   const [success, setSuccess] = useState<SuccessPayload | null>(null);
+  const [checkoutConfirm, setCheckoutConfirm] = useState<CheckoutConfirmPayload | null>(null);
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pinRequired = device?.pin_required === true;
 
@@ -117,6 +137,7 @@ export default function KioskScanPage() {
   const resetToEntry = useCallback(() => {
     setReady(null);
     setSuccess(null);
+    setCheckoutConfirm(null);
     setPinInput('');
     setEmployeeNumberInput('');
     setView(pinRequired ? 'entering-pin' : 'entering-number');
@@ -133,29 +154,88 @@ export default function KioskScanPage() {
     resetTimerRef.current = setTimeout(resetToEntry, SUCCESS_RESET_MS);
   }, [resetToEntry]);
 
-  // ---------- PIN-only flow: one tap, no name, no confirmation ----------
+  // ---------- PIN-only flow ----------
+  //
+  // Owner's rule 2026-10-04:
+  //  - check-IN is one tap (no "are you sure?" delay)
+  //  - check-OUT asks the employee to confirm, with the check-in time
+  //    shown on the confirm card, because ending the day is one-way and
+  //    a mis-typed PIN on a shared kiosk should never silently close
+  //    someone else's shift.
+  //
+  // The flow probes `/scan/status` first with the PIN. If the employee is
+  // `not_checked_in` we proceed straight to `/scan/record` (same instant
+  // feel as before). If they are `checked_in`, we park on the confirm
+  // card with the previous check-in time until they tap "تأكيد".
 
   const submitPinOnly = async () => {
     if (!PIN_PATTERN.test(pinInput)) {
       toast.error('أدخل رمز الحضور المكوّن من 4 أرقام');
       return;
     }
+    const pin = pinInput;
+    setView('checking-status');
+
+    try {
+      const status = await scanApi.status({ qr_token: qrToken, pin });
+
+      if (status.state === 'checked_out') {
+        setPinInput('');
+        setSuccess({
+          action: 'check-out',
+          at: status.check_out_at ?? null,
+          message: 'سجّلت حضورك وانصرافك لليوم.',
+        });
+        setView('day-complete');
+        scheduleAutoReset();
+        return;
+      }
+
+      if (status.state === 'checked_in') {
+        // Park on the confirm card. The PIN moves off the input into
+        // `checkoutConfirm` so the entry screen is clean behind the
+        // overlay AND so a cancel tap drops the PIN altogether.
+        setPinInput('');
+        setCheckoutConfirm({ pin, checkInAt: status.check_in_at ?? null });
+        setView('checkout-confirm');
+        return;
+      }
+
+      // not_checked_in → instant check-in path, same UX as before.
+      await commitScanRecord(pin, 'check-in');
+    } catch (err: unknown) {
+      const { message } = readApiError(err);
+      toast.error(message ?? 'رمز غير صحيح، حاول مرة أخرى');
+      setPinInput('');
+      setView('entering-pin');
+    }
+  };
+
+  /**
+   * Fires `/scan/record` and routes to the success / day-complete view
+   * based on the server's answer. Shared by the instant check-in path
+   * and the "تأكيد الانصراف" tap on the confirm card. The caller passes
+   * the action it EXPECTS so the error path can speak the right word
+   * ("حضور" vs "انصراف"), but the server's response is still trusted
+   * as the source of truth for which action was actually recorded.
+   */
+  const commitScanRecord = async (pin: string, expected: 'check-in' | 'check-out') => {
     setView('locating');
 
     const needsGeo = device?.enforce_geo === true;
     const position = needsGeo ? await getCurrentPosition() : null;
     const payload: ScanCheckPayload = {
       qr_token: qrToken,
-      pin: pinInput,
+      pin,
       latitude: position?.coords.latitude ?? undefined,
       longitude: position?.coords.longitude ?? undefined,
     };
 
     try {
       const response: ScanRecordResponse = await scanApi.record(payload);
-      // Clear PIN immediately so it never lingers on a shared kiosk,
-      // even for the fraction of a second before the success view mounts.
+      // Clear PIN immediately so it never lingers on a shared kiosk.
       setPinInput('');
+      setCheckoutConfirm(null);
 
       if (response.action === 'done') {
         setSuccess({
@@ -180,8 +260,6 @@ export default function KioskScanPage() {
       scheduleAutoReset();
     } catch (err: unknown) {
       const { status, message } = readApiError(err);
-      // 409 == day complete; the server still ships a message + the two
-      // timestamps so we can show the done screen with real times.
       if (status === 409) {
         const payload409 = (err as { response?: { data?: ScanRecordResponse } })?.response?.data;
         setSuccess({
@@ -193,10 +271,25 @@ export default function KioskScanPage() {
         scheduleAutoReset();
         return;
       }
-      toast.error(message ?? 'رمز غير صحيح، حاول مرة أخرى');
+      const fallback = expected === 'check-in'
+        ? 'تعذّر تسجيل الحضور. حاول مرة أخرى.'
+        : 'تعذّر تسجيل الانصراف. حاول مرة أخرى.';
+      toast.error(message ?? fallback);
       setPinInput('');
+      setCheckoutConfirm(null);
       setView('entering-pin');
     }
+  };
+
+  const confirmCheckoutNow = () => {
+    if (!checkoutConfirm) return;
+    void commitScanRecord(checkoutConfirm.pin, 'check-out');
+  };
+
+  const cancelCheckout = () => {
+    setCheckoutConfirm(null);
+    setPinInput('');
+    setView('entering-pin');
   };
 
   // ---------- Legacy flow (PIN-off): employee_number → status → confirm ----------
@@ -367,6 +460,47 @@ export default function KioskScanPage() {
           <div className="flex flex-col items-center gap-3 text-muted">
             <Spinner className="h-8 w-8" />
             <p>جارٍ التحقق من حالتك اليومية...</p>
+          </div>
+        )}
+
+        {view === 'checkout-confirm' && checkoutConfirm && (
+          <div className="flex w-full max-w-sm animate-in flex-col items-center gap-6 zoom-in-50 duration-300">
+            <div className="flex w-full flex-col items-center gap-5 rounded-3xl bg-amber-50 p-10 shadow-sm ring-1 ring-amber-500/40">
+              <div className="grid h-24 w-24 place-items-center rounded-full bg-white shadow-sm ring-4 ring-amber-500/40">
+                <LogOut className="h-12 w-12 text-amber-700" aria-hidden="true" />
+              </div>
+
+              <div className="flex flex-col items-center gap-2 text-center">
+                <p className="text-2xl font-bold text-ink">تأكيد الانصراف</p>
+                {checkoutConfirm.checkInAt && (
+                  <p className="text-sm text-ink-2">
+                    سُجّل حضورك عند{' '}
+                    <span className="num font-bold text-ink" dir="ltr">
+                      {formatTime(checkoutConfirm.checkInAt)}
+                    </span>
+                  </p>
+                )}
+              </div>
+
+              <div className="flex w-full flex-col gap-2">
+                <Button
+                  type="button"
+                  onClick={confirmCheckoutNow}
+                  className="min-h-[64px] w-full bg-amber-600 text-xl font-bold text-white shadow-sm hover:bg-amber-700"
+                >
+                  <LogOut className="me-2 h-6 w-6" />
+                  تأكيد الانصراف
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={cancelCheckout}
+                  className="min-h-[48px] w-full text-ink-2 hover:bg-surface-2"
+                >
+                  إلغاء
+                </Button>
+              </div>
+            </div>
           </div>
         )}
 

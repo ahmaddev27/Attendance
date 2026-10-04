@@ -142,10 +142,20 @@ export default function AttendancePage() {
     company_id: scopedCompanyId ?? undefined,
   };
 
+  // Owner's rule 2026-10-04: the admin page should visibly pick up a scan
+  // the moment it lands in the DB — otherwise the owner refreshes the
+  // tab and wonders why his just-finished kiosk scan isn't on the list.
+  // 20s is a compromise: tight enough that no admin reaches for F5
+  // first, loose enough that the DB doesn't take a count query every
+  // second across a 12-column aggregate.
+  const LIVE_REFETCH_MS = 20_000;
+
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ['attendance', filters, page],
     queryFn: () => attendanceApi.list({ ...filters, page, per_page: PER_PAGE }),
     placeholderData: (prev) => prev,
+    refetchInterval: LIVE_REFETCH_MS,
+    refetchIntervalInBackground: false,
   });
 
   // Stat tiles — same filter set as the list, no pagination. Keyed off the
@@ -154,6 +164,8 @@ export default function AttendancePage() {
     queryKey: ['attendance', 'stats', filters],
     queryFn: () => attendanceApi.stats(filters),
     placeholderData: (prev) => prev,
+    refetchInterval: LIVE_REFETCH_MS,
+    refetchIntervalInBackground: false,
   });
 
   const handlePageChange = (nextPage: number) => setPage(nextPage);
