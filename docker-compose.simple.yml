@@ -176,7 +176,10 @@ services:
   queue:
     <<: *api-service
     container_name: taqat_queue
-    command: php artisan queue:work redis --tries=3 --backoff=60
+    # Horizon supervises the workers (config/horizon.php) and serves the
+    # /horizon dashboard from the api container; it replaces queue:work.
+    command: php artisan horizon
+    stop_grace_period: 60s
     depends_on:
       db: { condition: service_healthy }
       redis: { condition: service_healthy }
