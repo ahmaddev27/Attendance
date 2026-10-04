@@ -164,9 +164,13 @@ switch_traffic() {
   # every data volume stays attached.
   dc up -d db redis minio meilisearch || return 1
 
-  # nginx resolves the api upstream per request (10s TTL); restarting it
-  # picks up the fresh container IP immediately.
-  dc restart nginx || return 1
+  # nginx needs a full recreate (not just restart) so compose-file changes
+  # like a new volume mount actually take effect — the owner's 2026-10-04
+  # company-logo bug stuck around because the earlier fix added an
+  # `api_storage` mount to the nginx service but `restart` never materialised
+  # it. `--force-recreate` also picks up the fresh api upstream IP that the
+  # per-request 10s DNS resolver would otherwise reach eventually anyway.
+  dc up -d --no-deps --force-recreate nginx || return 1
 }
 
 # Everything after traffic moved to the new containers. Each step returns
