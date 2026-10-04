@@ -6,14 +6,14 @@
  */
 
 /**
- * "512" minutes -> "8س 32د". Returns a placeholder dash for null/undefined.
+ * "512" minutes -> "8:32". Returns a placeholder dash for null/undefined.
  *
- * The caller MUST render this string inside an element that either has the
- * `.num` class or an explicit `dir="ltr"`. Otherwise the surrounding RTL
- * paragraph will reshuffle the hours/minutes runs (bidi neutrals like
- * spaces flip toward the Arabic letters, producing "س4د8"). We also use
- * a non-breaking space between number and unit so the pair never wraps
- * onto two lines mid-value.
+ * Switched from "8س 32د" to a plain H:MM separator on 2026-10-04 after
+ * the owner spotted "س 42 د 1" appearing on the attendance list — the
+ * old format mixed Arabic unit letters (RTL) with digit runs (LTR) and
+ * bidi reorder transposed the hour/minute digits around the trailing
+ * "د". The colon separator reads identically in any direction, and the
+ * zero-padded minutes align cleanly down a column ("8:05", not "8:5").
  */
 export function formatMinutesAsHours(minutes: number | null | undefined): string {
   if (minutes === null || minutes === undefined) return '—';
@@ -21,8 +21,7 @@ export function formatMinutesAsHours(minutes: number | null | undefined): string
   const abs = Math.abs(Math.round(minutes));
   const hours = Math.floor(abs / 60);
   const mins = abs % 60;
-  // U+00A0 non-breaking space keeps the digit + Arabic unit letter together.
-  return `${sign}${hours} س ${mins} د`;
+  return `${sign}${hours}:${String(mins).padStart(2, '0')}`;
 }
 
 /** "2026-09-07T08:03:00Z" -> "08:03 ص", using the viewer's locale/timezone.

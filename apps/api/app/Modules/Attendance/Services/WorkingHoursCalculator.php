@@ -210,13 +210,23 @@ class WorkingHoursCalculator
             return 0;
         }
 
-        $scheduledCheckIn = $checkInAt->copy()->setTimeFromTimeString($schedule->check_in_time->format('H:i:s'));
+        // Owner's rule 2026-10-04: Gaza timezone (Asia/Gaza). The app runs
+        // in UTC, so `$checkInAt` is a UTC Carbon and setting "09:00:00"
+        // on it anchors to 09:00 UTC — in Gaza (UTC+2/+3) that's 11:00 or
+        // 12:00 local. The admin page then shows a check-in close to the
+        // scheduled time as hours-late, which is what owner's screenshot
+        // captured. Convert both operands to the schedule's own timezone
+        // first so the comparison is on the wall clock the admin typed.
+        $scheduleTz = $schedule->timezone ?: 'Asia/Gaza';
+        $localCheckIn = $checkInAt->copy()->setTimezone($scheduleTz);
+        $scheduledCheckIn = $localCheckIn->copy()
+            ->setTimeFromTimeString($schedule->check_in_time->format('H:i:s'));
 
-        if ($checkInAt->lessThanOrEqualTo($scheduledCheckIn)) {
+        if ($localCheckIn->lessThanOrEqualTo($scheduledCheckIn)) {
             return 0;
         }
 
-        return max(0, (int) $scheduledCheckIn->diffInMinutes($checkInAt) - $schedule->grace_late_minutes);
+        return max(0, (int) $scheduledCheckIn->diffInMinutes($localCheckIn) - $schedule->grace_late_minutes);
     }
 
     /**
@@ -232,12 +242,17 @@ class WorkingHoursCalculator
             return 0;
         }
 
-        $scheduledCheckOut = $checkOutAt->copy()->setTimeFromTimeString($schedule->check_out_time->format('H:i:s'));
+        // Same timezone fix as calculateLateMinutes above — align both
+        // operands to the schedule's local wall clock before comparing.
+        $scheduleTz = $schedule->timezone ?: 'Asia/Gaza';
+        $localCheckOut = $checkOutAt->copy()->setTimezone($scheduleTz);
+        $scheduledCheckOut = $localCheckOut->copy()
+            ->setTimeFromTimeString($schedule->check_out_time->format('H:i:s'));
 
-        if ($checkOutAt->greaterThanOrEqualTo($scheduledCheckOut)) {
+        if ($localCheckOut->greaterThanOrEqualTo($scheduledCheckOut)) {
             return 0;
         }
 
-        return max(0, (int) $checkOutAt->diffInMinutes($scheduledCheckOut) - $schedule->grace_early_leave_minutes);
+        return max(0, (int) $localCheckOut->diffInMinutes($scheduledCheckOut) - $schedule->grace_early_leave_minutes);
     }
 }
