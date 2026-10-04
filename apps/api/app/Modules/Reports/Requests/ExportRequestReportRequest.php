@@ -21,6 +21,7 @@ class ExportRequestReportRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'format' => ['nullable', Rule::in(['json', 'csv', 'xlsx', 'pdf'])],
             'request_type_id' => ['nullable', 'integer', 'exists:request_types,id'],
             'status' => ['nullable', Rule::in(array_map(fn (RequestStatus $status) => $status->value, RequestStatus::cases()))],
             'from' => ['nullable', 'date_format:Y-m-d'],

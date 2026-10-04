@@ -84,6 +84,26 @@ export const reportsApi = {
     }),
   leavesCsv: (params: LeaveReportExportParams) =>
     apiClient.get<Blob>('/admin/reports/leaves/export', { params, responseType: 'blob' }),
+  leavesXlsx: (params: LeaveReportExportParams) =>
+    apiClient.get<Blob>('/admin/reports/leaves/export', {
+      params: { ...params, format: 'xlsx' },
+      responseType: 'blob',
+    }),
+  leavesPdf: (params: LeaveReportExportParams) =>
+    apiClient.get<Blob>('/admin/reports/leaves/export', {
+      params: { ...params, format: 'pdf' },
+      responseType: 'blob',
+    }),
   requestsCsv: (params: RequestReportExportParams) =>
     apiClient.get<Blob>('/admin/reports/requests/export', { params, responseType: 'blob' }),
+  requestsXlsx: (params: RequestReportExportParams) =>
+    apiClient.get<Blob>('/admin/reports/requests/export', {
+      params: { ...params, format: 'xlsx' },
+      responseType: 'blob',
+    }),
+  requestsPdf: (params: RequestReportExportParams) =>
+    apiClient.get<Blob>('/admin/reports/requests/export', {
+      params: { ...params, format: 'pdf' },
+      responseType: 'blob',
+    }),
 };

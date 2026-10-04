@@ -12,7 +12,7 @@ import { FilterBar } from '@/components/data-table/filter-bar';
 import { FilterSelect } from '@/components/data-table/filter-select';
 import { EmployeeAvatar } from '@/components/employees/employee-avatar';
 import { EmployeeSearchSelect } from '@/components/attendance/employee-search-select';
-import { ExportCsvButton } from '@/components/reports/export-csv-button';
+import { ExportMenuButton } from '@/components/reports/export-menu-button';
 import { RequestDetailDialog } from '@/components/requests/request-detail-dialog';
 import { RequestStatusBadge } from '@/components/requests/request-status-badge';
 import { RequestTypeBadge } from '@/components/requests/request-type-badge';
@@ -146,9 +146,13 @@ export default function RequestsPage() {
           <h1 className="mt-1 text-2xl font-bold text-ink">جميع الطلبات</h1>
         </div>
         {canExport && (
-          <ExportCsvButton
-            filename={`requests-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.csv`}
-            fetchCsv={() => reportsApi.requestsCsv(filters)}
+          <ExportMenuButton
+            basename={`requests-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`}
+            fetchers={{
+              csv: () => reportsApi.requestsCsv(filters),
+              xlsx: () => reportsApi.requestsXlsx(filters),
+              pdf: () => reportsApi.requestsPdf(filters),
+            }}
           />
         )}
       </div>

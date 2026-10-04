@@ -7,7 +7,9 @@ namespace App\Modules\Reports\Services;
 use App\Models\Request as RequestModel;
 use App\Modules\Reports\Repositories\RequestReportRepository;
 use App\Shared\Enums\RequestStatus;
+use App\Shared\Support\BoundedRows;
 use Generator;
+use Illuminate\Support\Collection;
 
 class RequestReportService
 {
@@ -32,9 +34,18 @@ class RequestReportService
         private readonly RequestReportRepository $repository,
     ) {}
 
-    public function exportFilename(): string
+    public function exportBasename(): string
     {
-        return sprintf('requests-%s.csv', now()->format('Ymd'));
+        return sprintf('requests-%s', now()->format('Ymd'));
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return Collection<int, list<int|string|null>>
+     */
+    public function documentRows(array $filters): Collection
+    {
+        return BoundedRows::collect($this->exportRows($filters));
     }
 
     /**

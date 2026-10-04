@@ -7,7 +7,9 @@ namespace App\Modules\Reports\Services;
 use App\Models\LeaveRequest;
 use App\Modules\Reports\Repositories\LeaveReportRepository;
 use App\Shared\Enums\LeaveStatus;
+use App\Shared\Support\BoundedRows;
 use Generator;
+use Illuminate\Support\Collection;
 
 class LeaveReportService
 {
@@ -38,9 +40,18 @@ class LeaveReportService
     /**
      * @param  array<string, mixed>  $filters
      */
-    public function exportFilename(array $filters): string
+    public function exportBasename(array $filters): string
     {
-        return sprintf('leaves-%04d.csv', $this->year($filters));
+        return sprintf('leaves-%04d', $this->year($filters));
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return Collection<int, list<int|float|string|null>>
+     */
+    public function documentRows(array $filters): Collection
+    {
+        return BoundedRows::collect($this->exportRows($filters));
     }
 
     /**

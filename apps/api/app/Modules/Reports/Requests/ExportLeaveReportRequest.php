@@ -21,6 +21,7 @@ class ExportLeaveReportRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'format' => ['nullable', Rule::in(['json', 'csv', 'xlsx', 'pdf'])],
             'year' => ['nullable', 'integer', 'min:2000', 'max:2100'],
             'leave_type_id' => ['nullable', 'integer', 'exists:leave_types,id'],
             'status' => ['nullable', Rule::in(array_map(fn (LeaveStatus $status) => $status->value, LeaveStatus::cases()))],

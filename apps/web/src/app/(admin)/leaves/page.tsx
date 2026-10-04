@@ -33,7 +33,7 @@ import { ApproveLeaveDialog } from '@/components/leaves/approve-leave-dialog';
 import { RejectLeaveDialog } from '@/components/leaves/reject-leave-dialog';
 import { LeaveDetailsDialog } from '@/components/leaves/leave-details-dialog';
 import { CreateLeaveDialog } from '@/components/leaves/create-leave-dialog';
-import { ExportCsvButton } from '@/components/reports/export-csv-button';
+import { ExportMenuButton } from '@/components/reports/export-menu-button';
 import { leaveRequestsApi } from '@/lib/api/endpoints/leaves';
 import { leaveTypesApi } from '@/lib/api/endpoints/leave-types';
 import { reportsApi } from '@/lib/api/endpoints/reports';
@@ -76,6 +76,10 @@ export default function LeavesPage() {
     company_id: scopedCompanyId ?? undefined,
   };
 
+  // The export scopes by year and has no employee or date-range filter, so
+  // only the filters it understands are forwarded.
+  const exportParams = { status: filters.status, leave_type_id: filters.leave_type_id };
+
   React.useEffect(() => {
     setPage(1);
   }, [status, leaveTypeId, employee?.id, from, to, scopedCompanyId]);
@@ -102,11 +106,13 @@ export default function LeavesPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {canExport && (
-            <ExportCsvButton
-              filename={`leaves-${new Date().getFullYear()}.csv`}
-              // The export scopes by year and has no employee or date-range
-              // filter, so only the filters it understands are forwarded.
-              fetchCsv={() => reportsApi.leavesCsv({ status: filters.status, leave_type_id: filters.leave_type_id })}
+            <ExportMenuButton
+              basename={`leaves-${new Date().getFullYear()}`}
+              fetchers={{
+                csv: () => reportsApi.leavesCsv(exportParams),
+                xlsx: () => reportsApi.leavesXlsx(exportParams),
+                pdf: () => reportsApi.leavesPdf(exportParams),
+              }}
             />
           )}
           <Button onClick={() => setCreateOpen(true)} className="gap-2 bg-brand text-white hover:bg-brand-hover">
