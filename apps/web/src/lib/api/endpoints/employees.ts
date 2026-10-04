@@ -56,6 +56,21 @@ export const employeesApi = {
   deleteNationalIdImage: (id: number) =>
     apiClient.delete(`/employees/${id}/national-id-image`),
 
+  /**
+   * Avatar goes to the PUBLIC disk; the response carries the ready-to-use
+   * `avatar_url` (no signing needed, unlike the private files above).
+   */
+  uploadAvatar: (id: number, file: File) => {
+    const formData = new FormData();
+    formData.append('avatar', file);
+    return apiClient.post<ApiResource<{ avatar_url: string | null }>>(
+      `/employees/${id}/avatar`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+  },
+  deleteAvatar: (id: number) => apiClient.delete(`/employees/${id}/avatar`),
+
   uploadEmploymentContract: (id: number, file: File) => {
     const formData = new FormData();
     formData.append('file', file);

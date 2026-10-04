@@ -26,7 +26,7 @@ import { formatDateTime } from '@/lib/request-format';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import type { RequestDetail } from '@/lib/api/types';
 
-function canCurrentUserAct(
+export function canCurrentUserAct(
   detail: RequestDetail,
   user: { id: number; employee_id?: number | null; roles?: string[]; permissions?: string[] } | null,
 ): boolean {

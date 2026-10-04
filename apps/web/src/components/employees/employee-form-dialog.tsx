@@ -40,6 +40,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import { EmployeeAvatar } from '@/components/employees/employee-avatar';
 import { EmployeePicker } from '@/components/employees/employee-picker';
 import { departmentsApi } from '@/lib/api/endpoints/departments';
 import { employeesApi } from '@/lib/api/endpoints/employees';
@@ -56,6 +57,9 @@ import { cn } from '@/lib/utils';
 // the limit before the upload round-trips with a 422.
 const MAX_ID_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_CONTRACT_BYTES = 10 * 1024 * 1024;
+// Mirrors UploadEmployeeAvatarRequest (2 MB, raster only).
+const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
+const AVATAR_ACCEPT = 'image/jpeg,image/png,image/webp';
 
 const employeeFormSchema = z
   .object({
@@ -166,6 +170,12 @@ export function EmployeeFormDialog({ open, onOpenChange, employee }: EmployeeFor
     employee?.direct_manager ?? null
   );
 
+  // Avatar is staged here and only sent on Save (edit mode), so cancelling
+  // the dialog never changes the stored photo. `removeAvatar` marks an
+  // existing photo for deletion.
+  const [avatarFile, setAvatarFile] = React.useState<File | null>(null);
+  const [removeAvatar, setRemoveAvatar] = React.useState(false);
+
   const form = useForm<EmployeeFormValues>({
     resolver: zodResolver(employeeFormSchema),
     defaultValues: buildDefaultValues(employee),
@@ -178,6 +188,8 @@ export function EmployeeFormDialog({ open, onOpenChange, employee }: EmployeeFor
     if (open) {
       form.reset(buildDefaultValues(employee));
       setDirectManager(employee?.direct_manager ?? null);
+      setAvatarFile(null);
+      setRemoveAvatar(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, employee?.id]);
@@ -295,7 +307,17 @@ export function EmployeeFormDialog({ open, onOpenChange, employee }: EmployeeFor
       if (!isEdit && scopedCompanyId !== null) {
         payload.company_id = scopedCompanyId;
       }
-      return isEdit ? employeesApi.update(employee.id, payload) : employeesApi.create(payload);
+      if (!isEdit) return employeesApi.create(payload);
+
+      const updated = await employeesApi.update(employee.id, payload);
+      // Separate endpoint keyed by employee id, so it runs after the
+      // profile update succeeds.
+      if (avatarFile) {
+        await employeesApi.uploadAvatar(employee.id, avatarFile);
+      } else if (removeAvatar && employee.avatar_url) {
+        await employeesApi.deleteAvatar(employee.id);
+      }
+      return updated;
     },
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
@@ -722,6 +744,21 @@ export function EmployeeFormDialog({ open, onOpenChange, employee }: EmployeeFor
                 edit mode. On create, the admin saves first then re-opens the
                 dialog to attach files. */}
             {isEdit && employee && (
+              <AvatarField
+                fullName={employee.full_name}
+                currentUrl={removeAvatar ? null : employee.avatar_url}
+                file={avatarFile}
+                onFileChange={(file) => {
+                  setAvatarFile(file);
+                  if (file) setRemoveAvatar(false);
+                }}
+                onRemove={() => {
+                  setAvatarFile(null);
+                  setRemoveAvatar(true);
+                }}
+              />
+            )}
+            {isEdit && employee && (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <EmployeeFileField
                   employeeId={employee.id}
@@ -961,6 +998,107 @@ function EmployeeFileField({
         accept={accept}
         className="hidden"
         onChange={onPickFile}
+      />
+    </div>
+  );
+}
+
+/**
+ * Drag/drop + picker for the employee photo. Purely controlled: it only
+ * stages a File and previews it; the dialog uploads on Save.
+ */
+function AvatarField({
+  fullName,
+  currentUrl,
+  file,
+  onFileChange,
+  onRemove,
+}: {
+  fullName: string;
+  currentUrl: string | null;
+  file: File | null;
+  onFileChange: (file: File | null) => void;
+  onRemove: () => void;
+}) {
+  const inputRef = React.useRef<HTMLInputElement | null>(null);
+  const [dragging, setDragging] = React.useState(false);
+  const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!file) {
+      setPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  const accept = (candidate: File | undefined) => {
+    if (!candidate) return;
+    if (!AVATAR_ACCEPT.split(',').includes(candidate.type)) {
+      toast.error('الصيغ المسموحة: JPG أو PNG أو WebP');
+      return;
+    }
+    if (candidate.size > MAX_AVATAR_BYTES) {
+      toast.error('حجم الصورة يتجاوز 2 ميغابايت');
+      return;
+    }
+    onFileChange(candidate);
+  };
+
+  const shownUrl = previewUrl ?? currentUrl;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <Label>الصورة الشخصية (اختياري)</Label>
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragging(false);
+          accept(e.dataTransfer.files?.[0]);
+        }}
+        className={cn(
+          'flex items-center gap-3 rounded-lg border border-dashed border-hairline bg-surface-muted p-3',
+          dragging && 'border-brand bg-brand-soft',
+        )}
+      >
+        <EmployeeAvatar employee={{ full_name: fullName, avatar_url: shownUrl }} size={64} />
+        <div className="flex flex-1 flex-col gap-1 text-xs text-muted">
+          <span>اسحب الصورة هنا أو اختر ملفاً</span>
+          <span>JPG / PNG / WebP — حتى 2 ميغابايت، تُحفظ عند الضغط على حفظ</span>
+        </div>
+        <Button type="button" variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
+          <Upload className="h-3.5 w-3.5" />
+          اختيار
+        </Button>
+        {shownUrl && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => (file ? onFileChange(null) : onRemove())}
+            title="إزالة الصورة"
+            className="text-danger hover:bg-danger-soft hover:text-danger"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={AVATAR_ACCEPT}
+        className="hidden"
+        onChange={(e) => {
+          accept(e.target.files?.[0]);
+          e.target.value = '';
+        }}
       />
     </div>
   );
