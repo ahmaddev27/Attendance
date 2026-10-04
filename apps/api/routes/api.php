@@ -216,6 +216,12 @@ Route::middleware('auth:sanctum')->group(function () {
         // the resource's /attendance/{attendance} show route (otherwise
         // `stats` would be swallowed as a bound Attendance id).
         Route::get('/admin/attendance/stats', [AttendanceController::class, 'stats']);
+        // Admin manual correction — PATCH + DELETE on a single row, plus
+        // the one-click "clear check-out" shortcut. All guarded by
+        // view-all-attendance which already names the admin audience.
+        Route::patch('/attendance/{attendance}', [AttendanceController::class, 'update']);
+        Route::delete('/attendance/{attendance}', [AttendanceController::class, 'destroy']);
+        Route::post('/attendance/{attendance}/clear-check-out', [AttendanceController::class, 'clearCheckOut']);
         Route::apiResource('attendance', AttendanceController::class)->only(['index', 'show']);
         Route::get('/attendance/employee/{employee}/monthly/{year}/{month}', [AttendanceController::class, 'monthlySummary']);
     });
@@ -699,6 +705,17 @@ Route::middleware('auth:sanctum')->group(function () {
     });
     Route::middleware('permission:manage-candidates')->group(function () {
         Route::post('/jobs/{job}/applications', [\App\Modules\Recruitment\Controllers\CandidateApplicationController::class, 'attach']);
+
+        // Bulk CSV / XLSX candidate import — template download, dry-run
+        // preview, async queue dispatch, and status polling. All four
+        // actions share the `manage-candidates` gate (plan §6.3) because
+        // the import ends up writing candidate rows.
+        Route::prefix('jobs/{job}/applications/import')->group(function () {
+            Route::get('/template', [\App\Modules\Recruitment\Controllers\CandidateImportController::class, 'template']);
+            Route::post('/dry-run', [\App\Modules\Recruitment\Controllers\CandidateImportController::class, 'dryRun']);
+            Route::post('/', [\App\Modules\Recruitment\Controllers\CandidateImportController::class, 'store']);
+            Route::get('/{jobRun}', [\App\Modules\Recruitment\Controllers\CandidateImportController::class, 'status']);
+        });
     });
 
     // Single-application endpoints. view-candidates reads, manage-candidates
@@ -732,5 +749,29 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/applications/{application}/screening', [\App\Modules\Recruitment\Controllers\CandidateScreeningController::class, 'store']);
         Route::patch('/applications/{application}/screening', [\App\Modules\Recruitment\Controllers\CandidateScreeningController::class, 'store']);
         Route::get('/recruitment-pipelines/{pipeline}/stages/{stage}/screening-schema', [\App\Modules\Recruitment\Controllers\CandidateScreeningController::class, 'schema']);
+    });
+
+    // ---- Phase 2 Week 3 — Interviews + Feedback ----
+    // Reads use view-interviews; writes use schedule-interviews; feedback
+    // writes use the dedicated submit-interview-feedback gate so a
+    // panellist can score without being granted the broader scheduling
+    // write surface.
+    Route::middleware('permission:view-interviews')->group(function () {
+        Route::get('/interviews', [\App\Modules\Recruitment\Controllers\InterviewController::class, 'index']);
+        Route::get('/interviews/{interview}', [\App\Modules\Recruitment\Controllers\InterviewController::class, 'show']);
+        Route::get('/interviews/{interview}/feedback', [\App\Modules\Recruitment\Controllers\InterviewFeedbackController::class, 'index']);
+    });
+
+    Route::middleware('permission:schedule-interviews')->group(function () {
+        Route::post('/applications/{application}/interviews', [\App\Modules\Recruitment\Controllers\InterviewController::class, 'store']);
+        Route::patch('/interviews/{interview}', [\App\Modules\Recruitment\Controllers\InterviewController::class, 'update']);
+        Route::post('/interviews/{interview}/cancel', [\App\Modules\Recruitment\Controllers\InterviewController::class, 'cancel']);
+        Route::post('/interviews/{interview}/reschedule', [\App\Modules\Recruitment\Controllers\InterviewController::class, 'reschedule']);
+        Route::post('/interviews/{interview}/complete', [\App\Modules\Recruitment\Controllers\InterviewController::class, 'complete']);
+    });
+
+    Route::middleware('permission:submit-interview-feedback')->group(function () {
+        Route::post('/interviews/{interview}/feedback', [\App\Modules\Recruitment\Controllers\InterviewFeedbackController::class, 'store']);
+        Route::patch('/interviews/{interview}/feedback/{feedback}', [\App\Modules\Recruitment\Controllers\InterviewFeedbackController::class, 'update']);
     });
 });

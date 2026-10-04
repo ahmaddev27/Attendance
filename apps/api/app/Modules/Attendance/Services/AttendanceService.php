@@ -206,4 +206,94 @@ class AttendanceService
             return $attendance->fresh(['employee']);
         });
     }
+
+    /**
+     * Admin manual correction — edit check_in_at / check_out_at / status /
+     * notes on an already-recorded row, then re-derive the computed hours
+     * so the admin table and payroll both see consistent numbers.
+     *
+     * Owner's call 2026-10-04 after seeing bad clock-outs on the live
+     * admin page: an admin needs to fix typos the kiosk cannot undo.
+     * The route stays behind `view-all-attendance`; the service does the
+     * recompute itself so the controller stays thin.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function updateByAdmin(Attendance $attendance, array $data): Attendance
+    {
+        return DB::transaction(function () use ($attendance, $data) {
+            $locked = Attendance::query()->lockForUpdate()->findOrFail($attendance->id);
+
+            // Only fill the fields the caller actually sent — `fill` on an
+            // associative array with explicit nulls still writes nulls,
+            // which is how an admin clears a bad check-out back to "open".
+            $locked->fill(array_intersect_key($data, array_flip([
+                'check_in_at', 'check_out_at', 'status', 'notes',
+            ])))->save();
+
+            // Recompute late / early-leave / total minutes if we touched a
+            // timestamp — the derived columns on the row are what the
+            // dashboard reads, so a stale "0 late" after a corrected
+            // check_in_at would quietly lie on the next render.
+            if (
+                array_key_exists('check_in_at', $data)
+                || array_key_exists('check_out_at', $data)
+            ) {
+                $schedule = $locked->employee?->workSchedule;
+                if ($schedule) {
+                    if ($locked->check_out_at !== null) {
+                        $this->calculator->computeForAttendance($locked, $schedule);
+                    } else {
+                        $this->calculator->stampCheckInStatus($locked, $schedule);
+                    }
+                }
+            }
+
+            return $locked->fresh(['employee', 'checkInDevice', 'checkOutDevice']);
+        });
+    }
+
+    /**
+     * Admin delete — removes the attendance row entirely. The companion
+     * action for `updateByAdmin`: a corrupt scan (e.g. kiosk fired twice
+     * on a flaky network) is sometimes cleaner to drop than to patch.
+     * Not soft-delete: the `attendances` table has no deleted_at column
+     * and payroll should never see tombstoned rows anyway.
+     */
+    public function deleteByAdmin(Attendance $attendance): void
+    {
+        DB::transaction(fn () => $attendance->delete());
+    }
+
+    /**
+     * Admin "clear check-out" — reopens the day by nulling the check-out
+     * columns + derived minutes. Separate from updateByAdmin so the UI
+     * can wire a one-click "undo clock-out" button without the admin
+     * having to type a payload.
+     */
+    public function clearCheckOutByAdmin(Attendance $attendance): Attendance
+    {
+        return DB::transaction(function () use ($attendance) {
+            $locked = Attendance::query()->lockForUpdate()->findOrFail($attendance->id);
+
+            $locked->fill([
+                'check_out_at' => null,
+                'check_out_ip' => null,
+                'check_out_lat' => null,
+                'check_out_lng' => null,
+                'check_out_device_id' => null,
+                'total_minutes' => null,
+                'early_leave_minutes' => null,
+                'overtime_minutes' => null,
+            ])->save();
+
+            // Re-run the check-in-only stamp so late_minutes stays in
+            // sync with the schedule's grace window.
+            if ($schedule = $locked->employee?->workSchedule) {
+                $this->calculator->stampCheckInStatus($locked, $schedule);
+            }
+
+            return $locked->fresh(['employee', 'checkInDevice', 'checkOutDevice']);
+        });
+    }
 }

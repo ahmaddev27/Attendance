@@ -18,7 +18,7 @@ class ScanPinException extends AttendanceModuleException
 
     public static function lockedOut(): self
     {
-        return new self('تم إيقاف المسح لهذا الرقم مؤقتاً بسبب محاولات خاطئة متكررة. حاول بعد 15 دقيقة.', 429);
+        return new self('تم إيقاف المسح لهذا الرقم مؤقتاً بسبب محاولات خاطئة متكررة. حاول بعد دقيقتين.', 429);
     }
 
     public static function notIssued(): self

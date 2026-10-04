@@ -8,7 +8,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use App\Models\Employee;
 use App\Modules\Attendance\Repositories\AttendanceRepository;
+use App\Modules\Attendance\Requests\UpdateAttendanceRequest;
 use App\Modules\Attendance\Resources\AttendanceResource;
+use App\Modules\Attendance\Services\AttendanceService;
 use App\Modules\Attendance\Services\AttendanceStatsService;
 use App\Modules\Attendance\Services\WorkingHoursCalculator;
 use Illuminate\Http\JsonResponse;
@@ -21,6 +23,7 @@ class AttendanceController extends Controller
         private readonly AttendanceRepository $attendances,
         private readonly WorkingHoursCalculator $calculator,
         private readonly AttendanceStatsService $stats,
+        private readonly AttendanceService $attendanceService,
     ) {}
 
     public function index(Request $request): AnonymousResourceCollection
@@ -58,6 +61,35 @@ class AttendanceController extends Controller
     public function show(Attendance $attendance): AttendanceResource
     {
         return new AttendanceResource($attendance->load(['employee', 'checkInDevice', 'checkOutDevice']));
+    }
+
+    /**
+     * Admin manual correction of a scanned row — see
+     * AttendanceService::updateByAdmin for the business rules
+     * (recompute hours on timestamp change, allow nulling check-out).
+     */
+    public function update(UpdateAttendanceRequest $request, Attendance $attendance): AttendanceResource
+    {
+        $updated = $this->attendanceService->updateByAdmin($attendance, $request->validated());
+
+        return new AttendanceResource($updated);
+    }
+
+    public function destroy(Attendance $attendance): JsonResponse
+    {
+        $this->attendanceService->deleteByAdmin($attendance);
+
+        return response()->json(null, 204);
+    }
+
+    /**
+     * Single-click "undo clock-out" — clears check_out_at + derived
+     * minutes so the day is reopened. Keeps the admin from having to
+     * assemble the right PATCH payload for the common case.
+     */
+    public function clearCheckOut(Attendance $attendance): AttendanceResource
+    {
+        return new AttendanceResource($this->attendanceService->clearCheckOutByAdmin($attendance));
     }
 
     public function monthlySummary(Employee $employee, int $year, int $month): JsonResponse

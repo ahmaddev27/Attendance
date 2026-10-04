@@ -17,6 +17,16 @@ import type {
   UpdateScanPinEnforcementPayload,
 } from '../types';
 
+/** Payload for the admin manual-correction PATCH. Every field is
+ *  optional — the server only touches what you send. `check_out_at: null`
+ *  explicitly reopens the day. */
+export type UpdateAttendancePayload = {
+  check_in_at?: string | null;
+  check_out_at?: string | null;
+  status?: Attendance['status'];
+  notes?: string | null;
+};
+
 export type AttendanceListParams = {
   page?: number;
   per_page?: number;
@@ -62,6 +72,26 @@ export const attendanceApi = {
 
   get: (id: number) =>
     apiClient.get<ApiResource<Attendance>>(`/attendance/${id}`).then((r) => r.data.data),
+
+  /** Admin manual correction — patches any of check_in_at / check_out_at /
+   *  status / notes. The server re-runs the hours engine on a timestamp
+   *  change so derived minutes stay in sync with the admin edit. */
+  update: (id: number, payload: UpdateAttendancePayload) =>
+    apiClient
+      .patch<ApiResource<Attendance>>(`/attendance/${id}`, payload)
+      .then((r) => r.data.data),
+
+  /** Hard-deletes an attendance row. Pair this with a confirm dialog on
+   *  the UI — there is no soft-delete column, so this is irreversible. */
+  remove: (id: number) =>
+    apiClient.delete<void>(`/attendance/${id}`).then(() => undefined),
+
+  /** One-click "undo clock-out" — clears check_out_at + derived minutes
+   *  so the day is reopened without the admin having to assemble a PATCH. */
+  clearCheckOut: (id: number) =>
+    apiClient
+      .post<ApiResource<Attendance>>(`/attendance/${id}/clear-check-out`)
+      .then((r) => r.data.data),
 
   monthlySummary: (employeeId: number, year: number, month: number) =>
     apiClient

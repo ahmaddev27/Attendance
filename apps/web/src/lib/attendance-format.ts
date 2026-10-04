@@ -25,12 +25,24 @@ export function formatMinutesAsHours(minutes: number | null | undefined): string
   return `${sign}${hours} س ${mins} د`;
 }
 
-/** "2026-09-07T08:03:00Z" -> "08:03 ص", using the viewer's locale/timezone. */
+/** "2026-09-07T08:03:00Z" -> "08:03 ص", using the viewer's locale/timezone.
+ *
+ * Uses `numberingSystem: 'latn'` so the digits render as Latin (0-9) rather
+ * than Arabic-Indic (٠-٩). The owner spotted that ٩:٠٤ visually read as
+ * ٠٤:٩ (hours and minutes swapped) because Arabic-Indic digits are Unicode
+ * class "AN" and sequence right-to-left even inside an LTR span, so the
+ * trailing "ص" dragged them. Latin digits are class "EN" and always flow
+ * left-to-right, so "9:04 ص" renders exactly as read.
+ */
 export function formatTime(isoDateTime: string | null | undefined): string {
   if (!isoDateTime) return '—';
   const date = new Date(isoDateTime);
   if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+  return date.toLocaleTimeString('ar-SA', {
+    hour: '2-digit',
+    minute: '2-digit',
+    numberingSystem: 'latn',
+  });
 }
 
 /** Formats an ISO date ("2026-09-07") for display without timezone drift.

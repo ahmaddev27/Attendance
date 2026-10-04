@@ -88,23 +88,25 @@ test('with enforcement on the correct pin checks the employee in', function () {
     expect(Attendance::query()->where('employee_id', $employee->id)->exists())->toBeTrue();
 });
 
-test('ten wrong pins from the same IP lock the kiosk out even when the next pin is correct', function () {
-    // PIN-only identity rate-limits per-IP (we can't key off an employee
-    // we haven't resolved yet). Threshold is 10 — wider than the old
-    // per-employee bucket because a busy shared kiosk sees legit typos.
+test('twenty-five wrong pins from the same IP lock the kiosk out even when the next pin is correct', function () {
+    // PIN-only identity rate-limits per-IP. Owner raised the threshold
+    // to 25 on 2026-10-04 so a busy shared kiosk (whole office + typos)
+    // never trips a lockout that reads as "the PIN stopped working for
+    // the day". The brute-force wall is still there — it's just set
+    // somewhere no legitimate shift can plausibly reach.
     enableScanPinEnforcement();
     $employee = makeEmployeeWithSchedule();
     issueScanPinFor($employee, '4829');
     $device = AttendanceDevice::factory()->create();
 
-    foreach (range(1, 10) as $attempt) {
+    foreach (range(1, 25) as $attempt) {
         $this->postJson('/api/scan/status', scanPinPayload($employee, $device, ['pin' => '9164']))
             ->assertUnprocessable();
     }
 
     $this->postJson('/api/scan/check-in', scanPinPayload($employee, $device, ['pin' => '4829']))
         ->assertStatus(429)
-        ->assertJsonPath('message', 'تم إيقاف المسح لهذا الرقم مؤقتاً بسبب محاولات خاطئة متكررة. حاول بعد 15 دقيقة.');
+        ->assertJsonPath('message', 'تم إيقاف المسح لهذا الرقم مؤقتاً بسبب محاولات خاطئة متكررة. حاول بعد دقيقتين.');
 
     expect(Attendance::query()->where('employee_id', $employee->id)->exists())->toBeFalse();
 });
@@ -116,7 +118,7 @@ test('a correct pin clears the IP failed-attempt counter', function () {
     $device = AttendanceDevice::factory()->create();
 
     foreach (range(1, 2) as $round) {
-        foreach (range(1, 9) as $attempt) {
+        foreach (range(1, 24) as $attempt) {
             $this->postJson('/api/scan/status', scanPinPayload($employee, $device, ['pin' => '9164']))
                 ->assertUnprocessable();
         }

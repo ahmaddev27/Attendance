@@ -104,12 +104,12 @@ test('PIN-only identity: /scan/record WITHOUT a PIN gets a validation error', fu
         ->assertJsonValidationErrors(['pin' => 'أدخل رمز الحضور المكوّن من 4 أرقام.']);
 });
 
-test('PIN-only identity: an IP that misses 10 PINs in a row is rate-limited', function () {
+test('PIN-only identity: an IP that misses 25 PINs in a row is rate-limited', function () {
     $employee = makeEmployeeWithSchedule();
     issueScanPinFor($employee, '4829');
     $device = AttendanceDevice::factory()->create();
 
-    for ($i = 0; $i < 10; $i++) {
+    for ($i = 0; $i < 25; $i++) {
         $this->postJson('/api/scan/record', [
             'qr_token' => $device->qr_token,
             'pin' => '9164',
@@ -121,7 +121,7 @@ test('PIN-only identity: an IP that misses 10 PINs in a row is rate-limited', fu
         'pin' => '4829',
     ])
         ->assertStatus(429)
-        ->assertJsonPath('message', 'تم إيقاف المسح لهذا الرقم مؤقتاً بسبب محاولات خاطئة متكررة. حاول بعد 15 دقيقة.');
+        ->assertJsonPath('message', 'تم إيقاف المسح لهذا الرقم مؤقتاً بسبب محاولات خاطئة متكررة. حاول بعد دقيقتين.');
 });
 
 test('PIN uniqueness: two employees can never share the same PIN via issueScanPinFor', function () {

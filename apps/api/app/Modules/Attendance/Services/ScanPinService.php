@@ -35,12 +35,27 @@ class ScanPinService
 
     /**
      * PIN-only identity resolves by IP (we don't know the employee until
-     * the lookup succeeds). A busy shared kiosk sees several legit typos
-     * in a shift, so the IP budget is wider than the per-employee one.
+     * the lookup succeeds). Owner's call 2026-10-04: PINs are permanent
+     * and must never feel "locked for the day" — the bucket is sized
+     * well above normal typing noise at a busy shared kiosk, and the
+     * lockout window below is now short (2 min, not 15) so even a
+     * tripped bucket clears before anyone notices.
+     *
+     * Deliberately kept under the per-route HTTP throttles
+     * (`throttle:30,1,scan-record` + `throttle:60,1,scan-status`) so the
+     * service-level counter stays the first wall the admin sees — the
+     * HTTP throttle has no Arabic message and would otherwise look like
+     * a mystery outage to a non-technical operator.
      */
-    private const MAX_IP_FAILED_ATTEMPTS = 10;
+    private const MAX_IP_FAILED_ATTEMPTS = 25;
 
-    private const LOCKOUT_SECONDS = 900;
+    /**
+     * Owner's call 2026-10-04: cool-off trimmed from 15 min to 2 min so a
+     * stray lockout never feels like "my PIN stopped working for the day".
+     * Keeps a minimum back-off against pure brute-force bursts without
+     * stranding a legitimate scanner behind a long wait.
+     */
+    private const LOCKOUT_SECONDS = 120;
 
     private const ISSUE_CHUNK_SIZE = 100;
 
