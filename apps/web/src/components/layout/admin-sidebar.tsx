@@ -121,6 +121,8 @@ const NAV_SECTIONS: NavSection[] = [
       { href: '/recruitment/clients', label: 'العملاء', icon: Building2, permissions: ['view-clients'] },
       { href: '/recruitment/cases', label: 'الحملات', icon: FolderKanban, permissions: ['view-recruitment-cases'] },
       { href: '/recruitment/jobs', label: 'الوظائف', icon: Briefcase, permissions: ['view-jobs'] },
+      { href: '/recruitment/candidates', label: 'بنك المرشّحين', icon: Users, permissions: ['view-candidates'] },
+      { href: '/recruitment/interviews', label: 'المقابلات', icon: Calendar, permissions: ['view-interviews'] },
       { href: '/recruitment/pipelines', label: 'مسارات التوظيف', icon: Route, permissions: ['manage-recruitment-pipelines'] },
     ],
   },

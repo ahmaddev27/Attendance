@@ -7,8 +7,9 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
 type FilterBarProps = {
-  searchValue: string;
-  onSearchChange: (value: string) => void;
+  /** Omit both search props to render the filters only. */
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
   searchPlaceholder?: string;
   /** Filter selects rendered next to the search box. */
   children?: React.ReactNode;
@@ -30,18 +31,20 @@ export function FilterBar({
         className
       )}
     >
+      {onSearchChange && (
       <div className="relative w-full md:w-64">
         {/* The search icon sits at the start of the field — RIGHT in RTL,
             LEFT in LTR — so we use logical `start`/`ps` and the input
             reserves matching padding for the icon overlay. */}
         <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
         <Input
-          value={searchValue}
+          value={searchValue ?? ''}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder={searchPlaceholder}
           className="ps-9"
         />
       </div>
+      )}
       {children && <div className="flex flex-1 flex-wrap items-center gap-3">{children}</div>}
     </div>
   );

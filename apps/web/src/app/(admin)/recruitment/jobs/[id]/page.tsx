@@ -118,6 +118,12 @@ export default function JobDetailPage() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline">
+              <Link href={`/recruitment/jobs/${jobId}/candidates`}>المرشّحون</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href={`/recruitment/jobs/${jobId}/shortlist`}>القائمة المختصرة</Link>
+            </Button>
             {canManage && (
               <Button type="button" variant="outline" className="gap-2" onClick={() => setEditOpen(true)}>
                 <Pencil className="h-4 w-4" /> تعديل

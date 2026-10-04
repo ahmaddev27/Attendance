@@ -1656,3 +1656,350 @@ export type RecruitmentUserOption = {
   name: string;
   employee_number: number | null;
 };
+
+// ---------------------------------------------------------------------------
+// Recruitment Phase 2 — Candidates, Applications, Screening, Interviews
+// ---------------------------------------------------------------------------
+//
+// Shapes mirror the Phase 2 Resources on the API side:
+//  - CandidateResource / CandidateApplicationResource / CandidateScreeningResource
+//  - Interview + InterviewFeedback (inferred from the Models + migrations
+//    until the sister-agent's Resources land).
+//
+// Status/kind unions are mirrored from the Shared/Enums on the backend —
+// a backend-side rename cascades here on next build.
+
+/** Lifecycle marker on a Candidate row (orthogonal to a specific application). */
+export type CandidateStatus = 'active' | 'blacklisted' | 'placed' | 'inactive';
+
+/** Status of a single CandidateApplication inside a job's pipeline. */
+export type CandidateApplicationStatus =
+  | 'applied'
+  | 'in_screening'
+  | 'screened_in'
+  | 'screened_out'
+  | 'shortlisted'
+  | 'interviewing'
+  | 'client_review'
+  | 'offered'
+  | 'rejected'
+  | 'withdrawn'
+  | 'hired';
+
+/** How the application arrived — audit trail for provenance. */
+export type CandidateApplicationSource = 'manual' | 'csv_import' | 'brightgaza';
+
+/** Internal (TAQAT panel) vs client-facing interview. */
+export type InterviewKind = 'internal' | 'client';
+
+export type InterviewStatus = 'scheduled' | 'completed' | 'cancelled' | 'no_show' | 'rescheduled';
+
+export type InterviewRecommendation = 'strong_hire' | 'hire' | 'maybe' | 'no_hire';
+
+/** Rough availability picker — mirrors StoreCandidateRequest's enum. */
+export type CandidateAvailability = 'immediate' | '2_weeks' | '1_month' | 'negotiable';
+
+// -- Candidate --------------------------------------------------------------
+
+export type Candidate = {
+  id: number;
+  candidate_number: string;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  country: string | null;
+  city: string | null;
+  linkedin_url: string | null;
+  portfolio_url: string | null;
+  status: CandidateStatus;
+  source: string | null;
+  source_reference: string | null;
+  headline: string | null;
+  years_of_experience: number | null;
+  current_title: string | null;
+  current_company: string | null;
+  expected_salary_min: number | null;
+  expected_salary_max: number | null;
+  salary_currency: string | null;
+  availability: CandidateAvailability | null;
+  skills: string[] | null;
+  languages: string[] | null;
+  notes: string | null;
+  /** Only PRESENCE leaks here — the server emits a short-lived signed URL below. */
+  has_resume: boolean;
+  resume_url: string | null;
+  resume_uploaded_at: string | null;
+  created_by?: { id: number; name: string } | null;
+  created_at: string | null;
+  updated_at: string | null;
+  deleted_at: string | null;
+};
+
+export type CandidatePayload = {
+  full_name: string;
+  email?: string | null;
+  phone?: string | null;
+  country?: string | null;
+  city?: string | null;
+  linkedin_url?: string | null;
+  portfolio_url?: string | null;
+  status?: CandidateStatus;
+  source?: string | null;
+  source_reference?: string | null;
+  headline?: string | null;
+  years_of_experience?: number | null;
+  current_title?: string | null;
+  current_company?: string | null;
+  expected_salary_min?: number | null;
+  expected_salary_max?: number | null;
+  salary_currency?: string | null;
+  availability?: CandidateAvailability | null;
+  skills?: string[] | null;
+  languages?: string[] | null;
+  notes?: string | null;
+};
+
+export type CandidateListParams = {
+  page?: number;
+  per_page?: number;
+  search?: string;
+  status?: CandidateStatus;
+  source?: string;
+  country?: string;
+  has_resume?: boolean;
+  min_experience?: number;
+  include_closed?: boolean;
+};
+
+// -- CandidateApplication ---------------------------------------------------
+
+/** Flattened snapshot of the candidate embedded in the application resource. */
+export type CandidateApplicationCandidate = {
+  id: number;
+  candidate_number: string;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  headline: string | null;
+};
+
+/** Flattened snapshot of the job embedded in the application resource. */
+export type CandidateApplicationJob = {
+  id: number;
+  job_number: string;
+  title: string;
+};
+
+/** Flattened current-stage snapshot. */
+export type CandidateApplicationStage = {
+  id: number;
+  code: string;
+  name: string;
+  display_order: number;
+};
+
+export type CandidateApplication = {
+  id: number;
+  application_number: string;
+  candidate?: CandidateApplicationCandidate | null;
+  job?: CandidateApplicationJob | null;
+  current_stage?: CandidateApplicationStage | null;
+  status: CandidateApplicationStatus;
+  source: CandidateApplicationSource;
+  applied_at: string | null;
+  is_shortlisted: boolean;
+  shortlisted_at: string | null;
+  rejected_at: string | null;
+  rejection_reason: string | null;
+  rejection_stage_code: string | null;
+  notes: string | null;
+  stage_entered_at: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  deleted_at: string | null;
+};
+
+export type AttachCandidatePayload = {
+  candidate_id: number;
+  source?: CandidateApplicationSource;
+  notes?: string | null;
+};
+
+export type UpdateApplicationPayload = {
+  status?: CandidateApplicationStatus;
+  notes?: string | null;
+};
+
+export type RejectApplicationPayload = {
+  reason: string;
+};
+
+export type ApplicationListParams = {
+  page?: number;
+  per_page?: number;
+  status?: CandidateApplicationStatus;
+  is_shortlisted?: boolean;
+  stage_id?: number;
+  source?: CandidateApplicationSource;
+  search?: string;
+  include_closed?: boolean;
+};
+
+// -- Screening schema + submission -----------------------------------------
+
+/**
+ * The three field types the backend validates against (see
+ * CandidateScreeningService::validateAgainstSchema): star rating 1–5,
+ * free number, and single-choice select. Anything else is ignored by
+ * the scorer but can still be rendered as context.
+ */
+export type ScreeningFieldType = 'rating_1_5' | 'number' | 'select' | 'text';
+
+export type ScreeningSchemaField = {
+  key: string;
+  label: string;
+  type: ScreeningFieldType;
+  weight?: number;
+  options?: string[];
+  description?: string | null;
+};
+
+/**
+ * Shape stored at `recruitment_pipeline_stages.screening_schema`. The
+ * backend reads `pass_threshold` on the schema when deciding `passed`.
+ */
+export type ScreeningSchema = {
+  fields: ScreeningSchemaField[];
+  pass_threshold?: number;
+};
+
+export type CandidateScreening = {
+  id: number;
+  application_id: number;
+  scorecard: Record<string, string | number>;
+  overall_score: number | null;
+  passed: boolean;
+  recommendation: 'advance' | 'reject' | 'hold' | null;
+  notes: string | null;
+  scored_at: string | null;
+  scored_by?: { id: number; name: string } | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type ScreeningPayload = {
+  scorecard: Record<string, string | number>;
+  notes?: string | null;
+};
+
+// -- Interview + Feedback ---------------------------------------------------
+
+export type InterviewFeedback = {
+  id: number;
+  interview_id: number;
+  interviewer_user_id: number;
+  interviewer?: UserMini | null;
+  scorecard: Record<string, string | number>;
+  overall_score: number | null;
+  recommendation: InterviewRecommendation;
+  strengths: string | null;
+  weaknesses: string | null;
+  notes: string | null;
+  submitted_at: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type Interview = {
+  id: number;
+  interview_number: string;
+  application_id: number;
+  application?: {
+    id: number;
+    application_number: string;
+    candidate?: CandidateApplicationCandidate | null;
+    job?: CandidateApplicationJob | null;
+  } | null;
+  kind: InterviewKind;
+  scheduled_at: string;
+  duration_minutes: number;
+  timezone: string;
+  location: string | null;
+  meeting_url: string | null;
+  meeting_notes: string | null;
+  status: InterviewStatus;
+  cancelled_reason: string | null;
+  rescheduled_from_id: number | null;
+  created_by?: UserMini | null;
+  feedbacks?: InterviewFeedback[];
+  /** Average of each panelist's `overall_score` — null before any submission. */
+  average_score?: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type InterviewPayload = {
+  kind: InterviewKind;
+  scheduled_at: string;
+  duration_minutes?: number;
+  timezone?: string;
+  location?: string | null;
+  meeting_url?: string | null;
+  meeting_notes?: string | null;
+};
+
+export type InterviewListParams = {
+  page?: number;
+  per_page?: number;
+  status?: InterviewStatus;
+  kind?: InterviewKind;
+  application_id?: number;
+  from?: string;
+  to?: string;
+  my_only?: boolean;
+};
+
+export type FeedbackPayload = {
+  scorecard: Record<string, string | number>;
+  overall_score?: number | null;
+  recommendation: InterviewRecommendation;
+  strengths?: string | null;
+  weaknesses?: string | null;
+  notes?: string | null;
+};
+
+// -- Candidate CSV Import ---------------------------------------------------
+
+export type CandidateImportRowError = {
+  row: number;
+  field?: string;
+  message: string;
+};
+
+/**
+ * Mirrors the Jobs CSV import job row — `status` walks through
+ * pending → processing → completed/failed. The counts become
+ * meaningful after the job finishes.
+ */
+export type CandidateImportJob = {
+  id: number;
+  job_requirement_id: number;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  total_rows: number;
+  created_count: number;
+  reused_count: number;
+  duplicates_skipped: number;
+  errors: CandidateImportRowError[];
+  file_name?: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type CandidateImportDryRunResult = {
+  parsed_rows: number;
+  errors: CandidateImportRowError[];
+  /** First 10 (or so) rows parsed, for a quick visual sanity check. */
+  preview: Array<Record<string, string | null>>;
+};

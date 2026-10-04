@@ -31,3 +31,15 @@ export {
   recruitmentPipelineStagesApi,
   recruitmentDashboardApi,
 } from '@/lib/api/endpoints/recruitment';
+export {
+  candidatesApi,
+  applicationsApi,
+  shortlistApi,
+  screeningApi,
+  interviewsApi,
+  INTERVIEW_KIND_LABEL,
+  INTERVIEW_STATUS_LABEL,
+  INTERVIEW_RECOMMENDATION_LABEL,
+  CANDIDATE_STATUS_LABEL,
+  APPLICATION_STATUS_LABEL,
+} from '@/lib/api/endpoints/candidates';
