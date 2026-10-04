@@ -151,6 +151,13 @@ test('reschedule creates a linked replacement and flips the old row to reschedul
 });
 
 test('complete flips to completed and fires InterviewCompleted only when feedback exists', function () {
+    // Fake Notification + Mail BEFORE touching the service — submitting
+    // feedback dispatches FeedbackSubmitted whose listener calls
+    // NotificationService::interviewFeedbackSubmitted, which in CI hits
+    // the real Resend transport ("API key is invalid") because the test
+    // env has no live key. Faking both keeps the test offline.
+    \Illuminate\Support\Facades\Notification::fake();
+    \Illuminate\Support\Facades\Mail::fake();
     Event::fake([InterviewCompleted::class]);
     $admin = $this->actingAsRecruitmentAdmin();
 
