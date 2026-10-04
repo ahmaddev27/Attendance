@@ -7,6 +7,7 @@ namespace App\Modules\Attendance\Services;
 use App\Models\Attendance;
 use App\Models\Employee;
 use App\Shared\Enums\AttendanceStatus;
+use App\Shared\Enums\EmployeeStatus;
 use App\Shared\Support\IpMatcher;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -80,11 +81,33 @@ class AttendanceStatsService
             ? round($totals['total_minutes'] / 60 / $hoursBearingRows, 2)
             : 0.0;
 
+        // Owner's rule 2026-10-04: on a single-day view (date_from ==
+        // date_to), "absent" should read as "active staff with no row and
+        // no leave for that day", not just the Absent-status rows the
+        // nightly engine writes at midnight — otherwise the tile reads 0
+        // all day for the admin watching live. Multi-day ranges keep the
+        // explicit count because deriving absenteeism across arbitrary
+        // ranges would need weekend/holiday awareness per employee.
+        $absentCount = $totals['absent_count'];
+        if ($this->isSingleDayView($filters) && $absentCount === 0) {
+            $activeHeadcount = Employee::query()
+                ->staffOnly()
+                ->where('status', EmployeeStatus::Active->value)
+                ->when(! empty($filters['company_id']), fn ($q) => $q->where('company_id', $filters['company_id']))
+                ->when(! empty($filters['department_id']), fn ($q) => $q->where('department_id', $filters['department_id']))
+                ->count();
+
+            $absentCount = max(
+                0,
+                $activeHeadcount - $totals['present_count'] - $totals['late_count'] - $totals['on_leave_count'],
+            );
+        }
+
         return [
             'total_rows' => $totals['total_rows'],
             'unique_employees' => $uniqueEmployees,
             'present_count' => $totals['present_count'],
-            'absent_count' => $totals['absent_count'],
+            'absent_count' => $absentCount,
             'late_count' => $totals['late_count'],
             'on_leave_count' => $totals['on_leave_count'],
             'holiday_count' => $totals['holiday_count'],
@@ -96,6 +119,22 @@ class AttendanceStatsService
             'remote_count' => $originCounts['remote'],
             'unknown_origin_count' => $originCounts['unknown'],
         ];
+    }
+
+    /**
+     * The derived-absent branch applies only when the admin is looking at
+     * a single calendar day — multi-day ranges would need per-employee
+     * weekend/holiday awareness to answer "would they have been expected
+     * to show up?" accurately, which is the nightly engine's job.
+     *
+     * @param  array<string, mixed>  $filters
+     */
+    private function isSingleDayView(array $filters): bool
+    {
+        $from = $filters['date_from'] ?? null;
+        $to = $filters['date_to'] ?? null;
+
+        return $from !== null && $to !== null && (string) $from === (string) $to;
     }
 
     /**
