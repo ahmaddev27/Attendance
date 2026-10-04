@@ -26,10 +26,22 @@ import { formatDate } from '@/lib/attendance-format';
 import { cn } from '@/lib/utils';
 import type { RecruitmentPipeline } from '@/lib/api/types';
 
-const chartSkeleton = (h: string) => ({ ssr: false, loading: () => <Skeleton className={h} /> });
-const StageBarChart = dynamic(() => import('./dashboard-charts').then((m) => m.StageBarChart), chartSkeleton('h-44 rounded-xl'));
-const AttendanceTrendChart = dynamic(() => import('./dashboard-charts').then((m) => m.AttendanceTrendChart), chartSkeleton('h-56 rounded-xl'));
-const LeaveTypePie = dynamic(() => import('./dashboard-charts').then((m) => m.LeaveTypePie), chartSkeleton('h-56 rounded-xl'));
+// next/dynamic options must be an object literal — the Next.js SWC
+// plugin reads them statically, so a helper function that returns the
+// options is rejected at compile time. Each dynamic() call therefore
+// inlines its own { ssr, loading } instead of sharing a helper.
+const StageBarChart = dynamic(
+  () => import('./dashboard-charts').then((m) => m.StageBarChart),
+  { ssr: false, loading: () => <Skeleton className="h-44 rounded-xl" /> },
+);
+const AttendanceTrendChart = dynamic(
+  () => import('./dashboard-charts').then((m) => m.AttendanceTrendChart),
+  { ssr: false, loading: () => <Skeleton className="h-56 rounded-xl" /> },
+);
+const LeaveTypePie = dynamic(
+  () => import('./dashboard-charts').then((m) => m.LeaveTypePie),
+  { ssr: false, loading: () => <Skeleton className="h-56 rounded-xl" /> },
+);
 
 const WEEKDAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
 
@@ -214,7 +226,10 @@ export function AttendanceWidgets({ companyId }: { companyId?: number }) {
       return Promise.all(
         days.map(async (d) => {
           const date = ymd(d);
-          const s = (await attendanceApi.stats({ date_from: date, date_to: date, company_id: companyId })).data.data;
+          // attendanceApi.stats already unwraps { data } for us, so the
+          // return type is AttendanceStatsSummary directly — no further
+          // .data.data chain needed.
+          const s = await attendanceApi.stats({ date_from: date, date_to: date, company_id: companyId });
           return { label: WEEKDAYS[d.getDay()], present: s.present_count, absent: s.absent_count };
         }),
       );
