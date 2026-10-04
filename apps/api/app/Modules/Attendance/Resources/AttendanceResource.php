@@ -31,6 +31,12 @@ class AttendanceResource extends JsonResource
             'date' => $this->date?->toDateString(),
             'check_in_at' => $this->check_in_at?->toIso8601String(),
             'check_out_at' => $this->check_out_at?->toIso8601String(),
+            // Owner's 2026-10-04 ask: surface the IP that recorded the
+            // scan so admins can see where a punch came from without
+            // opening the row — same column already powers the `origin`
+            // badge (onsite/remote), this is the raw value.
+            'check_in_ip' => $this->check_in_ip,
+            'check_out_ip' => $this->check_out_ip,
             'check_in_device' => $this->whenLoaded(
                 'checkInDevice',
                 fn () => $this->checkInDevice ? new AttendanceDeviceResource($this->checkInDevice) : null,

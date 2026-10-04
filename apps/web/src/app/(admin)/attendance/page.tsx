@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -313,6 +313,7 @@ export default function AttendancePage() {
               <TableHead className="text-start">الإضافي</TableHead>
               <TableHead className="text-start">الحالة</TableHead>
               <TableHead className="text-start">المصدر</TableHead>
+              <TableHead className="text-start">IP الحضور</TableHead>
               <TableHead className="text-start" />
             </TableRow>
           </TableHeader>
@@ -320,7 +321,7 @@ export default function AttendancePage() {
             {isLoading &&
               Array.from({ length: 6 }).map((_, i) => (
                 <TableRow key={`skeleton-${i}`}>
-                  {Array.from({ length: 11 }).map((__, j) => (
+                  {Array.from({ length: 12 }).map((__, j) => (
                     <TableCell key={j}>
                       <Skeleton className="h-4 w-full" />
                     </TableCell>
@@ -330,7 +331,7 @@ export default function AttendancePage() {
 
             {!isLoading && rows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={11} className="py-10 text-center text-sm text-muted">
+                <TableCell colSpan={12} className="py-10 text-center text-sm text-muted">
                   لا توجد سجلات حضور مطابقة للفلاتر المحددة
                 </TableCell>
               </TableRow>
@@ -387,6 +388,19 @@ export default function AttendancePage() {
                   </TableCell>
                   <TableCell>
                     <OriginBadge origin={row.origin} />
+                  </TableCell>
+                  <TableCell>
+                    {row.check_in_ip ? (
+                      <span
+                        className="num rounded-md bg-surface-2 px-2 py-0.5 text-xs text-ink-2"
+                        dir="ltr"
+                        title="عنوان IP لجهاز تسجيل الحضور"
+                      >
+                        {row.check_in_ip}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted">—</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
@@ -632,11 +646,15 @@ function EditAttendanceDialog({ attendance, onClose, onSave, saving }: EditDialo
 
   const open = !!attendance;
 
-  // When a new row is selected, re-hydrate the fields from it. Memoised on
+  // When a new row is selected, re-hydrate the fields from it. Keyed on
   // the row id so re-renders during saving don't blow away the admin's
-  // in-progress edits.
+  // in-progress edits. Switched from useMemo (side-effect anti-pattern
+  // that silently dropped writes under React 18 strict-mode double
+  // rendering — the root cause of the owner's 2026-10-04 "edit doesn't
+  // save the hours" report) to useEffect, which is the right tool for
+  // "run this once when the row id changes".
   const rowKey = attendance ? `${attendance.id}` : '';
-  useMemo(() => {
+  useEffect(() => {
     if (attendance) {
       setCheckIn(toLocalInputValue(attendance.check_in_at));
       setCheckOut(toLocalInputValue(attendance.check_out_at));
