@@ -287,13 +287,29 @@ class ScanPinService
             throw ScanPinException::invalidCredentials();
         }
 
-        $scanPin = $this->scanPins->findByLookupHash($this->hasher->hash($pin));
+        $lookupHash = $this->hasher->hash($pin);
+        $scanPin = $this->scanPins->findByLookupHash($lookupHash);
         // Defense-in-depth: cross-check against the bcrypt column so a
         // misconfigured HMAC backfill (same lookup, wrong plaintext) still
         // fails identity. In practice an HMAC hit implies a bcrypt hit for
         // the correct PIN; this just makes that implicit assumption fail
         // loud rather than silent.
         $bcryptOk = $scanPin !== null && Hash::check($pin, $scanPin->pin_hash);
+
+        // Legacy-row fallback: PINs issued before the HMAC lookup column
+        // existed (prior to migration 2026_10_06_300001) have
+        // `pin_lookup_hash = NULL`. Owner's 2026-10-04 note: "رمز الحضور
+        // القديم لسا مش شغال". Rather than make the admin bulk-reissue
+        // every PIN, bcrypt-match the typed PIN against the small set of
+        // un-backfilled rows and, on a hit, backfill the lookup hash so
+        // the next scan short-circuits through the fast index path.
+        if (! $bcryptOk) {
+            $scanPin = $this->scanPins->findByBcryptScan($pin);
+            if ($scanPin !== null) {
+                $this->scanPins->backfillLookupHash($scanPin, $lookupHash);
+                $bcryptOk = true;
+            }
+        }
 
         if (! $bcryptOk) {
             RateLimiter::hit($ipKey, self::LOCKOUT_SECONDS);

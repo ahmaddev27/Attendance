@@ -41,6 +41,39 @@ class EmployeeScanPinRepository
             ->exists();
     }
 
+    /**
+     * Legacy-row fallback for PIN-only identity: bcrypt-scan the (small)
+     * set of rows that pre-date the HMAC lookup column — those are the
+     * only rows that could pass the HMAC check and still match a typed
+     * PIN. Returns the first match or null. O(n) bcrypt per unresolved
+     * scan, but once the lookup hash is backfilled the scan short-circuits.
+     */
+    public function findByBcryptScan(string $pin): ?EmployeeScanPin
+    {
+        $pins = EmployeeScanPin::query()
+            ->whereNull('pin_lookup_hash')
+            ->get();
+
+        foreach ($pins as $scanPin) {
+            if (\Illuminate\Support\Facades\Hash::check($pin, $scanPin->pin_hash)) {
+                return $scanPin;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Fills in the HMAC lookup hash on a legacy row discovered via
+     * `findByBcryptScan`. Uses `updateQuietly` to avoid firing the model's
+     * saved event (which would otherwise write a `pin_hash` activity log
+     * entry on every first-use of a legacy PIN).
+     */
+    public function backfillLookupHash(EmployeeScanPin $scanPin, string $lookupHash): void
+    {
+        $scanPin->forceFill(['pin_lookup_hash' => $lookupHash])->saveQuietly();
+    }
+
     public function upsertForEmployee(int $employeeId, string $pinHash, string $lookupHash, ScanPinSource $setVia, ?int $setByUserId): void
     {
         EmployeeScanPin::query()->upsert(

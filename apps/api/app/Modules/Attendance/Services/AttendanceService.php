@@ -276,6 +276,11 @@ class AttendanceService
         return DB::transaction(function () use ($attendance) {
             $locked = Attendance::query()->lockForUpdate()->findOrFail($attendance->id);
 
+            // `overtime_minutes` is NOT NULL + default 0 on the schema, so
+            // explicitly reset it to 0 instead of null — nullable columns
+            // happily take null, but the overtime column would raise a
+            // database integrity error and the admin would just see the
+            // generic "تعذّر إلغاء الانصراف" toast with no clue why.
             $locked->fill([
                 'check_out_at' => null,
                 'check_out_ip' => null,
@@ -284,7 +289,7 @@ class AttendanceService
                 'check_out_device_id' => null,
                 'total_minutes' => null,
                 'early_leave_minutes' => null,
-                'overtime_minutes' => null,
+                'overtime_minutes' => 0,
             ])->save();
 
             // Re-run the check-in-only stamp so late_minutes stays in
