@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 
 /**
- * Reminds employees ~30 minutes BEFORE their shift-end that they still
+ * Reminds employees ~5 minutes BEFORE their shift-end that they still
  * have an open attendance session, so they get a chance to scan out
  * themselves instead of relying on AutoCloseForgottenAttendance to
  * stamp `check_out_at` at the shift-end after the fact.
@@ -28,30 +28,30 @@ use Illuminate\Support\Facades\Notification;
  * Selection window:
  *   - open attendance row (check_in_at set, check_out_at null)
  *   - non-flexible schedule (flexible schedules have no fixed shift-end,
- *     so "30 minutes before end" is meaningless)
- *   - shift-end is between +20 and +40 minutes from now
+ *     so "5 minutes before end" is meaningless)
+ *   - shift-end is between +3 and +8 minutes from now
  *
- * The 20-40 window is a superset of the "exactly 30 min out" target so
- * the every-15-min scheduler cadence catches every open session at
- * least once (13min or 27min after the last tick still lands inside
- * the window). Cache::add() memoizes per-attendance so back-to-back
- * ticks don't double-fire.
+ * The 3-8 window is a superset of the "exactly 5 min out" target so the
+ * every-5-min scheduler cadence catches every open session at least
+ * once (a tick that fires a few seconds late still lands inside the
+ * window). Cache::add() memoizes per-attendance so back-to-back ticks
+ * don't double-fire.
  */
 class NotifyOpenAttendanceSessions extends Command
 {
     protected $signature = 'taqat:notify-open-sessions
                             {--dry : print what would be notified without dispatching}';
 
-    protected $description = 'Push a reminder to any employee ~30 minutes before their shift ends with an open attendance session.';
+    protected $description = 'Push a reminder to any employee ~5 minutes before their shift ends with an open attendance session.';
 
     /**
      * Lower/upper bound of the "about to end" window, in minutes.
-     * Kept a bit wider than the 15-min scheduler cadence so no session
+     * Kept slightly wider than the 5-min scheduler cadence so no session
      * slips through when a tick runs a few seconds late.
      */
-    private const int WINDOW_MIN_MINUTES = 20;
+    private const int WINDOW_MIN_MINUTES = 3;
 
-    private const int WINDOW_MAX_MINUTES = 40;
+    private const int WINDOW_MAX_MINUTES = 8;
 
     public function handle(): int
     {
@@ -62,11 +62,15 @@ class NotifyOpenAttendanceSessions extends Command
         // 40 minutes of their shift-end. Anything older is either
         // already past shift-end (AutoCloseForgottenAttendance's job)
         // or was opened yesterday and forgotten (admin correction path).
+        // whereDate (not where(..., toDateString)): SQLite stores the
+        // Attendance.date column cast as 'YYYY-MM-DD 00:00:00', so a
+        // plain string comparison never matches. whereDate normalises
+        // both sides to Y-m-d and is portable across MySQL and SQLite.
         $open = Attendance::query()
             ->with(['employee.user.pushTokens:id,user_id', 'employee.workSchedule'])
             ->whereNotNull('check_in_at')
             ->whereNull('check_out_at')
-            ->where('date', $now->toDateString())
+            ->whereDate('date', $now->toDateString())
             ->get();
 
         if ($open->isEmpty()) {

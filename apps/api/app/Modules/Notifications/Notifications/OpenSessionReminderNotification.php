@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Notifications\Notifications;
 
 /**
- * "You forgot to scan out" reminder fired ~30 minutes before the
+ * "You forgot to scan out" reminder fired ~5 minutes before the
  * employee's shift-end for any attendance row that is still open
  * (check_in_at set, check_out_at null).
  *
@@ -23,7 +23,7 @@ namespace App\Modules\Notifications\Notifications;
  *
  * NotifyOpenAttendanceSessions is the only caller; it also memoizes
  * per-attendance-row so a session isn't pinged twice within the
- * schedule's 15-minute cadence window.
+ * schedule's 5-minute cadence window.
  */
 class OpenSessionReminderNotification extends TaqatNotification
 {
@@ -31,7 +31,7 @@ class OpenSessionReminderNotification extends TaqatNotification
     {
         parent::__construct(
             title: 'تذكير — لا تنسى تسجيل الانصراف',
-            body: 'دوامك ينتهي خلال 30 دقيقة تقريباً. اضغط لتسجيل الانصراف من QR.',
+            body: 'دوامك ينتهي بعد ٥ دقائق تقريباً. اضغط لتسجيل الانصراف من QR.',
             url: '/home',
             icon: 'clock',
             meta: ['attendance_id' => $attendanceId],

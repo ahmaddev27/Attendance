@@ -105,7 +105,10 @@ class AutoCloseForgottenAttendance extends Command
 
             try {
                 DB::transaction(function () use ($attendance, $shiftEnd, $schedule): void {
-                    $attendance->fill([
+                    // forceFill bypasses $fillable to make the auto-close
+                    // immune to a future refactor that drops check_out_at
+                    // / notes from the mass-assignable list.
+                    $attendance->forceFill([
                         'check_out_at' => $shiftEnd,
                         'notes' => trim(($attendance->notes ?? '')
                             ."\n[نظام] أُغلقت الجلسة تلقائياً عند نهاية الدوام لعدم تسجيل الانصراف."),
@@ -114,6 +117,31 @@ class AutoCloseForgottenAttendance extends Command
                     $this->calculator->computeForAttendance($attendance, $schedule);
                 });
 
+                // Confirm the write actually landed before we count it as
+                // closed — a silently-rolled-back transaction here would
+                // otherwise be invisible until an employee complains that
+                // their anṣrāf never appeared.
+                $attendance->refresh();
+                if ($attendance->check_out_at === null) {
+                    Log::warning('AutoClose transaction committed but check_out_at is still null', [
+                        'attendance_id' => $attendance->id,
+                        'employee_id' => $employee->id,
+                    ]);
+                    $skipped++;
+                    continue;
+                }
+
+                Log::info('AutoClose stamped shift-end check-out', [
+                    'attendance_id' => $attendance->id,
+                    'employee_id' => $employee->id,
+                    'check_out_at' => $attendance->check_out_at->toDateTimeString(),
+                ]);
+                $this->line(sprintf(
+                    'Closed attendance #%d (employee %d) at %s',
+                    $attendance->id,
+                    $employee->id,
+                    $shiftEnd->toDateTimeString(),
+                ));
                 $closed++;
             } catch (\Throwable $e) {
                 Log::warning('AutoClose failed on attendance row', [
@@ -125,7 +153,13 @@ class AutoCloseForgottenAttendance extends Command
             }
         }
 
-        $this->info(sprintf('Closed %d session(s); skipped %d.', $closed, $skipped));
+        $message = sprintf('Closed %d session(s); skipped %d.', $closed, $skipped);
+        $this->info($message);
+        Log::info('AutoCloseForgottenAttendance run complete', [
+            'closed' => $closed,
+            'skipped' => $skipped,
+            'dry' => $dryRun,
+        ]);
 
         return self::SUCCESS;
     }

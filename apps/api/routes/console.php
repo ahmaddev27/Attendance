@@ -174,20 +174,22 @@ Schedule::command('taqat:auto-close-attendance')
 | Forgot-checkout reminder
 |--------------------------------------------------------------------------
 |
-| Runs every 15 minutes alongside the auto-close sweep. For every open
+| Runs every 5 minutes alongside the auto-close sweep. For every open
 | attendance session on a non-flexible schedule, checks whether the
-| shift-end is within ~20-40 minutes from now and — if so — dispatches
+| shift-end is within ~3-8 minutes from now and — if so — dispatches
 | an OpenSessionReminderNotification (push + DB) to give the employee
 | a chance to close the session themselves before auto-close stamps
 | check_out_at at the schedule's declared shift-end.
 |
+| 5-min cadence matches the "5 minutes before end" promise; a longer
+| cadence would leave the ping arriving late or not at all for a
+| session whose shift-end lands between two ticks.
+|
 | The command memoizes per attendance row (Cache::add for 6h) so no
-| session is pinged twice inside the window. Ordering: this schedules
-| AFTER the auto-close entry above so both share the same cadence but
-| the reminder always references the currently-open population.
+| session is pinged twice inside the window.
 */
 Schedule::command('taqat:notify-open-sessions')
-    ->everyFifteenMinutes()
+    ->everyFiveMinutes()
     ->onOneServer()
     ->withoutOverlapping()
     ->name('taqat:notify-open-sessions');
