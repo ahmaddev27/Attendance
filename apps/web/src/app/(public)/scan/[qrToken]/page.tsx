@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import { toast } from 'sonner';
@@ -68,11 +68,11 @@ type CheckoutConfirmPayload = {
 };
 
 const PIN_PATTERN = /^\d{4}$/;
-// Owner's call 2026-10-04: the kiosk should sit on the success card long
-// enough that a passerby reads "تم تسجيل حضورك" + the time without
-// catching only the fade-out. 5 seconds is still short enough to clear
-// before the next scanner reaches the input.
-const SUCCESS_RESET_MS = 5000;
+// Owner's rule 2026-10-04 (revised): the success card STAYS until the
+// employee or the next person taps "موظف جديد" to clear it. The earlier
+// auto-reset timer was pulling the owner off the confirmation before
+// he'd read it; the new explicit button also doubles as "I'm done,
+// hand it off" on a shared kiosk.
 
 function getCurrentPosition(): Promise<GeolocationPosition | null> {
   // Geolocation is best-effort: if the device doesn't have it or the user
@@ -109,7 +109,6 @@ export default function KioskScanPage() {
   const [ready, setReady] = useState<ReadyPayload | null>(null);
   const [success, setSuccess] = useState<SuccessPayload | null>(null);
   const [checkoutConfirm, setCheckoutConfirm] = useState<CheckoutConfirmPayload | null>(null);
-  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pinRequired = device?.pin_required === true;
 
   const loadDevice = useCallback(async () => {
@@ -128,9 +127,6 @@ export default function KioskScanPage() {
 
   useEffect(() => {
     loadDevice();
-    return () => {
-      if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadDevice]);
 
@@ -148,11 +144,6 @@ export default function KioskScanPage() {
     setPinInput('');
     setView(pinRequired ? 'entering-pin' : 'entering-number');
   };
-
-  const scheduleAutoReset = useCallback(() => {
-    if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
-    resetTimerRef.current = setTimeout(resetToEntry, SUCCESS_RESET_MS);
-  }, [resetToEntry]);
 
   // ---------- PIN-only flow ----------
   //
@@ -187,7 +178,6 @@ export default function KioskScanPage() {
           message: 'سجّلت حضورك وانصرافك لليوم.',
         });
         setView('day-complete');
-        scheduleAutoReset();
         return;
       }
 
@@ -237,6 +227,12 @@ export default function KioskScanPage() {
       setPinInput('');
       setCheckoutConfirm(null);
 
+      // Owner's rule 2026-10-04: after a successful scan the success
+      // card STAYS until the next person taps "موظف جديد" — the auto-
+      // reset was pulling him off the confirmation before he'd read it,
+      // and this surface is a shared kiosk, not a form the employee
+      // leaves open while thinking. The explicit button also doubles as
+      // the "I'm done, hand it to the next person" cue.
       if (response.action === 'done') {
         setSuccess({
           action: 'check-out',
@@ -244,7 +240,6 @@ export default function KioskScanPage() {
           message: response.message,
         });
         setView('day-complete');
-        scheduleAutoReset();
         return;
       }
 
@@ -257,7 +252,6 @@ export default function KioskScanPage() {
         message: response.message,
       });
       setView('success');
-      scheduleAutoReset();
     } catch (err: unknown) {
       const { status, message } = readApiError(err);
       if (status === 409) {
@@ -268,7 +262,6 @@ export default function KioskScanPage() {
           message: payload409?.message ?? 'سجّلت حضورك وانصرافك لليوم.',
         });
         setView('day-complete');
-        scheduleAutoReset();
         return;
       }
       const fallback = expected === 'check-in'
@@ -341,7 +334,6 @@ export default function KioskScanPage() {
         message: response.message,
       });
       setView('success');
-      scheduleAutoReset();
     } catch (err: unknown) {
       const { message } = readApiError(err);
       toast.error(message ?? 'حدث خطأ، حاول مرة أخرى');
@@ -364,7 +356,6 @@ export default function KioskScanPage() {
   };
 
   const changeEmployee = () => {
-    if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
     resetToEntry();
   };
 
@@ -585,7 +576,23 @@ export default function KioskScanPage() {
         )}
 
         {view === 'success' && success && (
-          <SuccessCard action={success.action} message={success.message} at={success.at} />
+          <div className="flex w-full max-w-sm flex-col items-center gap-5">
+            <SuccessCard action={success.action} message={success.message} at={success.at} />
+            {/*
+              Owner's rule 2026-10-04: no auto-reset after a scan. The
+              success stays until a human taps "موظف جديد" so the owner
+              (or the next person at the kiosk) actually reads the
+              confirmation and sees who last used it.
+            */}
+            <Button
+              type="button"
+              onClick={changeEmployee}
+              className="min-h-[56px] w-full bg-ink text-base font-bold text-white hover:bg-ink/90"
+            >
+              <RefreshCw className="me-2 h-5 w-5" />
+              موظف جديد
+            </Button>
+          </div>
         )}
       </main>
 

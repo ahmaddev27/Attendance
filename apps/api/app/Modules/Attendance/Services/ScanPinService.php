@@ -59,10 +59,12 @@ class ScanPinService
 
     private const ISSUE_CHUNK_SIZE = 100;
 
-    // Kiosk identity is PIN-only (see memory: project-pin-only-scan-decision),
-    // so the SMS leads with the PIN and keeps the employee_number for the
-    // employee's own records. %1$s is employee_number, %2$s is the PIN.
-    private const PIN_SMS_TEMPLATE = "رمز الحضور الخاص بك في طاقات:\nرمز الحضور: %2\$s\nالرقم الوظيفي: %1\$s\nاستخدم رمز الحضور وحده عند مسح رمز QR، ولا تشاركه مع أحد.";
+    // Kiosk identity is PIN-only (see memory: project-pin-only-scan-decision)
+    // and owner's 2026-10-04 call: the SMS no longer leaks the
+    // employee_number because the PIN alone resolves identity on the
+    // kiosk — the number was decoration that confused employees into
+    // thinking they still had to type it. %1$s is the PIN.
+    private const PIN_SMS_TEMPLATE = "رمز الحضور الخاص بك في طاقات: %1\$s\nاستخدم الرمز وحده عند مسح رمز QR، ولا تشاركه مع أحد.";
 
     public function __construct(
         private readonly EmployeeScanPinRepository $scanPins,
@@ -408,7 +410,7 @@ class ScanPinService
         try {
             $this->sms->send(
                 to: (string) $employee->phone,
-                body: sprintf(self::PIN_SMS_TEMPLATE, $employee->employee_number, $pin),
+                body: sprintf(self::PIN_SMS_TEMPLATE, $pin),
             );
 
             return true;
