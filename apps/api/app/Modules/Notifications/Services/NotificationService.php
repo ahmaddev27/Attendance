@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Notifications\Services;
 
+use App\Models\CandidateApplication;
 use App\Models\Client;
+use App\Models\Interview;
+use App\Models\InterviewFeedback;
 use App\Models\JobRequirement;
 use App\Models\Lead;
 use App\Models\LeaveRequest;
@@ -428,5 +431,110 @@ class NotificationService
         }
 
         Notification::send($recipient, $notification);
+    }
+
+    /**
+     * An interview was just scheduled (or rescheduled). Routed to the
+     * single `$recipient` the caller resolves — typically the interview
+     * creator plus the application's job owner. Phase 2 Q7 locked:
+     * recipients are internal TAQAT staff only, never the candidate.
+     */
+    public function interviewScheduled(Interview $interview, User $recipient): void
+    {
+        $candidateName = $interview->application?->candidate?->full_name ?? 'المرشّح';
+        $jobTitle = $interview->application?->jobRequirement?->title ?? '';
+
+        $this->dispatch($recipient, "interview-scheduled:{$interview->id}", new TaqatNotification(
+            title: 'تم جدولة مقابلة جديدة',
+            body: sprintf(
+                '%s — %s · %s',
+                $interview->interview_number,
+                $candidateName,
+                $jobTitle,
+            ),
+            url: "/recruitment/interviews/{$interview->id}",
+            icon: 'calendar',
+            meta: [
+                'interview_id' => $interview->id,
+                'application_id' => $interview->application_id,
+            ],
+        ));
+    }
+
+    /**
+     * Scheduled reminder before an interview. The dedup key carries
+     * `$hoursUntil` so the daily (today) and hourly (next 1h) reminders
+     * are both delivered without squashing each other.
+     */
+    public function interviewReminder(Interview $interview, User $recipient, int $hoursUntil): void
+    {
+        $candidateName = $interview->application?->candidate?->full_name ?? 'المرشّح';
+        $when = $interview->scheduled_at?->format('H:i') ?? '';
+
+        $this->dispatch($recipient, "interview-reminder:{$interview->id}:{$hoursUntil}h", new TaqatNotification(
+            title: $hoursUntil <= 1
+                ? 'مقابلة خلال ساعة'
+                : 'مقابلة اليوم',
+            body: sprintf('%s · %s @ %s', $interview->interview_number, $candidateName, $when),
+            url: "/recruitment/interviews/{$interview->id}",
+            icon: 'bell',
+            meta: [
+                'interview_id' => $interview->id,
+                'hours_until' => $hoursUntil,
+            ],
+        ));
+    }
+
+    /**
+     * One interviewer just submitted (or edited) their scorecard. The
+     * job owner is the primary recipient so the hiring decision thread
+     * stays live — the dedup key carries the feedback id so a committee
+     * of three still fans out three distinct toasts.
+     */
+    public function interviewFeedbackSubmitted(InterviewFeedback $feedback): void
+    {
+        $interview = $feedback->interview;
+        if (! $interview instanceof Interview) {
+            return;
+        }
+
+        $jobOwner = $interview->application?->jobRequirement?->owner;
+        if (! $jobOwner instanceof User) {
+            return;
+        }
+
+        $candidateName = $interview->application?->candidate?->full_name ?? 'المرشّح';
+        $interviewerName = $feedback->interviewer?->name ?? 'المُقابِل';
+
+        $this->dispatch($jobOwner, "interview-feedback:{$feedback->id}", new TaqatNotification(
+            title: 'تم تقديم تقييم مقابلة جديد',
+            body: sprintf('%s عن %s', $interviewerName, $candidateName),
+            url: "/recruitment/interviews/{$interview->id}",
+            icon: 'clipboard-list',
+            meta: [
+                'interview_id' => $interview->id,
+                'feedback_id' => $feedback->id,
+            ],
+        ));
+    }
+
+    /**
+     * A CandidateApplication moved into a new pipeline stage. Mirror of
+     * jobStageAdvanced() but for the per-application pointer added in
+     * Phase 2 (D6). Reused by the auto-generator and manual advances
+     * alike.
+     */
+    public function applicationStageAdvanced(CandidateApplication $application, RecruitmentPipelineStage $newStage, User $recipient): void
+    {
+        $this->dispatch($recipient, "application-stage-advanced:{$application->id}:{$newStage->id}", new TaqatNotification(
+            title: 'مرحلة جديدة على طلب مرشّح',
+            body: sprintf('%s — %s', $application->application_number, $newStage->name),
+            url: "/recruitment/applications/{$application->id}",
+            icon: 'arrow-right-circle',
+            meta: [
+                'application_id' => $application->id,
+                'stage_id' => $newStage->id,
+            ],
+        ));
     }
 }

@@ -4,11 +4,17 @@ declare(strict_types=1);
 
 namespace App\Modules\Recruitment;
 
+use App\Modules\Recruitment\Events\FeedbackSubmitted;
+use App\Modules\Recruitment\Events\InterviewScheduled;
 use App\Modules\Recruitment\Events\JobRequirementStageAdvanced;
 use App\Modules\Recruitment\Events\JobRequirementSubmitted;
 use App\Modules\Recruitment\Events\LeadCreated;
+use App\Modules\Recruitment\Listeners\GenerateInterviewSchedulingTask;
 use App\Modules\Recruitment\Listeners\NotifyCaseOwnerOfSubmittedJob;
+use App\Modules\Recruitment\Listeners\NotifyFeedbackSubmitted;
+use App\Modules\Recruitment\Listeners\NotifyInterviewScheduled;
 use App\Modules\Recruitment\Listeners\NotifyLeadOwnerOfNewLead;
+use App\Modules\Recruitment\Listeners\RouteInterviewFeedbackRequest;
 use App\Modules\Recruitment\Services\PipelineTaskGeneratorService;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
@@ -40,5 +46,14 @@ class RecruitmentServiceProvider extends ServiceProvider
 
         Event::listen(LeadCreated::class, NotifyLeadOwnerOfNewLead::class);
         Event::listen(JobRequirementSubmitted::class, NotifyCaseOwnerOfSubmittedJob::class);
+
+        // Phase 2 Week 3 — Interview + Feedback automation. All three
+        // InterviewScheduled listeners run in-process; a listener's
+        // failure is contained inside its own try/catch so one bad
+        // notifier can't abort the task-generation or vice versa.
+        Event::listen(InterviewScheduled::class, GenerateInterviewSchedulingTask::class);
+        Event::listen(InterviewScheduled::class, RouteInterviewFeedbackRequest::class);
+        Event::listen(InterviewScheduled::class, NotifyInterviewScheduled::class);
+        Event::listen(FeedbackSubmitted::class, NotifyFeedbackSubmitted::class);
     }
 }

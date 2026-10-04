@@ -19,6 +19,9 @@ class InterviewFeedback extends Model
 {
     use LogsActivity;
 
+    // Laravel would pluralize to `interview_feedback` (uncountable word).
+    protected $table = 'interview_feedbacks';
+
     protected $fillable = [
         'interview_id',
         'interviewer_user_id',

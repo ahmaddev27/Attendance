@@ -243,6 +243,42 @@ Schedule::command('recruitment:scan-stale-leads')
 
 /*
 |--------------------------------------------------------------------------
+| Phase 2 — Interview reminders + application SLA scan
+|--------------------------------------------------------------------------
+|
+| Three new background sweeps the Phase 2 Week 3 slice depends on:
+|
+|   - recruitment:interview-reminders --horizon=hourly : every hour,
+|     surfaces interviews happening within the next 1h.
+|   - recruitment:interview-reminders --horizon=daily  : at 08:00,
+|     surfaces today's interviews so the panel sees the day's list on
+|     their morning inbox check.
+|   - recruitment:application-sla-scan : hourly mirror of scan-sla but
+|     for the per-application stage pointer added in Phase 2 (D6).
+|
+| onOneServer() guards against double-firing when we scale beyond one
+| scheduler container; withoutOverlapping() keeps a slow run from
+| stampeding the next tick.
+*/
+Schedule::command('recruitment:interview-reminders', ['--horizon=hourly'])
+    ->hourly()
+    ->onOneServer()
+    ->withoutOverlapping();
+
+Schedule::command('recruitment:interview-reminders', ['--horizon=daily'])
+    ->dailyAt('08:00')
+    ->timezone('Asia/Gaza')
+    ->onOneServer()
+    ->withoutOverlapping();
+
+Schedule::command('recruitment:application-sla-scan')
+    ->hourly()
+    ->onOneServer()
+    ->withoutOverlapping()
+    ->runInBackground();
+
+/*
+|--------------------------------------------------------------------------
 | Annual leave rollover
 |--------------------------------------------------------------------------
 |
