@@ -115,12 +115,34 @@ class AdminDashboardService
             + (int) ($counts[AttendanceStatus::BusinessMission->value] ?? 0)
             + $late;
 
+        $onLeave = (int) ($counts[AttendanceStatus::OnLeave->value] ?? 0);
+        $explicitAbsent = (int) ($counts[AttendanceStatus::Absent->value] ?? 0);
+
+        // Owner's rule 2026-10-04: "absent" on the live dashboard should
+        // read as "active staff who didn't show up and aren't on leave",
+        // not just the Absent-flagged rows the nightly engine writes at
+        // end of day. Earlier the number sat at 0 all morning because
+        // nobody is Absent-stamped until midnight. Derive it from the
+        // active headcount instead so it reflects reality in real time.
+        $activeHeadcount = Employee::query()
+            ->staffOnly()
+            ->where('status', EmployeeStatus::Active->value)
+            ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
+            ->count();
+
+        $derivedAbsent = max(0, $activeHeadcount - $present - $onLeave);
+
         return [
             'date' => $today->toDateString(),
             'present' => $present,
             'late' => $late,
-            'absent' => (int) ($counts[AttendanceStatus::Absent->value] ?? 0),
-            'on_leave' => (int) ($counts[AttendanceStatus::OnLeave->value] ?? 0),
+            // Prefer the nightly engine's explicit Absent rows once they
+            // exist (end of day — authoritative because it respects
+            // weekends + holidays + per-employee schedules). Fall back to
+            // the live derivation during the day so the number never
+            // looks stuck at zero.
+            'absent' => $explicitAbsent > 0 ? $explicitAbsent : $derivedAbsent,
+            'on_leave' => $onLeave,
         ];
     }
 
