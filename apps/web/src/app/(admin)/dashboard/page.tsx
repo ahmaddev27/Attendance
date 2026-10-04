@@ -20,9 +20,10 @@ import {
 } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
+import { AttendanceWidgets, LeaveWidgets, RecruitmentWidgets } from '@/components/dashboard/executive-widgets';
 import { Skeleton } from '@/components/ui/skeleton';
 import { adminDashboardApi, type AdminDashboardKpis } from '@/lib/api/endpoints/admin-dashboard';
-import { hasPermission, homePathFor, isAdminUser, useAuthStore } from '@/lib/stores/auth-store';
+import { hasAnyPermission, hasPermission, homePathFor, isAdminUser, useAuthStore } from '@/lib/stores/auth-store';
 import { useScopedCompanyId } from '@/lib/stores/company-scope-store';
 import { cn } from '@/lib/utils';
 
@@ -78,6 +79,9 @@ export default function AdminDashboardPage() {
   });
 
   const today = new Date().toISOString().slice(0, 10);
+  const canSee = !!user && isAdminUser(user) && hasPermission(user, 'view-reports');
+  // Recruitment endpoints are gated by view-leads / view-jobs, not view-reports.
+  const showRecruitment = canSee && hasAnyPermission(user, ['view-leads', 'view-jobs']);
 
   return (
     <div className="space-y-6">
@@ -186,6 +190,13 @@ export default function AdminDashboardPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <TodayOverviewCard data={data} loading={isLoading} />
         <PendingActionsCard data={data} loading={isLoading} />
+      </div>
+
+      {/* Executive widgets: 12-col grid at md+, stacked on mobile. */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
+        {canSee && <AttendanceWidgets companyId={scopedCompanyId ?? undefined} />}
+        {canSee && <LeaveWidgets companyId={scopedCompanyId ?? undefined} />}
+        {showRecruitment && <RecruitmentWidgets />}
       </div>
     </div>
   );
