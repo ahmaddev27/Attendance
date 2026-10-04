@@ -79,8 +79,12 @@ function deviceToForm(device: AttendanceDevice): DeviceFormState {
 
 function formToPayload(form: DeviceFormState): AttendanceDevicePayload {
   const toNumberOrNull = (v: string) => (v.trim() === '' ? null : Number(v));
+  // Owner's rule 2026-10-04: accept any sensible separator so pasted IPs
+  // land right whether they came from a line-per-row list, a CSV in an
+  // email, or a semicolon-separated Windows copy. Splits on newline,
+  // comma, Arabic comma (،), or semicolon.
   const ipList = form.ip_whitelist
-    .split('\n')
+    .split(/[\n,،;]+/)
     .map((line) => line.trim())
     .filter(Boolean);
 
@@ -418,7 +422,7 @@ export default function AttendanceDevicesPage() {
                 className="mt-1.5 num"
                 dir="ltr"
                 rows={3}
-                placeholder={'عنوان IP واحد لكل سطر\nاتركه فارغاً للسماح لأي عنوان'}
+                placeholder={'عناوين IP مفصولة بفواصل أو سطر لكل عنوان\nمثال: 192.168.1.10, 192.168.1.0/24, 10.0.0.5\nاتركه فارغاً للسماح لأي عنوان'}
               />
             </div>
             <div className="flex items-center justify-between rounded-lg border border-hairline p-3">
