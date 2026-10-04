@@ -18,6 +18,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 
+import { MotivationCard } from '@/components/motivation/motivation-card';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDate } from '@/lib/attendance-format';
@@ -66,6 +67,8 @@ export default function EmployeeHomePage() {
 
   return (
     <div className="space-y-6">
+      <MotivationCard />
+
       {/* Hero */}
       <div className="flex flex-col gap-4 rounded-2xl border border-hairline bg-surface p-6 md:flex-row md:items-center md:justify-between md:p-8">
         <div>

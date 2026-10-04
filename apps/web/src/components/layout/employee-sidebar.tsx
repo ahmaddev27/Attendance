@@ -10,6 +10,7 @@ import {
   FileText,
   Home,
   LogOut,
+  Sparkles,
   User,
 } from 'lucide-react';
 
@@ -33,6 +34,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/my-tasks', label: 'مهامي', icon: ClipboardList },
   { href: '/my-leaves', label: 'إجازاتي', icon: CalendarCheck },
   { href: '/my-requests', label: 'طلباتي', icon: FileText },
+  { href: '/motivation', label: 'رسالة اليوم', icon: Sparkles },
   { href: '/my-notifications', label: 'الإشعارات', icon: Bell },
   { href: '/profile', label: 'الملف الشخصي', icon: User },
 ];
