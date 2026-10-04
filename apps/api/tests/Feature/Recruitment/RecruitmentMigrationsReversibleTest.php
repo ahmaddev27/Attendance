@@ -48,8 +48,8 @@ test('recruitment migrations roll back completely and re-apply cleanly', functio
     $paths = recruitmentMigrationPaths();
     $names = array_map(fn (string $path) => basename($path, '.php'), $paths);
 
-    // 11 Phase 1 + 7 Phase 2.
-    expect($paths)->toHaveCount(18);
+    // 11 Phase 1 + 8 Phase 2 (candidate_import_jobs added in Week 2).
+    expect($paths)->toHaveCount(19);
 
     try {
         $this->artisan('migrate:rollback', ['--path' => $paths, '--realpath' => true])
@@ -72,7 +72,7 @@ test('recruitment migrations roll back completely and re-apply cleanly', functio
 
         expect(Schema::hasColumns('tasks', ['entity_type', 'entity_id']))->toBeTrue()
             ->and(Schema::hasColumns('leads', ['converted_client_id', 'lead_number']))->toBeTrue()
-            ->and(DB::table('migrations')->whereIn('migration', $names)->count())->toBe(18);
+            ->and(DB::table('migrations')->whereIn('migration', $names)->count())->toBe(19);
 
         // The reference-data migration re-seeds on the way back up.
         $pipelineId = DB::table('recruitment_pipelines')->where('code', 'standard')->value('id');
