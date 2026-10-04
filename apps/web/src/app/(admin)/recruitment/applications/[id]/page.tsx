@@ -22,6 +22,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DataTable, type DataTableColumn } from '@/components/data-table/data-table';
+import { AiScreeningCard } from '@/components/recruitment/ai-screening-card';
 import { RejectApplicationDialog } from '@/components/recruitment/reject-application-dialog';
 import { ScheduleInterviewDialog } from '@/components/recruitment/schedule-interview-dialog';
 import { ScreeningFormDialog } from '@/components/recruitment/screening-form-dialog';
@@ -148,13 +149,14 @@ export default function ApplicationDetailPage() {
           <OverviewCard application={application} />
         </TabsContent>
 
-        <TabsContent value="screening" className="mt-4">
+        <TabsContent value="screening" className="mt-4 space-y-4">
           <ScreeningPanel
             screening={screening ?? null}
             schema={schema ?? null}
             canScreen={canScreen && !!pipelineId && !!stageId && !isClosed}
             onOpen={() => setScreeningOpen(true)}
           />
+          {canScreen && <AiScreeningCard applicationId={applicationId} />}
         </TabsContent>
 
         <TabsContent value="interviews" className="mt-4 space-y-4">

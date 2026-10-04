@@ -753,6 +753,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:screen-candidates')->group(function () {
         Route::post('/applications/{application}/screening', [\App\Modules\Recruitment\Controllers\CandidateScreeningController::class, 'store']);
         Route::patch('/applications/{application}/screening', [\App\Modules\Recruitment\Controllers\CandidateScreeningController::class, 'store']);
+        Route::post('/applications/{application}/ai-screen', [\App\Modules\Recruitment\Controllers\CandidateApplicationController::class, 'aiScreen']);
         Route::get('/recruitment-pipelines/{pipeline}/stages/{stage}/screening-schema', [\App\Modules\Recruitment\Controllers\CandidateScreeningController::class, 'schema']);
     });
 

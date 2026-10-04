@@ -102,6 +102,17 @@ export const candidatesApi = {
 };
 
 /** Per-job applications table + attach-existing-candidate + single-app actions. */
+export type AiRecommendation = 'advance' | 'reject' | 'maybe';
+
+export interface AiScreeningResult {
+  overall_score: number;
+  summary: string;
+  strengths: string[];
+  concerns: string[];
+  skill_match: Record<string, boolean>;
+  recommendation: AiRecommendation;
+}
+
 export const applicationsApi = {
   listForJob: (jobId: number, params?: ApplicationListParams) =>
     apiClient.get<PaginatedResponse<CandidateApplication>>(
@@ -117,6 +128,10 @@ export const applicationsApi = {
     apiClient.post<ApiResource<CandidateApplication>>(`/applications/${id}/withdraw`),
   attach: (jobId: number, payload: AttachCandidatePayload) =>
     apiClient.post<ApiResource<CandidateApplication>>(`/jobs/${jobId}/applications`, payload),
+  aiScreen: (applicationId: number) =>
+    apiClient
+      .post<ApiResource<AiScreeningResult>>(`/applications/${applicationId}/ai-screen`)
+      .then((r) => r.data.data),
 };
 
 /** Shortlist flag toggle + per-job shortlist listing. */

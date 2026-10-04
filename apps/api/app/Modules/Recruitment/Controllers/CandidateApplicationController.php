@@ -12,6 +12,7 @@ use App\Modules\Recruitment\Requests\AttachCandidateToJobRequest;
 use App\Modules\Recruitment\Requests\RejectCandidateApplicationRequest;
 use App\Modules\Recruitment\Requests\UpdateCandidateApplicationRequest;
 use App\Modules\Recruitment\Resources\CandidateApplicationResource;
+use App\Modules\Recruitment\Services\AiCvScreeningService;
 use App\Modules\Recruitment\Services\CandidateApplicationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,6 +22,7 @@ class CandidateApplicationController extends Controller
 {
     public function __construct(
         private readonly CandidateApplicationService $applications,
+        private readonly AiCvScreeningService $aiScreening,
     ) {}
 
     public function indexForJob(Request $request, JobRequirement $job): AnonymousResourceCollection
@@ -78,5 +80,10 @@ class CandidateApplicationController extends Controller
     public function withdraw(CandidateApplication $application): CandidateApplicationResource
     {
         return CandidateApplicationResource::make($this->applications->withdraw($application));
+    }
+
+    public function aiScreen(CandidateApplication $application): JsonResponse
+    {
+        return response()->json(['data' => $this->aiScreening->screen($application)]);
     }
 }
