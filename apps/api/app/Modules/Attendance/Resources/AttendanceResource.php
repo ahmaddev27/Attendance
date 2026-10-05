@@ -31,6 +31,13 @@ class AttendanceResource extends JsonResource
             'date' => $this->date?->toDateString(),
             'check_in_at' => $this->check_in_at?->toIso8601String(),
             'check_out_at' => $this->check_out_at?->toIso8601String(),
+            // Pre-formatted wall-clock strings in Asia/Gaza — the admin
+            // table can render these verbatim without depending on the
+            // viewer's browser timezone data or the ICU small/full-icu
+            // build, which is why some users were seeing scan times 3h
+            // behind the real wall clock (owner, 2026-10-05).
+            'check_in_at_display' => $this->check_in_at?->copy()->setTimezone('Asia/Gaza')->format('H:i'),
+            'check_out_at_display' => $this->check_out_at?->copy()->setTimezone('Asia/Gaza')->format('H:i'),
             // Owner's 2026-10-04 ask: surface the IP that recorded the
             // scan so admins can see where a punch came from without
             // opening the row — same column already powers the `origin`

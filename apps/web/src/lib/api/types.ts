@@ -105,6 +105,10 @@ export type Attendance = {
   date: string;
   check_in_at: string | null;
   check_out_at: string | null;
+  /** Pre-formatted "HH:mm" in Asia/Gaza — safe to render verbatim; no
+   *  browser timezone math needed. */
+  check_in_at_display: string | null;
+  check_out_at_display: string | null;
   total_minutes: number | null;
   late_minutes: number | null;
   early_leave_minutes: number | null;

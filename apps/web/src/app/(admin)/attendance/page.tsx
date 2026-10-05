@@ -355,12 +355,12 @@ export default function AttendancePage() {
                   </TableCell>
                   <TableCell>
                     <span className="num" dir="ltr">
-                      {formatTime(row.check_in_at)}
+                      {row.check_in_at_display ?? formatTime(row.check_in_at)}
                     </span>
                   </TableCell>
                   <TableCell>
                     <span className="num" dir="ltr">
-                      {formatTime(row.check_out_at)}
+                      {row.check_out_at_display ?? formatTime(row.check_out_at)}
                     </span>
                   </TableCell>
                   <TableCell>
