@@ -16,30 +16,48 @@ use Illuminate\Support\Facades\Log;
 /**
  * Auto-closes open attendance sessions the employee forgot to close.
  *
- * For every row with `check_in_at` set and `check_out_at` null, look up
- * the employee's WorkSchedule and, if the shift's end time on the
- * attendance date has already passed, stamp `check_out_at` at the
- * schedule's declared shift-end (NOT `now()`) — the point of the shift
- * is when the employee was expected to leave, not when the scheduler
- * happened to run. A note marker distinguishes auto-closed rows from
- * ones the employee closed themselves, so ops can audit later.
+ * Runs ONCE per day shortly after midnight Asia/Gaza, scanning rows
+ * whose attendance.date is the previous Gaza day (or older) and that
+ * are still open. Running once at midnight — not every 15 minutes
+ * through the shift — is deliberate: employees who legitimately work
+ * past their declared shift-end (overtime) must have the whole day to
+ * scan out themselves. If a mid-day sweep stamps check_out_at at
+ * shift-end while they are still at their desk, the extra hours are
+ * lost. Any row still open at the end of the Gaza day is treated as
+ * a true "forgot to scan out" case and auto-closed at the schedule's
+ * declared shift-end.
+ *
+ * For every eligible row, look up the employee's WorkSchedule and,
+ * if the shift's end time on the attendance date has already passed,
+ * stamp `check_out_at` at the schedule's declared shift-end (NOT
+ * `now()`) — the point of the shift is when the employee was expected
+ * to leave, not when the scheduler happened to run. A note marker
+ * distinguishes auto-closed rows from ones the employee closed
+ * themselves, so ops can audit later.
  *
  * Employees on a flexible schedule (`is_flexible=true`) are skipped —
  * their "end of shift" is a moving target, so an automatic stamp would
  * be wrong more often than not. Same for employees with no
  * work_schedule_id: we don't have anything to base the closing time on.
  *
- * Sessions older than 18 hours are already blocked from a self-close
- * by AttendanceService::checkOut, so an admin correction is the only
- * remaining path there — this command runs every 15 minutes so it
- * catches shifts within the same day they end.
+ * All timestamps are interpreted in Asia/Gaza; the schedule's own
+ * timezone wins when it is set, and the Gaza fallback kicks in
+ * otherwise. config('app.timezone') is deliberately NOT used — the
+ * container may run UTC/Amman but attendance always belongs to Gaza.
  */
 class AutoCloseForgottenAttendance extends Command
 {
     protected $signature = 'taqat:auto-close-attendance
                             {--dry : print what would be closed without writing}';
 
-    protected $description = 'Auto-close open attendance sessions where the shift end time has already passed.';
+    protected $description = 'Auto-close open attendance sessions whose Gaza day has ended with no scan-out.';
+
+    /**
+     * Every date, "now" and schedule-fallback inside this command is
+     * evaluated against Asia/Gaza so a container running Asia/Amman or
+     * UTC does not shift the day boundary and mis-attribute rows.
+     */
+    private const string ATTENDANCE_TIMEZONE = 'Asia/Gaza';
 
     public function __construct(
         private readonly WorkingHoursCalculator $calculator,
@@ -50,15 +68,18 @@ class AutoCloseForgottenAttendance extends Command
     public function handle(): int
     {
         $dryRun = (bool) $this->option('dry');
-        $now = Carbon::now();
+        $now = Carbon::now(self::ATTENDANCE_TIMEZONE);
+        $yesterday = $now->copy()->subDay()->toDateString();
 
+        // Target rows whose Gaza day has already ended: date <= yesterday
+        // in Gaza. A 7-day lower bound still protects us from scanning
+        // ancient rows if the scheduler was down and never swept them.
         $open = Attendance::query()
             ->with(['employee.workSchedule'])
             ->whereNotNull('check_in_at')
             ->whereNull('check_out_at')
-            // Bound at 48h — anything older is out of the "same-day
-            // forgot" case this command handles; ops must intervene.
-            ->where('check_in_at', '>=', $now->copy()->subHours(48))
+            ->whereDate('date', '<=', $yesterday)
+            ->where('check_in_at', '>=', $now->copy()->subDays(7))
             ->get();
 
         if ($open->isEmpty()) {
@@ -179,6 +200,9 @@ class AutoCloseForgottenAttendance extends Command
         // Carbon instance carries today's date, so extract just the H:i.
         $endTime = Carbon::parse($schedule->check_out_time)->format('H:i:s');
 
-        return Carbon::parse($date->toDateString().' '.$endTime, $schedule->timezone ?: config('app.timezone'));
+        return Carbon::parse(
+            $date->toDateString().' '.$endTime,
+            $schedule->timezone ?: self::ATTENDANCE_TIMEZONE,
+        );
     }
 }

@@ -53,15 +53,22 @@ class NotifyOpenAttendanceSessions extends Command
 
     private const int WINDOW_MAX_MINUTES = 8;
 
+    /**
+     * Attendance is anchored to Asia/Gaza regardless of what the
+     * container clock is set to, so "today's open rows" and "now"
+     * always use Gaza — a server running UTC/Amman would otherwise
+     * drift the day boundary and miss the actual Gaza-today population.
+     */
+    private const string ATTENDANCE_TIMEZONE = 'Asia/Gaza';
+
     public function handle(): int
     {
         $dryRun = (bool) $this->option('dry');
-        $now = Carbon::now();
+        $now = Carbon::now(self::ATTENDANCE_TIMEZONE);
 
-        // Bounded scope: only today's open rows can plausibly be within
-        // 40 minutes of their shift-end. Anything older is either
-        // already past shift-end (AutoCloseForgottenAttendance's job)
-        // or was opened yesterday and forgotten (admin correction path).
+        // Bounded scope: only today's open rows (in Gaza) can plausibly
+        // be within 8 minutes of their shift-end. Anything older is
+        // AutoCloseForgottenAttendance's job after midnight.
         // whereDate (not where(..., toDateString)): SQLite stores the
         // Attendance.date column cast as 'YYYY-MM-DD 00:00:00', so a
         // plain string comparison never matches. whereDate normalises
@@ -179,7 +186,7 @@ class NotifyOpenAttendanceSessions extends Command
 
         return Carbon::parse(
             $date->toDateString().' '.$endTime,
-            $schedule->timezone ?: config('app.timezone'),
+            $schedule->timezone ?: self::ATTENDANCE_TIMEZONE,
         );
     }
 }

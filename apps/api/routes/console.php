@@ -152,19 +152,23 @@ Schedule::command('activitylog:clean --force')
 | Auto-close forgotten attendance
 |--------------------------------------------------------------------------
 |
-| Runs every 15 minutes. For every open attendance session (check_in_at
-| set, check_out_at null), looks up the employee's WorkSchedule and, if
-| the schedule's declared shift-end for that date has already passed,
-| stamps check_out_at at the shift-end (not now()) — the employee was
-| expected to leave then, so that's the honest closing time. Flexible
-| schedules and employees without a schedule are skipped.
+| Runs ONCE per day at 00:10 Asia/Gaza — ten minutes after the Gaza
+| day boundary. Deliberately NOT every 15 minutes through the shift:
+| employees who legitimately stay past their declared shift-end
+| (overtime) must have the entire Gaza day to scan out themselves. A
+| mid-day sweep would stamp check_out_at at the schedule's shift-end
+| while they are still at their desk, dropping the extra hours on the
+| floor.
 |
-| 15-minute cadence catches "forgot to scan out on my way out the door"
-| within the same day; anything older than 48h stays untouched (admin
-| correction path).
+| At 00:10 Gaza any row still open from yesterday (or older) is the
+| honest "forgot to scan out" case: the command stamps check_out_at
+| at the schedule's declared shift-end (not now()) and re-runs the
+| hours engine. attendance:recompute-hours runs 20 minutes later at
+| 00:30 Gaza so the previous day's hours reflect the auto-closed rows.
 */
 Schedule::command('taqat:auto-close-attendance')
-    ->everyFifteenMinutes()
+    ->dailyAt('00:10')
+    ->timezone('Asia/Gaza')
     ->onOneServer()
     ->withoutOverlapping()
     ->name('taqat:auto-close-attendance');
@@ -190,6 +194,7 @@ Schedule::command('taqat:auto-close-attendance')
 */
 Schedule::command('taqat:notify-open-sessions')
     ->everyFiveMinutes()
+    ->timezone('Asia/Gaza')
     ->onOneServer()
     ->withoutOverlapping()
     ->name('taqat:notify-open-sessions');
@@ -199,9 +204,12 @@ Schedule::command('taqat:notify-open-sessions')
 | Nightly working-hours recompute
 |--------------------------------------------------------------------------
 |
-| 00:30 Amman — half an hour past midnight so every stamp (check-in,
-| check-out, the 00:00 tick of the auto-close sweeper) has already
-| settled on yesterday's rows. Walks the previous day's attendance for
+| 00:30 Asia/Gaza — twenty minutes after taqat:auto-close-attendance
+| has stamped yesterday's forgotten rows, so this recompute walks a
+| settled picture. Explicit Gaza timezone (not config('app.timezone'))
+| because attendance always belongs to Gaza regardless of what the
+| container clock is set to; a UTC/Amman container would otherwise
+| recompute the wrong day. Walks the previous day's attendance for
 | every active employee and re-runs WorkingHoursCalculator against the
 | current schedule so late / early / overtime minutes reflect any
 | retroactive change (schedule edit, holiday backfilled late, admin
@@ -209,7 +217,7 @@ Schedule::command('taqat:notify-open-sessions')
 */
 Schedule::command('attendance:recompute-hours')
     ->dailyAt('00:30')
-    ->timezone(config('app.timezone'))
+    ->timezone('Asia/Gaza')
     ->onOneServer()
     ->withoutOverlapping()
     ->runInBackground()
