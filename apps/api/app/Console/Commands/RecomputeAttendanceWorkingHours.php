@@ -68,6 +68,8 @@ class RecomputeAttendanceWorkingHours extends Command
 {
     protected $signature = 'attendance:recompute-hours
                             {--date=yesterday : A date (Y-m-d), the literal word "yesterday", or "last-week" for the trailing 7 days}
+                            {--from= : Start of a date range (Y-m-d) — pair with --to to recompute an arbitrary window}
+                            {--to= : End of a date range (Y-m-d), inclusive — pair with --from}
                             {--employee-id= : Restrict the sweep to one employee (admin re-run / debugging)}
                             {--dry-run : Compute but do not persist; log the deltas that WOULD be written}';
 
@@ -84,7 +86,12 @@ class RecomputeAttendanceWorkingHours extends Command
     public function handle(): int
     {
         try {
-            $dates = $this->resolveDates((string) $this->option('date'));
+            $from = $this->option('from');
+            $to = $this->option('to');
+
+            $dates = ($from !== null || $to !== null)
+                ? $this->resolveRange((string) $from, (string) $to)
+                : $this->resolveDates((string) $this->option('date'));
         } catch (\InvalidArgumentException $e) {
             $this->error($e->getMessage());
 
@@ -198,6 +205,50 @@ class RecomputeAttendanceWorkingHours extends Command
         }
 
         return [$parsed->startOfDay()];
+    }
+
+    /**
+     * Resolve an inclusive date range into a list of individual day
+     * Carbons. Capped at 400 days so an operator typo can't fan out
+     * into a decade-long sweep.
+     *
+     * @return list<Carbon>
+     */
+    private function resolveRange(string $from, string $to): array
+    {
+        $tz = config('app.timezone');
+        $from = trim($from);
+        $to = trim($to);
+
+        if ($from === '' || $to === '') {
+            throw new \InvalidArgumentException('Both --from and --to are required for a range sweep.');
+        }
+
+        $start = Carbon::createFromFormat('Y-m-d', $from, $tz);
+        $end = Carbon::createFromFormat('Y-m-d', $to, $tz);
+
+        if ($start === false || $start->format('Y-m-d') !== $from
+            || $end === false || $end->format('Y-m-d') !== $to) {
+            throw new \InvalidArgumentException("Invalid --from / --to; expected Y-m-d.");
+        }
+
+        $start = $start->startOfDay();
+        $end = $end->startOfDay();
+
+        if ($end->lessThan($start)) {
+            throw new \InvalidArgumentException('--to must be the same day as --from or later.');
+        }
+
+        if ($start->diffInDays($end) > 400) {
+            throw new \InvalidArgumentException('Range cannot exceed 400 days — split the sweep into chunks.');
+        }
+
+        $dates = [];
+        for ($cursor = $start->copy(); $cursor->lte($end); $cursor->addDay()) {
+            $dates[] = $cursor->copy();
+        }
+
+        return $dates;
     }
 
     /**
@@ -319,12 +370,17 @@ class RecomputeAttendanceWorkingHours extends Command
         if ($checkOut === null) {
             // Open session: match the stampCheckInStatus contract — late
             // only, status Present / Late, no early/overtime stamping.
+            // Status flips only when the raw lateness exceeds the grace
+            // window (owner's rule 2026-10-05); the reported minutes are
+            // always raw.
             return [
                 'total_minutes' => $attendance->total_minutes,
                 'late_minutes' => $lateMinutes,
                 'early_leave_minutes' => (int) ($attendance->early_leave_minutes ?? 0),
                 'overtime_minutes' => (int) ($attendance->overtime_minutes ?? 0),
-                'status' => $lateMinutes > 0 ? AttendanceStatus::Late : AttendanceStatus::Present,
+                'status' => $lateMinutes > $schedule->grace_late_minutes
+                    ? AttendanceStatus::Late
+                    : AttendanceStatus::Present,
             ];
         }
 
@@ -332,9 +388,10 @@ class RecomputeAttendanceWorkingHours extends Command
         $earlyLeaveMinutes = $this->calculator->calculateEarlyLeaveMinutes($checkOut, $schedule);
         $overtimeMinutes = max(0, $totalMinutes - $schedule->expectedMinutes());
 
+        // Same owner's rule as above: grace governs the label only.
         $status = match (true) {
-            $lateMinutes > 0 => AttendanceStatus::Late,
-            $earlyLeaveMinutes > 0 => AttendanceStatus::EarlyLeave,
+            $lateMinutes > $schedule->grace_late_minutes => AttendanceStatus::Late,
+            $earlyLeaveMinutes > $schedule->grace_early_leave_minutes => AttendanceStatus::EarlyLeave,
             default => AttendanceStatus::Present,
         };
 

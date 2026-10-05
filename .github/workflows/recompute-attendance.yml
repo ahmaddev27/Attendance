@@ -1,0 +1,65 @@
+name: Recompute attendance hours
+
+# Backfills late / early-leave / overtime minutes and status for a given
+# window of attendance rows on production, by replaying the current
+# WorkingHoursCalculator logic. Used after a rule change (e.g. the
+# 2026-10-05 "raw minutes, grace only labels" switch) so historical
+# rows catch up without touching the server by hand.
+#
+# The scheduler already runs the same command nightly on yesterday's
+# rows (00:30 Asia/Gaza) — this workflow is for arbitrary windows the
+# owner needs recomputed sooner than that.
+
+on:
+  workflow_dispatch:
+    inputs:
+      from:
+        description: 'Start date (YYYY-MM-DD, inclusive)'
+        required: true
+      to:
+        description: 'End date (YYYY-MM-DD, inclusive)'
+        required: true
+      dry_run:
+        description: 'Dry run: log deltas without writing'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  recompute:
+    name: Recompute attendance window
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      # Share the vps-deploy slot so a running deploy or backup never
+      # overlaps with this sweep — recompute writes to the same tables.
+      group: vps-deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github/actions
+            infra/scripts
+
+      - name: Prepare SSH key
+        uses: ./.github/actions/vps-ssh
+        with:
+          ssh-key: ${{ secrets.VPS_SSH_KEY }}
+          host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_SSH_PORT }}
+
+      - name: Recompute
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
+          APP_PATH: ${{ secrets.VPS_APP_PATH }}
+          RECOMPUTE_FROM: ${{ inputs.from }}
+          RECOMPUTE_TO: ${{ inputs.to }}
+          RECOMPUTE_DRY_RUN: ${{ inputs.dry_run }}
+          REMOTE_ENV: APP_PATH RECOMPUTE_FROM RECOMPUTE_TO RECOMPUTE_DRY_RUN
+        run: bash infra/scripts/run-on-vps.sh infra/scripts/lib/vps-common.sh infra/scripts/vps-recompute-attendance.sh
