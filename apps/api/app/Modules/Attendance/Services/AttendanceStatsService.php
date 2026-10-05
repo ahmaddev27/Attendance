@@ -65,6 +65,17 @@ class AttendanceStatsService
 
         $uniqueEmployees = (clone $query)->distinct('employee_id')->count('employee_id');
 
+        // Headcount of active staff inside the current scope (ignores
+        // date filters — the question is "who was EXPECTED to be at
+        // work," not "who had a row"). Powers the "الموظفون" tile so it
+        // reads total staff, not just people with an attendance row.
+        $activeHeadcount = Employee::query()
+            ->staffOnly()
+            ->where('status', EmployeeStatus::Active->value)
+            ->when(! empty($filters['company_id']), fn ($q) => $q->where('company_id', $filters['company_id']))
+            ->when(! empty($filters['department_id']), fn ($q) => $q->where('department_id', $filters['department_id']))
+            ->count();
+
         $originCounts = $this->countByOrigin($query);
 
         $totalHours = round($totals['total_minutes'] / 60, 2);
@@ -90,22 +101,23 @@ class AttendanceStatsService
         // ranges would need weekend/holiday awareness per employee.
         $absentCount = $totals['absent_count'];
         if ($this->isSingleDayView($filters) && $absentCount === 0) {
-            $activeHeadcount = Employee::query()
-                ->staffOnly()
-                ->where('status', EmployeeStatus::Active->value)
-                ->when(! empty($filters['company_id']), fn ($q) => $q->where('company_id', $filters['company_id']))
-                ->when(! empty($filters['department_id']), fn ($q) => $q->where('department_id', $filters['department_id']))
-                ->count();
-
             $absentCount = max(
                 0,
                 $activeHeadcount - $totals['present_count'] - $totals['late_count'] - $totals['on_leave_count'],
             );
         }
 
+        // Owner's rule 2026-10-05 relabel: the "الحضور" tile should
+        // count everyone who scanned in that day (on-time + late),
+        // not just the status==Present rows. The on-time subset is
+        // surfaced separately as "في الوقت".
+        $scannedInCount = $totals['present_count'] + $totals['late_count'];
+
         return [
             'total_rows' => $totals['total_rows'],
             'unique_employees' => $uniqueEmployees,
+            'active_headcount' => $activeHeadcount,
+            'scanned_in_count' => $scannedInCount,
             'present_count' => $totals['present_count'],
             'absent_count' => $absentCount,
             'late_count' => $totals['late_count'],

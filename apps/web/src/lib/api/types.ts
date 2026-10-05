@@ -117,7 +117,13 @@ export type Attendance = {
 
 export type AttendanceStatsSummary = {
   total_rows: number;
+  /** Distinct employee rows in the filtered attendance set (= people with a row). */
   unique_employees: number;
+  /** All active staff in the current scope (ignores date filters). */
+  active_headcount: number;
+  /** present_count + late_count — everyone who scanned in. */
+  scanned_in_count: number;
+  /** Only employees whose status resolved to Present/Remote/BusinessMission (= on-time). */
   present_count: number;
   absent_count: number;
   late_count: number;

@@ -547,10 +547,11 @@ function StatCards({ stats, loading }: { stats: AttendanceStats | undefined; loa
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-      <StatTile label="الموظفون" value={stats.unique_employees} tone="brand" />
-      <StatTile label="الحضور" value={stats.present_count} tone="success" />
-      <StatTile label="الغياب" value={stats.absent_count} tone="danger" />
+      <StatTile label="الموظفون" value={stats.active_headcount} tone="brand" />
+      <StatTile label="الحضور" value={stats.scanned_in_count} tone="success" />
+      <StatTile label="في الوقت" value={stats.present_count} tone="success" />
       <StatTile label="التأخير" value={stats.late_count} tone="warn" />
+      <StatTile label="الغياب" value={stats.absent_count} tone="danger" />
       <StatTile label="إجازات" value={stats.on_leave_count} />
       <StatTile label="ساعات العمل" value={asHours(stats.total_hours)} />
       <StatTile label="وقت إضافي" value={asHours(stats.total_overtime_hours)} tone="success" />
