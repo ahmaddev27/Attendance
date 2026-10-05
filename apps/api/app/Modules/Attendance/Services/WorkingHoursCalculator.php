@@ -181,7 +181,19 @@ class WorkingHoursCalculator
         }
 
         $totalWorkingDays = $presentDays + $absentDays + $leaveDays;
-        $expectedMinutes = $totalWorkingDays * $schedule->expectedMinutes();
+
+        // Owner's rule 2026-10-05: when the schedule declares a monthly
+        // hours target, use THAT as the "expected" against which actual
+        // hours and the diff are measured — not the pro-rated
+        // (workdays-so-far × hours/day). The schedule's monthly target
+        // is the contractual anchor; prorating would under-report the
+        // target and show a flattering diff that hides shortfalls.
+        // Fallback to the pro-rated figure only when the schedule has
+        // no monthly target configured (expectedMonthlyMinutes() = null).
+        $monthlyTargetMinutes = $schedule->expectedMonthlyMinutes();
+        $expectedMinutes = $monthlyTargetMinutes
+            ?? ($totalWorkingDays * $schedule->expectedMinutes());
+
         $attendancePercentage = $totalWorkingDays > 0
             ? round(($presentDays / $totalWorkingDays) * 100, 2)
             : 0.0;
@@ -197,7 +209,7 @@ class WorkingHoursCalculator
             weekendDays: $weekendDays,
             totalMinutes: $totalMinutes,
             expectedMinutes: $expectedMinutes,
-            expectedMonthlyMinutes: $schedule->expectedMonthlyMinutes(),
+            expectedMonthlyMinutes: $monthlyTargetMinutes,
             differenceMinutes: $totalMinutes - $expectedMinutes,
             overtimeMinutes: $overtimeMinutes,
             lateMinutes: $lateMinutes,
