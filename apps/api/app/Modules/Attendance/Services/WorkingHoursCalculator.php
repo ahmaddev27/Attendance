@@ -44,7 +44,12 @@ class WorkingHoursCalculator
 
         $attendance->forceFill([
             'late_minutes' => $lateMinutes,
-            'status' => $lateMinutes > 0 ? AttendanceStatus::Late : AttendanceStatus::Present,
+            // The row is "متأخر" only when the raw lateness exceeds the
+            // grace window — the grace governs the LABEL, not the
+            // reported minutes (owner, 2026-10-05).
+            'status' => $lateMinutes > $schedule->grace_late_minutes
+                ? AttendanceStatus::Late
+                : AttendanceStatus::Present,
         ])->save();
     }
 
@@ -65,9 +70,13 @@ class WorkingHoursCalculator
         $earlyLeaveMinutes = $this->calculateEarlyLeaveMinutes($attendance->check_out_at, $schedule);
         $overtimeMinutes = max(0, $totalMinutes - $schedule->expectedMinutes());
 
+        // Status flips to Late/EarlyLeave only when the raw lateness
+        // actually exceeds its grace window. The reported minutes
+        // (late_minutes / early_leave_minutes) are always raw so the
+        // admin sees the honest wall-clock delta regardless of grace.
         $status = match (true) {
-            $lateMinutes > 0 => AttendanceStatus::Late,
-            $earlyLeaveMinutes > 0 => AttendanceStatus::EarlyLeave,
+            $lateMinutes > $schedule->grace_late_minutes => AttendanceStatus::Late,
+            $earlyLeaveMinutes > $schedule->grace_early_leave_minutes => AttendanceStatus::EarlyLeave,
             default => AttendanceStatus::Present,
         };
 
@@ -198,8 +207,15 @@ class WorkingHoursCalculator
     }
 
     /**
-     * Minutes late, net of grace, or 0 for a flexible schedule (no fixed
-     * check-in time) or an on-time/early arrival.
+     * Raw minutes late — the wall-clock delta between the schedule's
+     * check-in time and the employee's actual check-in. Returns 0 for a
+     * flexible schedule (no fixed check-in) or an on-time/early arrival.
+     *
+     * Owner's rule 2026-10-05: grace_late_minutes does NOT reduce the
+     * number of minutes reported here. The grace governs only whether
+     * the row's STATUS flips to "متأخر" (see computeForAttendance /
+     * stampCheckInStatus). The admin wants the honest delta —
+     * 9:55 against a 9:00 shift reads as 55 minutes, not 40.
      *
      * Pure compute, no side effects — safe to call from a nightly
      * recompute sweep or any other read-only consumer.
@@ -226,12 +242,17 @@ class WorkingHoursCalculator
             return 0;
         }
 
-        return max(0, (int) $scheduledCheckIn->diffInMinutes($localCheckIn) - $schedule->grace_late_minutes);
+        return (int) $scheduledCheckIn->diffInMinutes($localCheckIn);
     }
 
     /**
-     * Minutes left early, net of grace, or 0 for a flexible schedule (no
-     * fixed check-out time) or a departure at/after the scheduled time.
+     * Raw minutes left early — the wall-clock delta between the actual
+     * check-out and the schedule's declared check-out time. Returns 0
+     * for a flexible schedule or a departure at/after the scheduled time.
+     *
+     * Same owner's rule as calculateLateMinutes above:
+     * grace_early_leave_minutes is NOT subtracted here; it only decides
+     * whether the row's status flips to "انصراف مبكر".
      *
      * Pure compute, no side effects — safe to call from a nightly
      * recompute sweep or any other read-only consumer.
@@ -253,6 +274,6 @@ class WorkingHoursCalculator
             return 0;
         }
 
-        return max(0, (int) $localCheckOut->diffInMinutes($scheduledCheckOut) - $schedule->grace_early_leave_minutes);
+        return (int) $localCheckOut->diffInMinutes($scheduledCheckOut);
     }
 }

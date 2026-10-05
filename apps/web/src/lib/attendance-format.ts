@@ -24,7 +24,18 @@ export function formatMinutesAsHours(minutes: number | null | undefined): string
   return `${sign}${hours}:${String(mins).padStart(2, '0')}`;
 }
 
-/** "2026-09-07T08:03:00Z" -> "08:03 ص", using the viewer's locale/timezone.
+/** The business timezone every attendance surface is anchored to. */
+const ATTENDANCE_DISPLAY_TIMEZONE = 'Asia/Gaza';
+
+/** "2026-09-07T08:03:00Z" -> "08:03 ص", pinned to Asia/Gaza regardless of
+ *  the viewer's local timezone.
+ *
+ * Pinned timezone (added 2026-10-05) because the owner noticed that times
+ * were rendering two hours behind what the kiosk actually scanned. The
+ * previous behaviour let `toLocaleTimeString` fall back to the browser's
+ * TZ, so a server running UTC/Amman combined with a browser clock in a
+ * different zone would drift. Attendance always belongs to Gaza, so we
+ * force Gaza here and stop depending on the viewer's clock.
  *
  * Uses `numberingSystem: 'latn'` so the digits render as Latin (0-9) rather
  * than Arabic-Indic (٠-٩). The owner spotted that ٩:٠٤ visually read as
@@ -41,6 +52,7 @@ export function formatTime(isoDateTime: string | null | undefined): string {
     hour: '2-digit',
     minute: '2-digit',
     numberingSystem: 'latn',
+    timeZone: ATTENDANCE_DISPLAY_TIMEZONE,
   });
 }
 

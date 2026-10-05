@@ -113,6 +113,50 @@ test('a flexible schedule never produces late or early-leave minutes', function 
         ->and($attendance->status)->toBe(AttendanceStatus::Present);
 });
 
+test('late minutes report the raw delta — grace governs the status, not the number', function () {
+    // Owner reported 2026-10-05: 9:00 schedule, scan-in 9:55 was showing
+    // 40 late minutes (= 55 - 15 grace). Grace should only hide the
+    // "متأخر" label when the lateness is inside it, not shrink the
+    // reported minutes.
+    $schedule = makeWorkSchedule([
+        'check_in_time' => '09:00',
+        'check_out_time' => '17:00',
+        'min_hours_per_day' => 8,
+        'grace_late_minutes' => 15,
+        'grace_early_leave_minutes' => 15,
+        'timezone' => 'Asia/Gaza',
+    ]);
+    $employee = makeEmployeeWithSchedule($schedule);
+
+    $today = Carbon::today();
+
+    $late = Attendance::factory()->create([
+        'employee_id' => $employee->id,
+        'date' => $today->toDateString(),
+        'check_in_at' => Carbon::parse($today->toDateString().' 09:55:00', 'Asia/Gaza'),
+        'check_out_at' => Carbon::parse($today->toDateString().' 17:00:00', 'Asia/Gaza'),
+    ]);
+
+    app(WorkingHoursCalculator::class)->computeForAttendance($late, $schedule);
+
+    expect($late->late_minutes)->toBe(55)
+        ->and($late->status)->toBe(AttendanceStatus::Late);
+
+    // Inside the grace window: 7 minutes late is NOT flagged "متأخر"
+    // (status = Present) but the raw 7 minutes are still reported.
+    $within = Attendance::factory()->create([
+        'employee_id' => $employee->id,
+        'date' => $today->copy()->subDay()->toDateString(),
+        'check_in_at' => Carbon::parse($today->copy()->subDay()->toDateString().' 09:07:00', 'Asia/Gaza'),
+        'check_out_at' => Carbon::parse($today->copy()->subDay()->toDateString().' 17:00:00', 'Asia/Gaza'),
+    ]);
+
+    app(WorkingHoursCalculator::class)->computeForAttendance($within, $schedule);
+
+    expect($within->late_minutes)->toBe(7)
+        ->and($within->status)->toBe(AttendanceStatus::Present);
+});
+
 test('overtime is computed from raw total minutes and is not reduced by grace periods', function () {
     $schedule = makeWorkSchedule([
         'check_in_time' => '08:00',

@@ -102,9 +102,11 @@ test('check-out computes total_minutes from the check-in/check-out gap', functio
         ->and($attendance->total_hours)->toBe(8.5);
 });
 
-test('check-out computes late, early-leave and overtime minutes net of grace periods', function () {
+test('check-out reports raw late + early-leave minutes; grace only flips the status label', function () {
     // 20 minutes late (grace 15) and leaves 20 minutes early (grace 15):
-    // both breach their grace window by exactly 5 minutes.
+    // both breach their grace window by 5 minutes, so the status is
+    // "متأخر". Reported minutes are the raw delta (20 each), not
+    // "20 - 15 grace" — owner's rule from 2026-10-05.
     [$employee, $device] = checkInAt('08:20');
 
     Carbon::setTestNow(Carbon::today()->setTime(15, 40));
@@ -116,8 +118,8 @@ test('check-out computes late, early-leave and overtime minutes net of grace per
 
     $attendance = Attendance::query()->where('employee_id', $employee->id)->first();
 
-    expect($attendance->late_minutes)->toBe(5)
-        ->and($attendance->early_leave_minutes)->toBe(5)
+    expect($attendance->late_minutes)->toBe(20)
+        ->and($attendance->early_leave_minutes)->toBe(20)
         ->and($attendance->overtime_minutes)->toBe(0)
         // Late takes priority over early-leave per the spec's status rule.
         ->and($attendance->status)->toBe(AttendanceStatus::Late);

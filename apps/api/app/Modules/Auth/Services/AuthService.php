@@ -134,7 +134,11 @@ class AuthService
 
         // Bind the user to Laravel's session guard. The controller will
         // then regenerate the session id (session-fixation defense).
-        Auth::guard('web')->login($user);
+        // remember=true issues a long-lived "remember me" cookie keyed
+        // off users.remember_token so closing the tab (or Chrome's own
+        // session rotation) does not log the user out — the owner's
+        // standing rule: web login should always be sticky, no checkbox.
+        Auth::guard('web')->login($user, remember: true);
 
         $user->forceFill(['last_login_at' => now()])->save();
 
