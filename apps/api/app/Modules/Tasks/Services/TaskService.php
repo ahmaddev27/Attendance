@@ -54,7 +54,9 @@ class TaskService
             ownedByEmployeeId: $this->authorizedScopeFor($actor),
         );
 
-        $this->entityLabels->hydrate($page->items());
+        $items = collect($page->items());
+        $subtasks = $items->flatMap(fn (Task $t) => $t->relationLoaded('subtasks') ? $t->subtasks : []);
+        $this->entityLabels->hydrate($items->concat($subtasks)->all());
 
         return $page;
     }

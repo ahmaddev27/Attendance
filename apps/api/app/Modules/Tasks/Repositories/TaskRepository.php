@@ -7,6 +7,7 @@ namespace App\Modules\Tasks\Repositories;
 use App\Models\Employee;
 use App\Models\Task;
 use App\Models\TaskStatus;
+use Carbon\CarbonInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -34,7 +35,7 @@ class TaskRepository
     /**
      * @var list<string>
      */
-    private const WITH_COUNTS = ['comments as comments_count', 'media as attachments_count'];
+    private const WITH_COUNTS = ['comments as comments_count', 'media as attachments_count', 'subtasks as subtasks_count'];
 
     /**
      * @param  array<string, mixed>  $filters
@@ -49,7 +50,9 @@ class TaskRepository
      */
     public function paginate(array $filters, int $perPage, ?int $ownedByEmployeeId = null): LengthAwarePaginator
     {
-        $query = $this->baseQuery($filters);
+        $query = ! empty($filters['tree'])
+            ? $this->treeQuery($filters, $ownedByEmployeeId)
+            : $this->baseQuery($filters);
 
         if ($ownedByEmployeeId !== null) {
             $query->where(function (Builder $q) use ($ownedByEmployeeId): void {
@@ -121,6 +124,24 @@ class TaskRepository
         }
 
         return $result;
+    }
+
+    /**
+     * Every task the employee is assigned to or created, born inside the
+     * window, with the relations the report needs in one eager-load.
+     *
+     * @return Collection<int, Task>
+     */
+    public function involvingEmployeeBetween(int $employeeId, CarbonInterface $from, CarbonInterface $to): Collection
+    {
+        return Task::query()
+            ->with(['status', 'priority'])
+            ->where(function (Builder $q) use ($employeeId): void {
+                $q->where('assigned_to', $employeeId)->orWhere('created_by', $employeeId);
+            })
+            ->whereBetween('created_at', [$from, $to])
+            ->orderByDesc('created_at')
+            ->get();
     }
 
     /**
@@ -201,6 +222,39 @@ class TaskRepository
         $task->restore();
 
         return $task->refresh()->load(self::WITH);
+    }
+
+    /**
+     * Tree mode: only top-level tasks are paginated, each with its direct
+     * subtasks nested. A parent matches the filters when it matches itself
+     * OR any of its subtasks does, so a filtered-on subtask still surfaces
+     * under its parent. Combined filters AND together inside each branch.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return Builder<Task>
+     */
+    private function treeQuery(array $filters, ?int $ownedByEmployeeId): Builder
+    {
+        unset($filters['parent_task_id']);
+
+        $query = Task::query()
+            ->with(self::WITH)
+            ->withCount(self::WITH_COUNTS)
+            ->with(['subtasks' => function ($sub) use ($ownedByEmployeeId): void {
+                $sub->with(self::WITH)->withCount(self::WITH_COUNTS)->orderBy('id');
+                if ($ownedByEmployeeId !== null) {
+                    $sub->where(fn (Builder $q) => $q->where('created_by', $ownedByEmployeeId)
+                        ->orWhere('assigned_to', $ownedByEmployeeId));
+                }
+            }])
+            ->whereNull('parent_task_id');
+
+        $query->where(function (Builder $q) use ($filters): void {
+            $q->where(fn (Builder $own) => $this->applyFilters($own, $filters))
+                ->orWhereHas('subtasks', fn (Builder $sub) => $this->applyFilters($sub, $filters));
+        });
+
+        return $query;
     }
 
     /**

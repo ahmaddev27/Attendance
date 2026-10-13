@@ -842,6 +842,8 @@ export type Task = {
   comments_count: number;
   attachments_count: number;
   subtasks_count: number;
+  /** Present only when listed with `tree: true` (direct children, one level). */
+  subtasks?: Task[];
   created_at: string;
 };
 
@@ -878,6 +880,8 @@ export type TaskListParams = {
   priority_id?: number;
   tag_id?: number;
   parent_task_id?: number | null;
+  /** Top-level tasks only, with direct subtasks nested; filters match parent OR any subtask. */
+  tree?: boolean;
   due_date_from?: string;
   due_date_to?: string;
   search?: string;

@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { CornerDownRight, Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -37,6 +37,16 @@ import { cn } from '@/lib/utils';
 
 const PER_PAGE = 20;
 
+type TaskRow = Task & { isSubtask: boolean };
+
+/** Parent row followed directly by its subtasks (one level). */
+function flattenTree(tasks: Task[]): TaskRow[] {
+  return tasks.flatMap((task) => [
+    { ...task, isSubtask: false },
+    ...(task.subtasks ?? []).map((sub) => ({ ...sub, isSubtask: true })),
+  ]);
+}
+
 export default function TasksPage() {
   const router = useRouter();
   const [view, setView] = React.useState<'kanban' | 'list'>('kanban');
@@ -47,6 +57,7 @@ export default function TasksPage() {
   const [priorityId, setPriorityId] = React.useState<string | undefined>();
   const [tagId, setTagId] = React.useState<string | undefined>();
   const [assignee, setAssignee] = React.useState<EmployeeSummary | null>(null);
+  const [creator, setCreator] = React.useState<EmployeeSummary | null>(null);
   const [dueFrom, setDueFrom] = React.useState('');
   const [dueTo, setDueTo] = React.useState('');
 
@@ -62,7 +73,7 @@ export default function TasksPage() {
 
   React.useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, statusId, priorityId, tagId, assignee?.id, dueFrom, dueTo, scopedCompanyId]);
+  }, [debouncedSearch, statusId, priorityId, tagId, assignee?.id, creator?.id, dueFrom, dueTo, scopedCompanyId]);
 
   const { data: statuses } = useQuery({
     queryKey: ['task-statuses'],
@@ -81,7 +92,7 @@ export default function TasksPage() {
     queryKey: [
       'tasks',
       'list',
-      { page, search: debouncedSearch, statusId, priorityId, tagId, assigneeId: assignee?.id, dueFrom, dueTo, scopedCompanyId },
+      { page, search: debouncedSearch, statusId, priorityId, tagId, assigneeId: assignee?.id, creatorId: creator?.id, dueFrom, dueTo, scopedCompanyId },
     ],
     queryFn: async () => {
       const { data } = await tasksApi.list({
@@ -92,6 +103,8 @@ export default function TasksPage() {
         priority_id: priorityId ? Number(priorityId) : undefined,
         tag_id: tagId ? Number(tagId) : undefined,
         assigned_to: assignee?.id,
+        created_by: creator?.id,
+        tree: true,
         due_date_from: dueFrom || undefined,
         due_date_to: dueTo || undefined,
         company_id: scopedCompanyId ?? undefined,
@@ -112,19 +125,29 @@ export default function TasksPage() {
     setFormOpen(true);
   };
 
-  const columns: DataTableColumn<Task>[] = [
+  const columns: DataTableColumn<TaskRow>[] = [
     {
       key: 'title',
       header: 'العنوان',
       cell: (task) => (
-        <button
-          type="button"
-          onClick={() => openTaskDetail(task)}
-          className="max-w-[220px] truncate text-start font-medium text-brand-ink hover:underline"
-          title={task.title}
-        >
-          {task.title}
-        </button>
+        <div className={cn('flex items-center gap-2', task.isSubtask && 'ps-8')}>
+          {task.isSubtask && (
+            <>
+              <CornerDownRight className="h-4 w-4 shrink-0 text-muted rtl:-scale-x-100" aria-hidden />
+              <span className="shrink-0 rounded bg-surface-2 px-1.5 py-0.5 text-[10px] font-semibold text-muted">
+                فرعية
+              </span>
+            </>
+          )}
+          <button
+            type="button"
+            onClick={() => openTaskDetail(task)}
+            className="max-w-[220px] truncate text-start font-medium text-brand-ink hover:underline"
+            title={task.title}
+          >
+            {task.title}
+          </button>
+        </div>
       ),
     },
     {
@@ -261,9 +284,15 @@ export default function TasksPage() {
               </Select>
             </div>
             <div>
-              <Label className="text-xs font-semibold text-ink-2">المسند إليه</Label>
+              <Label className="text-xs font-semibold text-ink-2">مُسندة إلى</Label>
               <div className="mt-1.5">
                 <EmployeeSearchSelect value={assignee} onChange={setAssignee} />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs font-semibold text-ink-2">منشئ المهمة</Label>
+              <div className="mt-1.5">
+                <EmployeeSearchSelect value={creator} onChange={setCreator} />
               </div>
             </div>
             <div>
@@ -282,7 +311,7 @@ export default function TasksPage() {
 
           <DataTable
             columns={columns}
-            data={data?.data ?? []}
+            data={flattenTree(data?.data ?? [])}
             rowKey={(task) => task.id}
             isLoading={isLoading}
             emptyMessage="لا توجد مهام مطابقة لبحثك"

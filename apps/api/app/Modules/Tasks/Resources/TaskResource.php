@@ -73,6 +73,9 @@ class TaskResource extends JsonResource
             'comments_count' => $this->when(isset($this->comments_count), fn () => (int) $this->comments_count),
             'attachments_count' => $this->when(isset($this->attachments_count), fn () => (int) $this->attachments_count),
 
+            'subtasks_count' => $this->when(isset($this->subtasks_count), fn () => (int) $this->subtasks_count),
+            'subtasks' => self::collection($this->whenLoaded('subtasks')),
+
             'estimated_hours' => $this->estimated_hours === null ? null : (float) $this->estimated_hours,
             'actual_hours' => $this->actual_hours === null ? null : (float) $this->actual_hours,
             'progress_percent' => $this->progress_percent,
