@@ -40,6 +40,25 @@ test('flat mode stays the default and does not nest', function () {
         ->assertJsonMissingPath('data.0.subtasks');
 });
 
+test('tree mode without filters still lists parents that have no subtasks', function () {
+    // Regression for 2026-10-13: an empty-filter tree query was emitting
+    // `AND EXISTS(subtasks)`, so a parent-with-no-children never appeared.
+    $this->actingAsSuperAdmin();
+    $lonely = nestingTask();
+    $parent = nestingTask();
+    nestingTask(['parent_task_id' => $parent->id]);
+
+    $res = $this->getJson('/api/tasks?tree=1')->assertOk();
+
+    $res->assertJsonCount(2, 'data');
+    $ids = collect($res->json('data'))->pluck('id')->all();
+    expect($ids)->toContain($lonely->id)->toContain($parent->id);
+
+    // The lonely parent is in the response AND still has subtasks_count 0.
+    $lonelyRow = collect($res->json('data'))->firstWhere('id', $lonely->id);
+    expect($lonelyRow['subtasks_count'])->toBe(0);
+});
+
 test('a matching subtask surfaces its parent in tree mode', function () {
     $this->actingAsSuperAdmin();
     $alice = Employee::factory()->create();

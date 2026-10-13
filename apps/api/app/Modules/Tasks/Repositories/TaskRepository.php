@@ -235,7 +235,9 @@ class TaskRepository
      */
     private function treeQuery(array $filters, ?int $ownedByEmployeeId): Builder
     {
-        unset($filters['parent_task_id']);
+        // Strip meta keys the applyFilters loop would otherwise never read
+        // but that must NOT leak into the parent-vs-subtasks grouping.
+        unset($filters['parent_task_id'], $filters['tree']);
 
         $query = Task::query()
             ->with(self::WITH)
@@ -249,12 +251,37 @@ class TaskRepository
             }])
             ->whereNull('parent_task_id');
 
-        $query->where(function (Builder $q) use ($filters): void {
-            $q->where(fn (Builder $own) => $this->applyFilters($own, $filters))
-                ->orWhereHas('subtasks', fn (Builder $sub) => $this->applyFilters($sub, $filters));
-        });
+        // ONLY wrap the parent-or-subtask-matches group when there is
+        // actually a filter to apply. An unconditional wrapper would make
+        // Laravel emit `AND EXISTS(subtasks ...)` because the empty inner
+        // closure contributes no SQL, which hid every parent that had no
+        // subtasks when the admin opened the list without filters.
+        if ($this->hasListFilters($filters)) {
+            $query->where(function (Builder $q) use ($filters): void {
+                $q->where(fn (Builder $own) => $this->applyFilters($own, $filters))
+                    ->orWhereHas('subtasks', fn (Builder $sub) => $this->applyFilters($sub, $filters));
+            });
+        }
 
         return $query;
+    }
+
+    /**
+     * Does $filters carry at least one condition that applyFilters would
+     * emit? Keeps treeQuery from wrapping the empty case in a group that
+     * collapses to "parent must have a matching subtask".
+     *
+     * @param  array<string, mixed>  $filters
+     */
+    private function hasListFilters(array $filters): bool
+    {
+        foreach (['assigned_to', 'created_by', 'status_id', 'priority_id', 'tag_id', 'search', 'due_date_from', 'due_date_to'] as $key) {
+            if (! empty($filters[$key])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
