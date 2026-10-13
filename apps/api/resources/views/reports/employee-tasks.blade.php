@@ -25,18 +25,14 @@
     <meta charset="UTF-8">
     <title>تقرير مهام {{ $employee['full_name'] }}</title>
     <style>
-        @if (app()->environment() !== 'testing')
-        {{-- Skipped under tests: CI has no egress to fonts.gstatic.com. --}}
-        @font-face {
-            font-family: 'Amiri';
-            font-style: normal;
-            font-weight: 400;
-            src: url('https://fonts.gstatic.com/s/amiri/v27/J7aRnpd8CGxBHqUpvrIw74NL.ttf') format('truetype');
-        }
-        @endif
+        {{-- No remote @font-face: dompdf's enable_remote=true was fetching
+             fonts.gstatic.com on every request. The VPS can be slow or
+             outright blocked for that host, which stalls the whole PDF
+             pipeline and surfaces as "تعذّر تحميل PDF" to the admin.
+             DejaVu Sans ships inside dompdf and covers Arabic cleanly. --}}
 
         @page { margin: 28px 24px 48px; }
-        body { font-family: 'Amiri', 'DejaVu Sans', sans-serif; font-size: 10px; color: #1a1a1a; direction: rtl; margin: 0; }
+        body { font-family: 'DejaVu Sans', sans-serif; font-size: 10px; color: #1a1a1a; direction: rtl; margin: 0; }
         header.rpt-head { border-bottom: 3px solid #2678C4; padding-bottom: 8px; margin-bottom: 12px; }
         .brand { font-size: 20px; font-weight: bold; color: #2678C4; letter-spacing: 2px; direction: ltr; text-align: left; }
         h1 { margin: 4px 0 2px; font-size: 16px; color: #1a1a1a; }
