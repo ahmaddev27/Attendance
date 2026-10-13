@@ -55,12 +55,9 @@
     </style>
 </head>
 <body>
-<script type="text/php">
-    if (isset($pdf)) {
-        $font = $fontMetrics->getFont('DejaVu Sans', 'normal');
-        $pdf->page_text(28, $pdf->get_height() - 30, 'Page {PAGE_NUM} / {PAGE_COUNT}', $font, 8, [0.42, 0.42, 0.42]);
-    }
-</script>
+{{-- No <script type="text/php"> page footer: config/dompdf.php ships
+     enable_php=false and dompdf errors out when the inline-PHP block is
+     present. The report is almost always a single page anyway. --}}
 
 <header class="rpt-head">
     <div class="brand">TAQAT</div>
