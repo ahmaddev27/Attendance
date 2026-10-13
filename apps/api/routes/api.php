@@ -27,6 +27,7 @@ use App\Modules\Organization\Controllers\DepartmentController;
 use App\Modules\Organization\Controllers\PositionController;
 use App\Modules\Organization\Controllers\TeamController;
 use App\Modules\Push\Controllers\PushTokenController;
+use App\Modules\Tasks\Controllers\EmployeeTasksReportController;
 use App\Modules\Recruitment\Controllers\BrightGazaJobImportController;
 use App\Modules\Recruitment\Controllers\ClientContactController;
 use App\Modules\Recruitment\Controllers\ClientController;
@@ -445,6 +446,8 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/reports/attendance/monthly', [AttendanceReportController::class, 'monthly']);
             Route::get('/reports/leaves/export', [LeaveReportController::class, 'export']);
             Route::get('/reports/requests/export', [RequestReportController::class, 'export']);
+            Route::get('/employees/{employee}/tasks-report', [EmployeeTasksReportController::class, 'show']);
+            Route::get('/employees/{employee}/tasks-report/pdf', [EmployeeTasksReportController::class, 'pdf']);
         });
 
         // Analytics dashboards (Phase 3). Same permission gate as reports;

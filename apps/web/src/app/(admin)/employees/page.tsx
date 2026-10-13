@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { CalendarDays, KeyRound, Mail, MessageSquareText, Pencil, Plus, QrCode, ShieldCheck, Trash2, X } from 'lucide-react';
+import { CalendarDays, FileText, KeyRound, Mail, MessageSquareText, Pencil, Plus, QrCode, ShieldCheck, Trash2, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { DataTable, type DataTableColumn } from '@/components/data-table/data-table';
@@ -86,6 +86,8 @@ export default function EmployeesPage() {
   // all 403 for a user who lacks it. Hide the row action instead of letting
   // them navigate into a broken page.
   const canApproveLeaves = hasPermission(user, 'approve-leaves');
+  // The details page's tasks report calls `permission:view-reports` endpoints.
+  const canViewReports = hasPermission(user, 'view-reports');
   const [page, setPage] = React.useState(1);
   const [search, setSearch] = React.useState('');
   const [departmentId, setDepartmentId] = React.useState<string | undefined>();
@@ -332,6 +334,12 @@ export default function EmployeesPage() {
             : undefined
         }
         actions={[
+          {
+            label: 'تفاصيل',
+            icon: FileText,
+            onClick: (employee) => router.push(`/employees/${employee.id}`),
+            hidden: () => !canViewReports,
+          },
           {
             label: 'عرض الإجازات',
             icon: CalendarDays,
