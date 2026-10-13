@@ -17,6 +17,7 @@
         "laravel/tinker": "^2.9",
         "maatwebsite/excel": "^4.0",
         "meilisearch/meilisearch-php": "^1.10",
+        "mpdf/mpdf": "^8.3",
         "predis/predis": "^2.0",
         "resend/resend-laravel": "^1.0",
         "spatie/laravel-activitylog": "^4.0",
