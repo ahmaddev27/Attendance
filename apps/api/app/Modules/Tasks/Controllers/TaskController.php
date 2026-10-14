@@ -27,6 +27,12 @@ class TaskController extends Controller
 
     public function index(Request $request): AnonymousResourceCollection
     {
+        // Query-string booleans arrive as strings; axios sends `true`, which
+        // Laravel's `boolean` rule rejects. Normalise before validating.
+        if ($request->has('tree')) {
+            $request->merge(['tree' => filter_var($request->query('tree'), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE)]);
+        }
+
         $request->validate([
             'company_id' => ['nullable', 'integer', 'exists:companies,id'],
             'assigned_to' => ['nullable', 'integer', 'exists:employees,id'],
@@ -39,6 +45,8 @@ class TaskController extends Controller
             'tag_id', 'search', 'due_date_from', 'due_date_to',
             'parent_task_id', 'sort', 'company_id', 'tree',
         ]);
+
+        $filters['tree'] = $request->boolean('tree');
 
         $perPage = (int) $request->integer('per_page', self::DEFAULT_PER_PAGE);
 
