@@ -49,7 +49,11 @@ class StoreTaskRequest extends FormRequest
 
             'estimated_hours' => ['nullable', 'numeric', 'min:0', 'max:999.99'],
             'actual_hours' => ['nullable', 'numeric', 'min:0', 'max:999.99'],
-            'progress_percent' => ['nullable', 'integer', 'min:0', 'max:100'],
+            // progress_percent intentionally omitted from the request:
+            // it is auto-computed server-side (TaskProgressCalculator),
+            // and TaskService::create unsets any value a stale client
+            // might send. Keeping the validator silent prevents a 422
+            // from clients that are mid-upgrade.
             'start_date' => ['nullable', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:start_date'],
 

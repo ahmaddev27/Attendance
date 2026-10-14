@@ -67,11 +67,19 @@ test('deleting a subtask recomputes the parent progress', function () {
     expect($parent->fresh()->progress_percent)->toBe(100);
 });
 
-test('an explicit progress_percent on a leaf is respected', function () {
+test('an explicit progress_percent on a leaf is ignored (auto-only, owner rule 2026-10-14)', function () {
+    // Previously the service respected a manual value from the payload.
+    // The owner removed the slider from the admin form and asked for the
+    // percentage to be fully auto-computed. TaskService::update now
+    // unsets progress_percent before persisting, so a stale FE client
+    // cannot override the calculator's output.
     $actor = $this->actingAsSuperAdmin();
     [$open, , , $parent] = progressFixture();
 
     app(TaskService::class)->update($parent, ['progress_percent' => 40, 'status_id' => $open->id], $actor);
 
-    expect($parent->fresh()->progress_percent)->toBe(40);
+    // Leaf task in an "open" status with no subtasks → calculator keeps
+    // the stored value (which started at 0 in the fixture) rather than
+    // honouring the 40 the caller tried to force in.
+    expect($parent->fresh()->progress_percent)->toBe(0);
 });

@@ -197,6 +197,12 @@ class TaskService
         $tags = $data['tags'] ?? null;
         unset($data['tags']);
 
+        // Owner's rule 2026-10-14: progress is always auto-computed from
+        // the task's own status + subtask completion (TaskProgressCalculator).
+        // The manual slider was removed from the admin form; drop any
+        // leftover payload so a stale FE client cannot override it.
+        unset($data['progress_percent']);
+
         $task = DB::transaction(function () use ($data, $createdBy, $statusId, $tags, $actor) {
             $task = $this->tasks->create([
                 ...$data,
@@ -215,9 +221,7 @@ class TaskService
                 $this->history->log($task, $actor, TaskAction::Assigned, null, ['assignee_id' => $data['assigned_to']]);
             }
 
-            if (! array_key_exists('progress_percent', $data)) {
-                $task = $this->syncProgress($task);
-            }
+            $task = $this->syncProgress($task);
             $this->syncProgressOfId($task->parent_task_id);
 
             return $task;
@@ -264,6 +268,11 @@ class TaskService
 
         $tags = $data['tags'] ?? null;
         unset($data['tags']);
+
+        // Owner's rule 2026-10-14 (same as create): progress is auto-only.
+        // Strip any payload field so a stale FE client cannot override the
+        // computed value even if the request validator still accepts it.
+        unset($data['progress_percent']);
 
         $changes = $this->detectTrackedChanges($task, $data);
         $oldParentId = $task->parent_task_id;
@@ -392,9 +401,8 @@ class TaskService
             return $updated;
         }
 
-        if (! array_key_exists('progress_percent', $data)) {
-            $updated = $this->syncProgress($updated);
-        }
+        // Progress is always auto-computed (manual override removed).
+        $updated = $this->syncProgress($updated);
 
         $this->syncProgressOfId($updated->parent_task_id);
 

@@ -27,7 +27,8 @@ class UpdateTaskRequest extends FormRequest
             'assigned_to' => ['sometimes', 'nullable', 'integer', 'exists:employees,id'],
             'estimated_hours' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:999.99'],
             'actual_hours' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:999.99'],
-            'progress_percent' => ['sometimes', 'integer', 'min:0', 'max:100'],
+            // progress_percent intentionally omitted — auto-computed only
+            // (see StoreTaskRequest for the rationale).
             'start_date' => ['sometimes', 'nullable', 'date'],
             'due_date' => ['sometimes', 'nullable', 'date'],
 

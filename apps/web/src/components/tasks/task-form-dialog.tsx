@@ -53,7 +53,6 @@ const taskFormSchema = z
     estimated_hours: z.number().min(0, 'القيمة يجب أن تكون صفر أو أكثر').nullable(),
     start_date: z.string().optional().or(z.literal('')),
     due_date: z.string().optional().or(z.literal('')),
-    progress_percent: z.number().min(0).max(100),
   })
   .refine((data) => !data.start_date || !data.due_date || data.due_date >= data.start_date, {
     message: 'تاريخ الاستحقاق يجب أن يكون بعد تاريخ البدء أو يساويه',
@@ -70,7 +69,6 @@ const EMPTY_VALUES: TaskFormValues = {
   estimated_hours: null,
   start_date: '',
   due_date: '',
-  progress_percent: 0,
 };
 
 function buildDefaultValues(task?: Task | TaskDetail | null): TaskFormValues {
@@ -83,7 +81,6 @@ function buildDefaultValues(task?: Task | TaskDetail | null): TaskFormValues {
     estimated_hours: task.estimated_hours,
     start_date: task.start_date ?? '',
     due_date: task.due_date ?? '',
-    progress_percent: task.progress_percent,
   };
 }
 
@@ -170,7 +167,6 @@ export function TaskFormDialog({ open, onOpenChange, task, defaultParentTask }: 
         priority_id: values.priority_id,
         assigned_to: assignee?.id ?? null,
         estimated_hours: values.estimated_hours,
-        progress_percent: values.progress_percent,
         start_date: values.start_date || null,
         due_date: values.due_date || null,
         tag_ids: tags.map((t) => t.id),
@@ -364,32 +360,10 @@ export function TaskFormDialog({ open, onOpenChange, task, defaultParentTask }: 
               <TaskTagPicker value={tags} onChange={setTags} />
             </div>
 
-            {isEdit && (
-              <FormField
-                control={form.control}
-                name="progress_percent"
-                render={({ field }) => (
-                  <FormItem>
-                    <div className="flex items-center justify-between">
-                      <FormLabel>نسبة الإنجاز</FormLabel>
-                      <span className="num text-sm font-medium text-ink-2">{field.value}%</span>
-                    </div>
-                    <FormControl>
-                      <input
-                        type="range"
-                        min={0}
-                        max={100}
-                        step={5}
-                        value={field.value}
-                        onChange={(e) => field.onChange(Number(e.target.value))}
-                        className="w-full accent-brand"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
+            {/* Progress is now computed server-side from the task's
+                subtask completion (TaskProgressCalculator). The manual
+                slider was removed on 2026-10-14 so one source of truth
+                drives the number everywhere it is shown. */}
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
