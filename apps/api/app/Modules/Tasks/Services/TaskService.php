@@ -41,6 +41,7 @@ class TaskService
         private readonly TaskHistoryService $history,
         private readonly NotificationService $notifier,
         private readonly TaskEntityLabeler $entityLabels,
+        private readonly TaskProgressCalculator $progress,
     ) {}
 
     /**
@@ -214,6 +215,11 @@ class TaskService
                 $this->history->log($task, $actor, TaskAction::Assigned, null, ['assignee_id' => $data['assigned_to']]);
             }
 
+            if (! array_key_exists('progress_percent', $data)) {
+                $task = $this->syncProgress($task);
+            }
+            $this->syncProgressOfId($task->parent_task_id);
+
             return $task;
         });
 
@@ -260,8 +266,9 @@ class TaskService
         unset($data['tags']);
 
         $changes = $this->detectTrackedChanges($task, $data);
+        $oldParentId = $task->parent_task_id;
 
-        $updated = DB::transaction(function () use ($task, $data, $changes, $tags, $actor) {
+        $updated = DB::transaction(function () use ($task, $data, $changes, $tags, $actor, $oldParentId) {
             $updated = $this->tasks->update($task, $data);
 
             if ($tags !== null) {
@@ -287,7 +294,7 @@ class TaskService
                 }
             }
 
-            return $updated;
+            return $this->resyncProgressAfterUpdate($updated, $data, $changes, $oldParentId);
         });
 
         TaskUpdated::dispatch($updated, $changes);
@@ -336,6 +343,8 @@ class TaskService
                 ['status_id' => $doneStatus->id, 'completed_at' => $completedAt->toIso8601String()],
             );
 
+            $this->syncProgressOfId($updated->parent_task_id);
+
             return $updated;
         });
 
@@ -351,6 +360,7 @@ class TaskService
         DB::transaction(function () use ($task, $actor) {
             $this->tasks->delete($task);
             $this->history->log($task, $actor, TaskAction::Deleted);
+            $this->syncProgressOfId($task->parent_task_id);
         });
     }
 
@@ -361,9 +371,65 @@ class TaskService
         return DB::transaction(function () use ($trashed, $actor) {
             $restored = $this->tasks->restore($trashed);
             $this->history->log($restored, $actor, TaskAction::Restored);
+            $this->syncProgressOfId($restored->parent_task_id);
 
             return $restored;
         });
+    }
+
+    /**
+     * Recompute the edited task (unless the caller typed a manual value)
+     * and the parent(s) whose subtask set or subtask statuses moved.
+     *
+     * @param  array<string, mixed>  $data
+     * @param  array<string, array{0: mixed, 1: mixed}>  $changes
+     */
+    private function resyncProgressAfterUpdate(Task $updated, array $data, array $changes, ?int $oldParentId): Task
+    {
+        $parentMoved = array_key_exists('parent_task_id', $data) && $oldParentId !== $updated->parent_task_id;
+
+        if (! array_key_exists('status_id', $changes) && ! $parentMoved) {
+            return $updated;
+        }
+
+        if (! array_key_exists('progress_percent', $data)) {
+            $updated = $this->syncProgress($updated);
+        }
+
+        $this->syncProgressOfId($updated->parent_task_id);
+
+        if ($parentMoved) {
+            $this->syncProgressOfId($oldParentId);
+        }
+
+        return $updated;
+    }
+
+    /**
+     * Persist the calculated progress when it differs from the stored one.
+     */
+    private function syncProgress(Task $task): Task
+    {
+        // Drop any stale relation snapshot so subtasks are read fresh.
+        $task->unsetRelation('subtasks');
+        $computed = $this->progress->compute($task);
+
+        return $computed === (int) $task->progress_percent
+            ? $task
+            : $this->tasks->update($task, ['progress_percent' => $computed]);
+    }
+
+    private function syncProgressOfId(?int $taskId): void
+    {
+        if ($taskId === null) {
+            return;
+        }
+
+        $parent = $this->tasks->find($taskId);
+
+        if ($parent !== null) {
+            $this->syncProgress($parent);
+        }
     }
 
     /**

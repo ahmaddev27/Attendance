@@ -189,6 +189,11 @@ class TaskRepository
         return Task::query()->lockForUpdate()->findOrFail($id);
     }
 
+    public function find(int $id): ?Task
+    {
+        return Task::query()->find($id);
+    }
+
     public function findTrashedOrFail(int $id): Task
     {
         return Task::onlyTrashed()->findOrFail($id);
