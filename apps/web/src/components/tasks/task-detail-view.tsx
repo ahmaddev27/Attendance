@@ -104,7 +104,6 @@ export function TaskDetailView({ taskId, basePath }: TaskDetailViewProps) {
   const [titleDraft, setTitleDraft] = React.useState('');
   const [editingDescription, setEditingDescription] = React.useState(false);
   const [descriptionDraft, setDescriptionDraft] = React.useState('');
-  const [progressDraft, setProgressDraft] = React.useState(0);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false);
   const [subtaskFormOpen, setSubtaskFormOpen] = React.useState(false);
   const [editFormOpen, setEditFormOpen] = React.useState(false);
@@ -115,7 +114,6 @@ export function TaskDetailView({ taskId, basePath }: TaskDetailViewProps) {
     setTitleDraft(task.title);
     setEditingDescription(false);
     setDescriptionDraft(task.description ?? '');
-    setProgressDraft(task.progress_percent);
   }, [task]);
 
   // Every mutation pins the task id into its `variables` instead of closing
@@ -185,11 +183,6 @@ export function TaskDetailView({ taskId, basePath }: TaskDetailViewProps) {
       updateMutation.mutate({ taskId: task.id, payload: { description: descriptionDraft || undefined } });
     }
     setEditingDescription(false);
-  };
-
-  const commitProgress = () => {
-    if (!task || progressDraft === task.progress_percent) return;
-    updateMutation.mutate({ taskId: task.id, payload: { progress_percent: progressDraft } });
   };
 
   const handleAssigneeChange = (employee: EmployeeSummary | null) => {
@@ -548,21 +541,12 @@ export function TaskDetailView({ taskId, basePath }: TaskDetailViewProps) {
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <Label className="text-xs font-semibold text-ink-2">نسبة الإنجاز</Label>
-              <span className="num text-xs font-medium text-ink-2">{progressDraft}%</span>
+              <span className="num text-xs font-medium text-ink-2">{task.progress_percent}%</span>
             </div>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              step={5}
-              value={progressDraft}
-              onChange={(e) => setProgressDraft(Number(e.target.value))}
-              onMouseUp={commitProgress}
-              onTouchEnd={commitProgress}
-              onKeyUp={commitProgress}
-              className="w-full accent-brand"
-            />
-            <TaskProgressBar value={progressDraft} />
+            {/* Read-only — the number is auto-computed server-side from
+                the task's status + subtask completion
+                (TaskProgressCalculator). Owner, 2026-10-14. */}
+            <TaskProgressBar value={task.progress_percent} />
           </div>
 
           <div className="space-y-1.5">
