@@ -599,27 +599,34 @@ function OriginBadge({ origin }: { origin: AttendanceOrigin }) {
 /* Edit dialog                                                                */
 /* -------------------------------------------------------------------------- */
 
-/** Converts a UTC ISO datetime into the `datetime-local` input's expected
- *  shape in the viewer's local timezone. The native input strips the TZ
- *  suffix so we must do the clock-offset ourselves. */
+const GAZA_PARTS_FORMAT = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Asia/Gaza',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
+
+/** Renders a stored instant as Asia/Gaza wall-clock in the
+ *  `datetime-local` shape, regardless of the browser's own timezone. */
 function toLocalInputValue(iso: string | null | undefined): string {
   if (!iso) return '';
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return (
-    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
-    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
-  );
+  const p: Record<string, string> = {};
+  for (const part of GAZA_PARTS_FORMAT.formatToParts(date)) p[part.type] = part.value;
+  const hour = p.hour === '24' ? '00' : p.hour;
+  return `${p.year}-${p.month}-${p.day}T${hour}:${p.minute}`;
 }
 
-/** Converts the `datetime-local` string back into an ISO UTC string so the
- *  backend never has to guess what offset the admin typed in. */
+/** Sends the typed value as a naive `YYYY-MM-DD HH:mm` string. The API
+ *  interprets zone-less timestamps as Asia/Gaza, so no browser-local math
+ *  (or DST guessing) happens here. */
 function fromLocalInputValue(local: string): string | null {
   if (!local) return null;
-  const parsed = new Date(local);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed.toISOString();
+  return local.replace('T', ' ');
 }
 
 const EDIT_STATUS_OPTIONS: { value: AttendanceStatus; label: string }[] = [
